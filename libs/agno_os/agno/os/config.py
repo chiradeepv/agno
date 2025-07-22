@@ -78,10 +78,10 @@ class OSConfig:
         from os import environ
 
         from agno.constants import (
-            AWS_REGION_ENV_VAR,
             AGNO_OS_INFRA_DIR,
             AGNO_OS_NAME,
             AGNO_OS_ROOT,
+            AWS_REGION_ENV_VAR,
         )
 
         if self.os_root_path is not None:

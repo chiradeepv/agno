@@ -179,10 +179,10 @@ class AwsApp(InfraApp):
 
     def get_container_env(self, container_context: ContainerContext, build_context: AwsBuildContext) -> Dict[str, str]:
         from agno.constants import (
+            AGNO_OS_ROOT,
             AGNO_RUNTIME_ENV_VAR,
             PYTHONPATH_ENV_VAR,
             REQUIREMENTS_FILE_PATH_ENV_VAR,
-            AGNO_OS_ROOT,
         )
 
         # Container Environment
@@ -516,9 +516,7 @@ class AwsApp(InfraApp):
         if container_cmd:
             logger.debug("Command: {}".format(" ".join(container_cmd)))
 
-        aws_region = build_context.aws_region or (
-            self.os_settings.aws_region if self.os_settings else None
-        )
+        aws_region = build_context.aws_region or (self.os_settings.aws_region if self.os_settings else None)
         return EcsContainer(
             name=self.get_app_name(),
             image=self.get_image_str(),

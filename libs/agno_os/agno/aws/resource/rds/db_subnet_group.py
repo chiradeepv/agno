@@ -1,5 +1,5 @@
-from typing import Any, Dict, List, Optional, Union
 from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Union
 
 from agno.aws.api_client import AwsApiClient
 from agno.aws.resource.base import AwsResource

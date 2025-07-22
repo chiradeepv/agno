@@ -1,7 +1,7 @@
 import json
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-from dataclasses import dataclass
 
 from agno.aws.api_client import AwsApiClient
 from agno.aws.resource.base import AwsResource

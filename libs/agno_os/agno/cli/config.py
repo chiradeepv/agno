@@ -3,8 +3,8 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from agno.cli.console import print_heading, print_info
-from agno.os.config import OSConfig
 from agno.cli.settings import agno_cli_settings
+from agno.os.config import OSConfig
 from agno.utils.json_io import read_json_file, write_json_file
 from agno.utils.logging import logger
 
@@ -86,9 +86,7 @@ class AgnoCliConfig:
         # Return the updated_os_config
         return existing_os_config
 
-    def add_new_os_to_config(
-        self, os_root_path: Path
-    ) -> Optional[OSConfig]:
+    def add_new_os_to_config(self, os_root_path: Path) -> Optional[OSConfig]:
         """Adds a newly created workspace to the AgnoCliConfig"""
 
         ws_config = self._add_or_update_os_config(os_root_path=os_root_path)
@@ -190,9 +188,7 @@ class AgnoCliConfig:
             print_heading(f"Active os directory: {self.active_os_dir}\n")
         else:
             print_info("No active os found.")
-            print_info(
-                "Please create a os using `ag os create` or setup an existing os using `ag os setup`"
-            )
+            print_info("Please create a os using `ag os create` or setup an existing os using `ag os setup`")
 
         if show_all and len(self.os_config_map) > 0:
             print_heading("Available os:\n")

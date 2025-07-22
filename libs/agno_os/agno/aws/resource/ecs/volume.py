@@ -1,5 +1,5 @@
-from typing import Any, Dict, Optional
 from dataclasses import dataclass
+from typing import Any, Dict, Optional
 
 from agno.aws.resource.base import AwsResource
 from agno.utils.logging import logger

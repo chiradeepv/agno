@@ -1,6 +1,6 @@
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-from dataclasses import dataclass
 
 from pydantic import BaseModel
 from typing_extensions import Literal

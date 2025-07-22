@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Optional
 
 from agno.os.settings import OSSettings
 
+
 @dataclass
 class InfraBase:
     """Base class for all InfraResource, InfraApp and InfraResources objects."""
@@ -73,7 +74,6 @@ class InfraBase:
     cached_os_dir: Optional[Path] = None
     cached_env_file_data: Optional[Dict[str, Any]] = None
     cached_secret_file_data: Optional[Dict[str, Any]] = None
-
 
     def get_group_name(self) -> Optional[str]:
         return self.group or self.name

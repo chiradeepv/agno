@@ -11,10 +11,10 @@ from agno.cli.console import (
     print_info,
     print_subheading,
 )
-from agno.infra.resources import InfraResources
-from agno.utils.logging import logger
-from agno.os.config import OSConfig
 from agno.constants import OSStarterTemplate
+from agno.infra.resources import InfraResources
+from agno.os.config import OSConfig
+from agno.utils.logging import logger
 
 TEMPLATE_TO_NAME_MAP: Dict[OSStarterTemplate, str] = {
     OSStarterTemplate.agent_api: "agent-api",
@@ -37,9 +37,9 @@ def create_os_from_template(
     import git
 
     from agno.cli.operator import initialize_agno_cli
+    from agno.os.helpers import get_os_infra_dir_path
     from agno.utils.filesystem import rmdir_recursive
     from agno.utils.git import GitCloneProgress
-    from agno.os.helpers import get_os_infra_dir_path
 
     current_dir: Path = Path("").resolve()
 
@@ -161,8 +161,8 @@ def setup_os(os_root_path: Path) -> Optional[OSConfig]:
     1.5 Create or update OSConfig
     """
     from agno.cli.operator import initialize_agno_cli
-    from agno.utils.git import get_remote_origin_for_dir
     from agno.os.helpers import get_os_infra_dir_path
+    from agno.utils.git import get_remote_origin_for_dir
 
     print_heading("Setting up os\n")
 
@@ -376,7 +376,6 @@ def stop_os(
         logger.error("Some resources failed to delete, please check logs")
 
 
-
 def update_os(
     os_config: OSConfig,
     target_env: Optional[str] = None,
@@ -448,7 +447,6 @@ def update_os(
 
     if num_resources_updated != num_resources_to_update:
         logger.error("Some resources failed to update, please check logs")
-
 
 
 def delete_os(agno_config: AgnoCliConfig, os_to_delete: Optional[List[Path]]) -> None:

@@ -5,8 +5,8 @@ from agno.docker.app.base import DockerApp
 from agno.docker.context import DockerBuildContext
 from agno.docker.resource.base import DockerResource
 from agno.infra.resources import InfraResources
-from agno.utils.logging import logger
 from agno.os.settings import OSSettings
+from agno.utils.logging import logger
 
 
 class DockerResources(InfraResources):

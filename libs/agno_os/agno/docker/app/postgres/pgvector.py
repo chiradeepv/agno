@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 from agno.docker.app.postgres.postgres import PostgresDb
 
+
 @dataclass
 class PgVectorDb(PostgresDb):
     # -*- App Name

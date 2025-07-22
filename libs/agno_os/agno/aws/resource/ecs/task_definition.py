@@ -1,6 +1,6 @@
+from dataclasses import dataclass
 from textwrap import dedent
 from typing import Any, Dict, List, Optional
-from dataclasses import dataclass
 
 from typing_extensions import Literal
 

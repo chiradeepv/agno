@@ -12,4 +12,5 @@ class AgnoCliSettings(BaseSettings):
 
     model_config = SettingsConfigDict(env_prefix="AGNO_")
 
+
 agno_cli_settings = AgnoCliSettings()

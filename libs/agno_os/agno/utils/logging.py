@@ -78,13 +78,13 @@ logger: AgnoLogger = build_logger(LOGGER_NAME)
 
 debug_on: bool = False
 
+
 def set_log_level_to_debug():
     _logger = logging.getLogger(LOGGER_NAME)
     _logger.setLevel(logging.DEBUG)
 
     global debug_on
     debug_on = True
-
 
 
 def set_log_level_to_info():

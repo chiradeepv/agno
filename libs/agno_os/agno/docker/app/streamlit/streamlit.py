@@ -3,6 +3,7 @@ from typing import Dict, List, Optional, Union
 
 from agno.docker.app.base import ContainerContext, DockerApp  # noqa: F401
 
+
 @dataclass
 class Streamlit(DockerApp):
     # -*- App Name

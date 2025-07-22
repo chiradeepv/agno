@@ -2,6 +2,7 @@
 
 This is the entrypoint for the `agno os` application.
 """
+
 import json
 from dataclasses import asdict
 from pathlib import Path
@@ -185,10 +186,10 @@ def up(
 
     from agno.cli.config import AgnoCliConfig
     from agno.cli.operator import initialize_agno_cli
-    from agno.utils.resource_filter import parse_resource_filter
     from agno.os.config import OSConfig
     from agno.os.helpers import get_os_infra_dir_path
     from agno.os.operator import setup_os, start_os
+    from agno.utils.resource_filter import parse_resource_filter
 
     agno_config: Optional[AgnoCliConfig] = AgnoCliConfig.from_saved_config()
     if not agno_config:
@@ -352,10 +353,10 @@ def down(
 
     from agno.cli.config import AgnoCliConfig
     from agno.cli.operator import initialize_agno_cli
-    from agno.utils.resource_filter import parse_resource_filter
     from agno.os.config import OSConfig
     from agno.os.helpers import get_os_infra_dir_path
     from agno.os.operator import setup_os, stop_os
+    from agno.utils.resource_filter import parse_resource_filter
 
     agno_config: Optional[AgnoCliConfig] = AgnoCliConfig.from_saved_config()
     if not agno_config:
@@ -521,10 +522,10 @@ def patch(
 
     from agno.cli.config import AgnoCliConfig
     from agno.cli.operator import initialize_agno_cli
-    from agno.utils.resource_filter import parse_resource_filter
     from agno.os.config import OSConfig
     from agno.os.helpers import get_os_infra_dir_path
     from agno.os.operator import setup_os, update_os
+    from agno.utils.resource_filter import parse_resource_filter
 
     agno_config: Optional[AgnoCliConfig] = AgnoCliConfig.from_saved_config()
     if not agno_config:
@@ -734,8 +735,8 @@ def config(
 
     from agno.cli.config import AgnoCliConfig
     from agno.cli.operator import initialize_agno_cli
-    from agno_os.agno.utils.load_env import load_env
     from agno.os.config import OSConfig
+    from agno.utils.load_env import load_env
 
     agno_config: Optional[AgnoCliConfig] = AgnoCliConfig.from_saved_config()
     if not agno_config:

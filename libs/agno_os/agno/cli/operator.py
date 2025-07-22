@@ -1,7 +1,6 @@
 from pathlib import Path
 from typing import List, Optional
 
-
 from agno.cli.config import AgnoCliConfig
 from agno.cli.console import print_heading, print_info
 from agno.cli.settings import AGNO_CLI_CONFIG_DIR
@@ -10,7 +9,7 @@ from agno.utils.logging import logger
 
 
 def delete_agno_config() -> None:
-    from agno_os.agno.utils.filesystem import delete_from_fs
+    from agno.utils.filesystem import delete_from_fs
 
     logger.debug("Removing existing Agno configuration")
     delete_from_fs(AGNO_CLI_CONFIG_DIR)
@@ -23,7 +22,7 @@ def initialize_agno_cli(reset: bool = False) -> Optional[AgnoCliConfig]:
     1. Check if AGNO_CLI_CONFIG_DIR exists, if not, create it. If reset == True, recreate AGNO_CLI_CONFIG_DIR.
     2. If AgnoCliConfig exists and auth is valid, returns AgnoCliConfig.
     """
-    from agno_os.agno.utils.filesystem import delete_from_fs
+    from agno.utils.filesystem import delete_from_fs
 
     print_heading("Welcome to Agno!")
     if reset:

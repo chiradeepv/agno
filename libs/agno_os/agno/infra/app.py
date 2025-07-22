@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Union
 
 from agno.infra.base import InfraBase
@@ -109,18 +109,18 @@ class InfraApp(InfraBase):
         updated_resources = []
         # Convert to dict for property access (similar to model_dump)
         app_properties = {
-            'skip_create': self.skip_create,
-            'skip_read': self.skip_read,
-            'skip_update': self.skip_update,
-            'skip_delete': self.skip_delete,
-            'recreate_on_update': self.recreate_on_update,
-            'use_cache': self.use_cache,
-            'force': self.force,
-            'debug_mode': self.debug_mode,
-            'wait_for_create': self.wait_for_create,
-            'wait_for_update': self.wait_for_update,
-            'wait_for_delete': self.wait_for_delete,
-            'save_output': self.save_output,
+            "skip_create": self.skip_create,
+            "skip_read": self.skip_read,
+            "skip_update": self.skip_update,
+            "skip_delete": self.skip_delete,
+            "recreate_on_update": self.recreate_on_update,
+            "use_cache": self.use_cache,
+            "force": self.force,
+            "debug_mode": self.debug_mode,
+            "wait_for_create": self.wait_for_create,
+            "wait_for_update": self.wait_for_update,
+            "wait_for_delete": self.wait_for_delete,
+            "save_output": self.save_output,
         }
         app_group = self.get_group_name()
         app_output_dir = self.get_app_name()
@@ -141,18 +141,18 @@ class InfraApp(InfraBase):
         for resource in resources:
             # Convert resource to dict for property access (similar to model_dump)
             resource_properties = {
-                'skip_create': getattr(resource, 'skip_create', None),
-                'skip_read': getattr(resource, 'skip_read', None),
-                'skip_update': getattr(resource, 'skip_update', None),
-                'skip_delete': getattr(resource, 'skip_delete', None),
-                'recreate_on_update': getattr(resource, 'recreate_on_update', None),
-                'use_cache': getattr(resource, 'use_cache', None),
-                'force': getattr(resource, 'force', None),
-                'debug_mode': getattr(resource, 'debug_mode', None),
-                'wait_for_create': getattr(resource, 'wait_for_create', None),
-                'wait_for_update': getattr(resource, 'wait_for_update', None),
-                'wait_for_delete': getattr(resource, 'wait_for_delete', None),
-                'save_output': getattr(resource, 'save_output', None),
+                "skip_create": getattr(resource, "skip_create", None),
+                "skip_read": getattr(resource, "skip_read", None),
+                "skip_update": getattr(resource, "skip_update", None),
+                "skip_delete": getattr(resource, "skip_delete", None),
+                "recreate_on_update": getattr(resource, "recreate_on_update", None),
+                "use_cache": getattr(resource, "use_cache", None),
+                "force": getattr(resource, "force", None),
+                "debug_mode": getattr(resource, "debug_mode", None),
+                "wait_for_create": getattr(resource, "wait_for_create", None),
+                "wait_for_update": getattr(resource, "wait_for_update", None),
+                "wait_for_delete": getattr(resource, "wait_for_delete", None),
+                "save_output": getattr(resource, "save_output", None),
             }
             resource_skip_create = resource_properties.get("skip_create")
             resource_skip_read = resource_properties.get("skip_read")
