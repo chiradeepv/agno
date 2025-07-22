@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from agno.cli.os import OSSettings
+from agno.os.settings import OSSettings
 
 @dataclass
 class InfraBase:
@@ -92,9 +92,9 @@ class InfraBase:
             return self.cached_os_dir
 
         if self.os_root is not None:
-            from agno.cli.os.operator import get_os_dir_path
+            from agno.os.helpers import get_os_infra_dir_path
 
-            os_dir = get_os_dir_path(self.os_root)
+            os_dir = get_os_infra_dir_path(self.os_root)
             if os_dir is not None:
                 self.cached_os_dir = os_dir
                 return os_dir

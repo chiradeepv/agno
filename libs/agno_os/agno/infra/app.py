@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional, Union
 from agno.infra.base import InfraBase
 from agno.infra.context import ContainerContext
 from agno.infra.resource import InfraResource
-from agno.utils.log import logger
+from agno.utils.logging import logger
 
 
 @dataclass

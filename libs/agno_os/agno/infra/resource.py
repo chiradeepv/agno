@@ -1,10 +1,12 @@
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from dataclasses import dataclass
 
 from agno.infra.base import InfraBase
-from agno.utils.log import logger
+from agno.utils.logging import logger
 
 
+@dataclass
 class InfraResource(InfraBase):
     """Base class for Infrastructure Resources."""
 

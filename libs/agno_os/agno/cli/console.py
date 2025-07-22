@@ -1,7 +1,7 @@
 from rich.console import Console
 from rich.style import Style
 
-from agno.utils.log import logger
+from agno.utils.logging import logger
 
 console = Console()
 

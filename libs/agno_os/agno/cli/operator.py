@@ -6,11 +6,11 @@ from agno.cli.config import AgnoCliConfig
 from agno.cli.console import print_heading, print_info
 from agno.cli.settings import AGNO_CLI_CONFIG_DIR
 from agno.infra.resources import InfraResources
-from agno.utils.log import logger
+from agno.utils.logging import logger
 
 
 def delete_agno_config() -> None:
-    from agno.utils.filesystem import delete_from_fs
+    from agno_os.agno.utils.filesystem import delete_from_fs
 
     logger.debug("Removing existing Agno configuration")
     delete_from_fs(AGNO_CLI_CONFIG_DIR)
@@ -23,7 +23,7 @@ def initialize_agno_cli(reset: bool = False) -> Optional[AgnoCliConfig]:
     1. Check if AGNO_CLI_CONFIG_DIR exists, if not, create it. If reset == True, recreate AGNO_CLI_CONFIG_DIR.
     2. If AgnoCliConfig exists and auth is valid, returns AgnoCliConfig.
     """
-    from agno.utils.filesystem import delete_from_fs
+    from agno_os.agno.utils.filesystem import delete_from_fs
 
     print_heading("Welcome to Agno!")
     if reset:
@@ -57,27 +57,11 @@ def initialize_agno_cli(reset: bool = False) -> Optional[AgnoCliConfig]:
         agno_config = AgnoCliConfig()
         agno_config.save_config()
 
-    return agno_config
-
-
-
-
-def initialize_agno(reset: bool = False) -> Optional[AgnoCliConfig]:
-    """Initialize Agno on the users machine.
-
-    Steps:
-    1. Check if AGNO_CLI_CONFIG_DIR exists, if not, create it. If reset == True, recreate AGNO_CLI_CONFIG_DIR.
-    2. Authenticates the user if login == True.
-    3. If AgnoCliConfig exists and auth is valid, returns AgnoCliConfig.
-    """
-    agno_config = initialize_agno_cli(reset)
-
-    logger.debug("Agno initialized")
+    logger.debug("Agno CLI initialized")
     return agno_config
 
 
 def start_resources(
-    agno_config: AgnoCliConfig,
     resources_file_path: Path,
     target_env: Optional[str] = None,
     target_infra: Optional[str] = None,
@@ -100,7 +84,7 @@ def start_resources(
     logger.debug(f"\tforce        : {force}")
     logger.debug(f"\tpull         : {pull}")
 
-    from agno.cli.os import OSConfig
+    from agno.os.config import OSConfig
 
     if not resources_file_path.exists():
         logger.error(f"File does not exist: {resources_file_path}")
@@ -154,7 +138,6 @@ def start_resources(
 
 
 def stop_resources(
-    agno_config: AgnoCliConfig,
     resources_file_path: Path,
     target_env: Optional[str] = None,
     target_infra: Optional[str] = None,
@@ -175,7 +158,7 @@ def stop_resources(
     logger.debug(f"\tauto_confirm : {auto_confirm}")
     logger.debug(f"\tforce        : {force}")
 
-    from agno.cli.os import OSConfig
+    from agno.os.config import OSConfig
 
     if not resources_file_path.exists():
         logger.error(f"File does not exist: {resources_file_path}")
@@ -228,7 +211,6 @@ def stop_resources(
 
 
 def patch_resources(
-    agno_config: AgnoCliConfig,
     resources_file_path: Path,
     target_env: Optional[str] = None,
     target_infra: Optional[str] = None,
@@ -249,7 +231,7 @@ def patch_resources(
     logger.debug(f"\tauto_confirm : {auto_confirm}")
     logger.debug(f"\tforce        : {force}")
 
-    from agno.cli.os import OSConfig
+    from agno.os.config import OSConfig
 
     if not resources_file_path.exists():
         logger.error(f"File does not exist: {resources_file_path}")

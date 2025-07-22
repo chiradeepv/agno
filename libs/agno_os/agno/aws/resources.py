@@ -1,15 +1,17 @@
 from typing import List, Optional, Tuple
+from dataclasses import dataclass, field
 
 from agno.aws.api_client import AwsApiClient
 from agno.aws.app.base import AwsApp
 from agno.aws.context import AwsBuildContext
 from agno.aws.resource.base import AwsResource
 from agno.infra.resources import InfraResources
-from agno.utils.log import logger
+from agno.utils.logging import logger
 
 
+@dataclass
 class AwsResources(InfraResources):
-    infra: str = "aws"
+    infra: str = field(default="aws", init=False)
 
     apps: Optional[List[AwsApp]] = None
     resources: Optional[List[AwsResource]] = None
@@ -18,16 +20,16 @@ class AwsResources(InfraResources):
     aws_profile: Optional[str] = None
 
     # -*- Cached Data
-    _api_client: Optional[AwsApiClient] = None
+    _api_client: Optional[AwsApiClient] = field(default=None, init=False, repr=False)
 
     def get_aws_region(self) -> Optional[str]:
         # Priority 1: Use aws_region from ResourceGroup (or cached value)
         if self.aws_region:
             return self.aws_region
 
-        # Priority 2: Get aws_region from workspace settings
-        if self.workspace_settings is not None and self.workspace_settings.aws_region is not None:
-            self.aws_region = self.workspace_settings.aws_region
+        # Priority 2: Get aws_region from os settings
+        if self.os_settings is not None and self.os_settings.aws_region is not None:
+            self.aws_region = self.os_settings.aws_region
             return self.aws_region
 
         # Priority 3: Get aws_region from env
@@ -46,9 +48,9 @@ class AwsResources(InfraResources):
         if self.aws_profile:
             return self.aws_profile
 
-        # Priority 2: Get aws_profile from workspace settings
-        if self.workspace_settings is not None and self.workspace_settings.aws_profile is not None:
-            self.aws_profile = self.workspace_settings.aws_profile
+        # Priority 2: Get aws_profile from os settings
+        if self.os_settings is not None and self.os_settings.aws_profile is not None:
+            self.aws_profile = self.os_settings.aws_profile
             return self.aws_profile
 
         # Priority 3: Get aws_profile from env
@@ -88,7 +90,7 @@ class AwsResources(InfraResources):
         # Add resources to resources_to_create
         if self.resources is not None:
             for r in self.resources:
-                r.set_workspace_settings(workspace_settings=self.workspace_settings)
+                r.set_os_settings(os_settings=self.os_settings)
                 if r.group is None and self.name is not None:
                     r.group = self.name
                 if r.should_create(
@@ -96,7 +98,7 @@ class AwsResources(InfraResources):
                     name_filter=name_filter,
                     type_filter=type_filter,
                 ):
-                    r.set_workspace_settings(workspace_settings=self.workspace_settings)
+                    r.set_os_settings(os_settings=self.os_settings)
                     resources_to_create.append(r)
 
         # Build a list of AwsApps to create
@@ -112,7 +114,7 @@ class AwsResources(InfraResources):
         if len(apps_to_create) > 0:
             logger.debug(f"Found {len(apps_to_create)} apps to create")
             for app in apps_to_create:
-                app.set_workspace_settings(workspace_settings=self.workspace_settings)
+                app.set_os_settings(os_settings=self.os_settings)
                 app_resources = app.get_resources(
                     build_context=AwsBuildContext(aws_region=self.get_aws_region(), aws_profile=self.get_aws_profile())
                 )
@@ -122,7 +124,7 @@ class AwsResources(InfraResources):
                     if app.depends_on is not None:
                         for dep in app.depends_on:
                             if isinstance(dep, AwsApp):
-                                dep.set_workspace_settings(workspace_settings=self.workspace_settings)
+                                dep.set_os_settings(os_settings=self.os_settings)
                                 dep_resources = dep.get_resources(
                                     build_context=AwsBuildContext(
                                         aws_region=self.get_aws_region(), aws_profile=self.get_aws_profile()
@@ -217,7 +219,7 @@ class AwsResources(InfraResources):
                 if _resource_created:
                     num_resources_created += 1
                 else:
-                    if self.workspace_settings is not None and not self.workspace_settings.continue_on_create_failure:
+                    if self.os_settings is not None and not self.os_settings.continue_on_create_failure:
                         return num_resources_created, num_resources_to_create
             except Exception as e:
                 logger.error(f"Failed to create {resource.get_resource_type()}: {resource.get_resource_name()}")
@@ -250,7 +252,7 @@ class AwsResources(InfraResources):
         # Add resources to resources_to_delete
         if self.resources is not None:
             for r in self.resources:
-                r.set_workspace_settings(workspace_settings=self.workspace_settings)
+                r.set_os_settings(os_settings=self.os_settings)
                 if r.group is None and self.name is not None:
                     r.group = self.name
                 if r.should_delete(
@@ -258,7 +260,7 @@ class AwsResources(InfraResources):
                     name_filter=name_filter,
                     type_filter=type_filter,
                 ):
-                    r.set_workspace_settings(workspace_settings=self.workspace_settings)
+                    r.set_os_settings(os_settings=self.os_settings)
                     resources_to_delete.append(r)
 
         # Build a list of AwsApps to delete
@@ -274,7 +276,7 @@ class AwsResources(InfraResources):
         if len(apps_to_delete) > 0:
             logger.debug(f"Found {len(apps_to_delete)} apps to delete")
             for app in apps_to_delete:
-                app.set_workspace_settings(workspace_settings=self.workspace_settings)
+                app.set_os_settings(os_settings=self.os_settings)
                 app_resources = app.get_resources(
                     build_context=AwsBuildContext(aws_region=self.get_aws_region(), aws_profile=self.get_aws_profile())
                 )
@@ -372,7 +374,7 @@ class AwsResources(InfraResources):
                 if _resource_deleted:
                     num_resources_deleted += 1
                 else:
-                    if self.workspace_settings is not None and not self.workspace_settings.continue_on_delete_failure:
+                    if self.os_settings is not None and not self.os_settings.continue_on_delete_failure:
                         return num_resources_deleted, num_resources_to_delete
             except Exception as e:
                 logger.error(f"Failed to delete {resource.get_resource_type()}: {resource.get_resource_name()}")
@@ -407,7 +409,7 @@ class AwsResources(InfraResources):
         # Add resources to resources_to_update
         if self.resources is not None:
             for r in self.resources:
-                r.set_workspace_settings(workspace_settings=self.workspace_settings)
+                r.set_os_settings(os_settings=self.os_settings)
                 if r.group is None and self.name is not None:
                     r.group = self.name
                 if r.should_update(
@@ -415,7 +417,7 @@ class AwsResources(InfraResources):
                     name_filter=name_filter,
                     type_filter=type_filter,
                 ):
-                    r.set_workspace_settings(workspace_settings=self.workspace_settings)
+                    r.set_os_settings(os_settings=self.os_settings)
                     resources_to_update.append(r)
 
         # Build a list of AwsApps to update
@@ -431,7 +433,7 @@ class AwsResources(InfraResources):
         if len(apps_to_update) > 0:
             logger.debug(f"Found {len(apps_to_update)} apps to update")
             for app in apps_to_update:
-                app.set_workspace_settings(workspace_settings=self.workspace_settings)
+                app.set_os_settings(os_settings=self.os_settings)
                 app_resources = app.get_resources(
                     build_context=AwsBuildContext(aws_region=self.get_aws_region(), aws_profile=self.get_aws_profile())
                 )
@@ -520,7 +522,7 @@ class AwsResources(InfraResources):
                 if _resource_updated:
                     num_resources_updated += 1
                 else:
-                    if self.workspace_settings is not None and not self.workspace_settings.continue_on_patch_failure:
+                    if self.os_settings is not None and not self.os_settings.continue_on_patch_failure:
                         return num_resources_updated, num_resources_to_update
             except Exception as e:
                 logger.error(f"Failed to update {resource.get_resource_type()}: {resource.get_resource_name()}")

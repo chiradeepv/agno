@@ -1,6 +1,6 @@
 from typing import Any, Optional
 
-from agno.utils.log import logger
+from agno.utils.logging import logger
 
 
 class AwsApiClient:

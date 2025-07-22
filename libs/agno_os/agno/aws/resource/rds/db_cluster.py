@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
+from dataclasses import dataclass
 
 from typing_extensions import Literal
 
@@ -11,9 +12,10 @@ from agno.aws.resource.rds.db_instance import DbInstance
 from agno.aws.resource.rds.db_subnet_group import DbSubnetGroup
 from agno.aws.resource.secret.manager import SecretsManager
 from agno.cli.console import print_info
-from agno.utils.log import logger
+from agno.utils.logging import logger
 
 
+@dataclass
 class DbCluster(AwsResource):
     """
     Reference:

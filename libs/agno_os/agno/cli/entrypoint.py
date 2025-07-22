@@ -7,7 +7,7 @@ from typing import Optional
 
 import typer
 
-from agno.utils.log import set_log_level_to_debug
+from agno.utils.logging import set_log_level_to_debug
 
 agno_cli = typer.Typer(
     help="""\b
@@ -49,9 +49,9 @@ def init(
     if print_debug_log:
         set_log_level_to_debug()
 
-    from agno.cli import initialize_agno
+    from agno.cli.operator import initialize_agno_cli
 
-    initialize_agno(reset=reset)
+    initialize_agno_cli(reset=reset)
 
 
 @agno_cli.command(short_help="Reset Agno installation")
@@ -70,9 +70,9 @@ def reset(
     if print_debug_log:
         set_log_level_to_debug()
 
-    from agno.cli import initialize_agno
+    from agno.cli.operator import initialize_agno_cli
 
-    initialize_agno(reset=True)
+    initialize_agno_cli(reset=True)
 
 
 @agno_cli.command(short_help="Print Agno config")
@@ -90,11 +90,11 @@ def config(
 
     from agno.cli.config import AgnoCliConfig
     from agno.cli.console import log_config_not_available_msg
-    from agno.cli import initialize_agno
+    from agno.cli.operator import initialize_agno_cli
 
     agno_config: Optional[AgnoCliConfig] = AgnoCliConfig.from_saved_config()
     if not agno_config:
-        agno_config = initialize_agno()
+        agno_config = initialize_agno_cli()
         if not agno_config:
             log_config_not_available_msg()
             return
@@ -122,7 +122,7 @@ def set(
     $ `ag os set`           -> Set the current directory as the active Agno OS
     $ `ag os set -os idata` -> Set the OS named "idata" as the active Agno OS
     """
-    from agno.cli.os.operator import set_os_as_active
+    from agno.os.operator import set_os_as_active
 
     if print_debug_log:
         set_log_level_to_debug()
@@ -195,11 +195,11 @@ def start(
 
     from agno.cli.config import AgnoCliConfig
     from agno.cli.console import log_config_not_available_msg
-    from agno.cli import initialize_agno, start_resources
+    from agno.cli.operator import initialize_agno_cli, start_resources
 
     agno_config: Optional[AgnoCliConfig] = AgnoCliConfig.from_saved_config()
     if not agno_config:
-        agno_config = initialize_agno()
+        agno_config = initialize_agno_cli()
         if not agno_config:
             log_config_not_available_msg()
             return
@@ -223,7 +223,6 @@ def start(
 
     resources_file_path: Path = Path("").resolve().joinpath(resources_file)
     start_resources(
-        agno_config=agno_config,
         resources_file_path=resources_file_path,
         target_env=target_env,
         target_infra=target_infra,
@@ -296,11 +295,11 @@ def stop(
 
     from agno.cli.config import AgnoCliConfig
     from agno.cli.console import log_config_not_available_msg
-    from agno.cli import initialize_agno, stop_resources
+    from agno.cli.operator import initialize_agno_cli, stop_resources
 
     agno_config: Optional[AgnoCliConfig] = AgnoCliConfig.from_saved_config()
     if not agno_config:
-        agno_config = initialize_agno()
+        agno_config = initialize_agno_cli()
         if not agno_config:
             log_config_not_available_msg()
             return
@@ -324,7 +323,6 @@ def stop(
 
     resources_file_path: Path = Path("").resolve().joinpath(resources_file)
     stop_resources(
-        agno_config=agno_config,
         resources_file_path=resources_file_path,
         target_env=target_env,
         target_infra=target_infra,
@@ -388,7 +386,6 @@ def patch(
     \b
     Examples:
     > `ag ws patch`                -> Update resources defined in a resources.py file
-    > `ag ws patch workspace.py`   -> Update resources defined in a workspace.py file
     """
     if print_debug_log:
         set_log_level_to_debug()
@@ -397,11 +394,11 @@ def patch(
 
     from agno.cli.config import AgnoCliConfig
     from agno.cli.console import log_config_not_available_msg
-    from agno.cli import initialize_agno, patch_resources
+    from agno.cli.operator import initialize_agno_cli, patch_resources
 
     agno_config: Optional[AgnoCliConfig] = AgnoCliConfig.from_saved_config()
     if not agno_config:
-        agno_config = initialize_agno()
+        agno_config = initialize_agno_cli()
         if not agno_config:
             log_config_not_available_msg()
             return
@@ -425,7 +422,6 @@ def patch(
 
     resources_file_path: Path = Path("").resolve().joinpath(resources_file)
     patch_resources(
-        agno_config=agno_config,
         resources_file_path=resources_file_path,
         target_env=target_env,
         target_infra=target_infra,
@@ -488,7 +484,6 @@ def restart(
     \b
     Examples:
     > `ag ws restart`                -> Start resources defined in a resources.py file
-    > `ag ws restart workspace.py`   -> Start resources defined in a workspace.py file
     """
     from time import sleep
 

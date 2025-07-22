@@ -1,11 +1,13 @@
+from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
 from agno.cli.console import console, print_info
 from agno.docker.api_client import DockerApiClient
 from agno.docker.resource.base import DockerResource
-from agno.utils.log import logger
+from agno.utils.logging import logger
 
 
+@dataclass
 class DockerImage(DockerResource):
     resource_type: str = "Image"
 

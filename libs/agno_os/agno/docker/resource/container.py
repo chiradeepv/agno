@@ -1,12 +1,13 @@
+from dataclasses import dataclass
 from time import sleep
 from typing import Any, Dict, List, Optional, Union
 
 from agno.cli.console import print_info
 from agno.docker.api_client import DockerApiClient
 from agno.docker.resource.base import DockerResource
-from agno.utils.log import logger
+from agno.utils.logging import logger
 
-
+@dataclass
 class DockerContainerMount(DockerResource):
     resource_type: str = "ContainerMount"
 
@@ -17,6 +18,7 @@ class DockerContainerMount(DockerResource):
     labels: Optional[Dict[str, Any]] = None
 
 
+@dataclass
 class DockerContainer(DockerResource):
     resource_type: str = "Container"
 
@@ -115,11 +117,6 @@ class DockerContainer(DockerResource):
         from rich.progress import Progress, SpinnerColumn, TextColumn
 
         print_info("Starting container: {}".format(self.name))
-        # logger.debug()(
-        #     "Args: {}".format(
-        #         self.json(indent=2, exclude_unset=True, exclude_none=True)
-        #     )
-        # )
         try:
             _api_client: DockerClient = docker_client.api_client
             with Progress(

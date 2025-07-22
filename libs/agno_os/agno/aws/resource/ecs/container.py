@@ -1,12 +1,14 @@
 from typing import Any, Dict, List, Optional, Union
+from dataclasses import dataclass
 
 from agno.aws.api_client import AwsApiClient
 from agno.aws.resource.base import AwsResource
 from agno.aws.resource.secret.manager import SecretsManager
 from agno.aws.resource.secret.reader import read_secrets
-from agno.utils.log import logger
+from agno.utils.logging import logger
 
 
+@dataclass
 class EcsContainer(AwsResource):
     """
     Reference:

@@ -4,26 +4,26 @@ from httpx import AsyncClient as HttpxAsyncClient
 from httpx import Client as HttpxClient
 from httpx import Response
 
-from agno.cli.settings import agno_cli_settings
+from agno.api.settings import agno_api_settings
 
 
 class Api:
     def __init__(self):
         self.headers: Dict[str, str] = {
-            "user-agent": f"{agno_cli_settings.app_name}/{agno_cli_settings.app_version}",
+            "user-agent": f"{agno_api_settings.app_name}/{agno_api_settings.app_version}",
             "Content-Type": "application/json",
         }
 
     def Client(self) -> HttpxClient:
         return HttpxClient(
-            base_url=agno_cli_settings.api_url,
+            base_url=agno_api_settings.api_url,
             headers=self.headers,
             timeout=60,
         )
 
     def AsyncClient(self) -> HttpxAsyncClient:
         return HttpxAsyncClient(
-            base_url=agno_cli_settings.api_url,
+            base_url=agno_api_settings.api_url,
             headers=self.headers,
             timeout=60,
         )

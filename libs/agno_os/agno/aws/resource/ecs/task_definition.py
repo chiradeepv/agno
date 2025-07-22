@@ -1,5 +1,6 @@
 from textwrap import dedent
 from typing import Any, Dict, List, Optional
+from dataclasses import dataclass
 
 from typing_extensions import Literal
 
@@ -10,9 +11,10 @@ from agno.aws.resource.ecs.volume import EcsVolume
 from agno.aws.resource.iam.policy import IamPolicy
 from agno.aws.resource.iam.role import IamRole
 from agno.cli.console import print_info
-from agno.utils.log import logger
+from agno.utils.logging import logger
 
 
+@dataclass
 class EcsTaskDefinition(AwsResource):
     """
     Reference:

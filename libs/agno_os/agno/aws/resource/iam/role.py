@@ -1,12 +1,14 @@
 from typing import Any, Dict, List, Optional
+from dataclasses import dataclass
 
 from agno.aws.api_client import AwsApiClient
 from agno.aws.resource.base import AwsResource
 from agno.aws.resource.iam.policy import IamPolicy
 from agno.cli.console import print_info
-from agno.utils.log import logger
+from agno.utils.logging import logger
 
 
+@dataclass
 class IamRole(AwsResource):
     """
     Reference:

@@ -1,4 +1,5 @@
 from typing import Any, Dict, List, Optional
+from dataclasses import dataclass
 
 from typing_extensions import Literal
 
@@ -6,9 +7,10 @@ from agno.aws.api_client import AwsApiClient
 from agno.aws.resource.base import AwsResource
 from agno.aws.resource.s3.object import S3Object
 from agno.cli.console import print_info
-from agno.utils.log import logger
+from agno.utils.logging import logger
 
 
+@dataclass
 class S3Bucket(AwsResource):
     """
     Reference:

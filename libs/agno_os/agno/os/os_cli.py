@@ -15,7 +15,7 @@ from agno.cli.console import (
     print_available_os,
     print_info,
 )
-from agno.utils.log import logger, set_log_level_to_debug
+from agno.utils.logging import logger, set_log_level_to_debug
 
 os_cli = typer.Typer(
     name="os",
@@ -72,7 +72,7 @@ def create(
     if print_debug_log:
         set_log_level_to_debug()
 
-    from agno.cli.os.operator import create_os_from_template
+    from agno.os.operator import create_os_from_template
 
     create_os_from_template(name=name, template=template, url=url)
 
@@ -101,7 +101,7 @@ def setup(
     if print_debug_log:
         set_log_level_to_debug()
 
-    from agno.cli.os.operator import setup_os
+    from agno.os.operator import setup_os
 
     # By default, we assume this command is run from the OS directory
     os_root_path: Path = Path("").resolve()
@@ -184,15 +184,15 @@ def up(
         set_log_level_to_debug()
 
     from agno.cli.config import AgnoCliConfig
-    from agno.cli import initialize_agno
+    from agno.cli.operator import initialize_agno_cli
     from agno.utils.resource_filter import parse_resource_filter
-    from agno.cli.os import OSConfig
-    from agno.cli.os import get_os_infra_dir_path
-    from agno.cli.os.operator import setup_os, start_os
+    from agno.os.config import OSConfig
+    from agno.os.helpers import get_os_infra_dir_path
+    from agno.os.operator import setup_os, start_os
 
     agno_config: Optional[AgnoCliConfig] = AgnoCliConfig.from_saved_config()
     if not agno_config:
-        agno_config = initialize_agno()
+        agno_config = initialize_agno_cli()
         if not agno_config:
             log_config_not_available_msg()
             return
@@ -201,7 +201,7 @@ def up(
     # OS to start
     os_to_start: Optional[OSConfig] = None
 
-    # If there is an existing workspace at current path, use that workspace
+    # If there is an existing OS at current path, use that OS
     current_path: Path = Path("").resolve()
     os_at_current_path: Optional[OSConfig] = agno_config.get_os_config_by_path(current_path)
     if os_at_current_path is not None:
@@ -351,15 +351,15 @@ def down(
         set_log_level_to_debug()
 
     from agno.cli.config import AgnoCliConfig
-    from agno.cli import initialize_agno
+    from agno.cli.operator import initialize_agno_cli
     from agno.utils.resource_filter import parse_resource_filter
-    from agno.cli.os import OSConfig
-    from agno.cli.os import get_os_infra_dir_path
-    from agno.cli.os.operator import setup_os, stop_os
+    from agno.os.config import OSConfig
+    from agno.os.helpers import get_os_infra_dir_path
+    from agno.os.operator import setup_os, stop_os
 
     agno_config: Optional[AgnoCliConfig] = AgnoCliConfig.from_saved_config()
     if not agno_config:
-        agno_config = initialize_agno()
+        agno_config = initialize_agno_cli()
         if not agno_config:
             log_config_not_available_msg()
             return
@@ -367,7 +367,7 @@ def down(
     # OS to stop
     os_to_stop: Optional[OSConfig] = None
 
-    # If there is an existing workspace at current path, use that workspace
+    # If there is an existing OS at current path, use that OS
     current_path: Path = Path("").resolve()
     os_at_current_path: Optional[OSConfig] = agno_config.get_os_config_by_path(current_path)
     if os_at_current_path is not None:
@@ -377,8 +377,8 @@ def down(
             agno_config.set_active_os_dir(os_at_current_path.os_root_path)
         os_to_stop = os_at_current_path
 
-    # If there's no existing workspace at current path, check if there's a `workspace` dir in the current path
-    # In that case setup the workspace
+    # If there's no existing OS at current path, check if there's a `infra` dir in the current path
+    # In that case setup the OS
     if os_to_stop is None:
         os_os_dir_path = get_os_infra_dir_path(current_path)
         if os_os_dir_path is not None:
@@ -520,15 +520,15 @@ def patch(
         set_log_level_to_debug()
 
     from agno.cli.config import AgnoCliConfig
-    from agno.cli import initialize_agno
+    from agno.cli.operator import initialize_agno_cli
     from agno.utils.resource_filter import parse_resource_filter
-    from agno.cli.os import OSConfig
-    from agno.cli.os import get_os_infra_dir_path
-    from agno.cli.os.operator import setup_os, update_os
+    from agno.os.config import OSConfig
+    from agno.os.helpers import get_os_infra_dir_path
+    from agno.os.operator import setup_os, update_os
 
     agno_config: Optional[AgnoCliConfig] = AgnoCliConfig.from_saved_config()
     if not agno_config:
-        agno_config = initialize_agno()
+        agno_config = initialize_agno_cli()
         if not agno_config:
             log_config_not_available_msg()
             return
@@ -536,7 +536,7 @@ def patch(
     # OS to patch
     os_to_patch: Optional[OSConfig] = None
 
-    # If there is an existing workspace at current path, use that workspace
+    # If there is an existing OS at current path, use that OS
     current_path: Path = Path("").resolve()
     os_at_current_path: Optional[OSConfig] = agno_config.get_os_config_by_path(current_path)
     if os_at_current_path is not None:
@@ -546,8 +546,8 @@ def patch(
             agno_config.set_active_os_dir(os_at_current_path.os_root_path)
         os_to_patch = os_at_current_path
 
-    # If there's no existing workspace at current path, check if there's a `workspace` dir in the current path
-    # In that case setup the workspace
+    # If there's no existing OS at current path, check if there's a `infra` dir in the current path
+    # In that case setup the OS
     if os_to_patch is None:
         os_os_dir_path = get_os_infra_dir_path(current_path)
         if os_os_dir_path is not None:
@@ -733,13 +733,13 @@ def config(
         set_log_level_to_debug()
 
     from agno.cli.config import AgnoCliConfig
-    from agno.cli import initialize_agno
-    from agno_os.agno.utils.env import load_env
-    from agno.cli.os import OSConfig
+    from agno.cli.operator import initialize_agno_cli
+    from agno_os.agno.utils.load_env import load_env
+    from agno.os.config import OSConfig
 
     agno_config: Optional[AgnoCliConfig] = AgnoCliConfig.from_saved_config()
     if not agno_config:
-        agno_config = initialize_agno()
+        agno_config = initialize_agno_cli()
         if not agno_config:
             log_config_not_available_msg()
             return
@@ -789,12 +789,12 @@ def delete(
         set_log_level_to_debug()
 
     from agno.cli.config import AgnoCliConfig
-    from agno.cli import initialize_agno
-    from agno.cli.os.operator import delete_os
+    from agno.cli.operator import initialize_agno_cli
+    from agno.os.operator import delete_os
 
     agno_config: Optional[AgnoCliConfig] = AgnoCliConfig.from_saved_config()
     if not agno_config:
-        agno_config = initialize_agno()
+        agno_config = initialize_agno_cli()
         if not agno_config:
             log_config_not_available_msg()
             return

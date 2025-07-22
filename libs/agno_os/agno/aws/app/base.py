@@ -1,12 +1,13 @@
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from pydantic import Field, field_validator
 from pydantic_core.core_schema import ValidationInfo
 
 from agno.aws.context import AwsBuildContext
-from agno.base.app import InfraApp
-from agno.base.context import ContainerContext
-from agno.utils.log import logger
+from agno.infra.app import InfraApp
+from agno.infra.context import ContainerContext
+from agno.utils.logging import logger
 
 if TYPE_CHECKING:
     from agno.aws.resource.base import AwsResource
@@ -20,11 +21,12 @@ if TYPE_CHECKING:
     from agno.aws.resource.elb.target_group import TargetGroup
 
 
+@dataclass
 class AwsApp(InfraApp):
-    # -*- Workspace Configuration
-    # Path to the workspace directory inside the container
-    workspace_dir_container_path: str = "/app"
-    
+    # -*- OS Configuration
+    # Path to the OS directory inside the container
+    os_dir_container_path: str = "/app"
+
     # Read secret variables from AWS Secrets
     aws_secrets: Optional[Any] = None
 
@@ -124,7 +126,7 @@ class AwsApp(InfraApp):
             env_dict[AWS_REGION_ENV_VAR] = aws_region
             env_dict[AWS_DEFAULT_REGION_ENV_VAR] = aws_region
         elif self.infra_settings is not None and self.infra_settings.aws_region is not None:
-            # logger.debug(f"Setting AWS Region to {aws_region} using workspace_settings")
+            # logger.debug(f"Setting AWS Region to {aws_region} using os_settings")
             env_dict[AWS_REGION_ENV_VAR] = self.infra_settings.aws_region
             env_dict[AWS_DEFAULT_REGION_ENV_VAR] = self.infra_settings.aws_region
 
@@ -150,28 +152,28 @@ class AwsApp(InfraApp):
         if self.container_context is not None:  # type: ignore
             return self.container_context  # type: ignore
 
-        workspace_name = self.workspace_name
-        if workspace_name is None:
-            raise Exception("Could not determine workspace_name")
+        os_name = self.os_name
+        if os_name is None:
+            raise Exception("Could not determine os_name")
 
-        workspace_root_in_container = self.workspace_dir_container_path
-        if workspace_root_in_container is None:
-            raise Exception("Could not determine workspace_root in container")
+        os_root_in_container = self.os_dir_container_path
+        if os_root_in_container is None:
+            raise Exception("Could not determine os_root in container")
 
-        workspace_parent_paths = workspace_root_in_container.split("/")[0:-1]
-        workspace_parent_in_container = "/".join(workspace_parent_paths)
+        os_parent_paths = os_root_in_container.split("/")[0:-1]
+        os_parent_in_container = "/".join(os_parent_paths)
 
         self.container_context = ContainerContext(
-            workspace_name=workspace_name,
-            workspace_root=workspace_root_in_container,
-            workspace_parent=workspace_parent_in_container,
+            os_name=os_name,
+            os_root=os_root_in_container,
+            os_parent=os_parent_in_container,
         )
 
-        if self.workspace_settings is not None and self.workspace_settings.ws_schema is not None:
-            self.container_context.workspace_schema = self.workspace_settings.ws_schema  # type: ignore
+        if self.os_settings is not None and self.os_settings.os_schema is not None:
+            self.container_context.os_schema = self.os_settings.os_schema  # type: ignore
 
         if self.requirements_file is not None:
-            self.container_context.requirements_file = f"{workspace_root_in_container}/{self.requirements_file}"  # type: ignore
+            self.container_context.requirements_file = f"{os_root_in_container}/{self.requirements_file}"  # type: ignore
 
         return self.container_context
 
@@ -180,8 +182,7 @@ class AwsApp(InfraApp):
             AGNO_RUNTIME_ENV_VAR,
             PYTHONPATH_ENV_VAR,
             REQUIREMENTS_FILE_PATH_ENV_VAR,
-            WORKSPACE_ID_ENV_VAR,
-            WORKSPACE_ROOT_ENV_VAR,
+            AGNO_OS_ROOT,
         )
 
         # Container Environment
@@ -192,21 +193,14 @@ class AwsApp(InfraApp):
                 "PRINT_ENV_ON_LOAD": str(self.print_env_on_load),
                 AGNO_RUNTIME_ENV_VAR: "ecs",
                 REQUIREMENTS_FILE_PATH_ENV_VAR: container_context.requirements_file or "",
-                WORKSPACE_ROOT_ENV_VAR: container_context.workspace_root or "",
+                AGNO_OS_ROOT: container_context.os_root or "",
             }
         )
-
-        try:
-            if container_context.workspace_schema is not None:
-                if container_context.workspace_schema.id_workspace is not None:
-                    container_env[WORKSPACE_ID_ENV_VAR] = str(container_context.workspace_schema.id_workspace) or ""
-        except Exception:
-            pass
 
         if self.set_python_path:
             python_path = self.python_path
             if python_path is None:
-                python_path = container_context.workspace_root
+                python_path = container_context.os_root
                 if self.add_python_paths is not None:
                     python_path = "{}:{}".format(python_path, ":".join(self.add_python_paths))
             if python_path is not None:
@@ -523,7 +517,7 @@ class AwsApp(InfraApp):
             logger.debug("Command: {}".format(" ".join(container_cmd)))
 
         aws_region = build_context.aws_region or (
-            self.workspace_settings.aws_region if self.workspace_settings else None
+            self.os_settings.aws_region if self.os_settings else None
         )
         return EcsContainer(
             name=self.get_app_name(),
@@ -677,7 +671,7 @@ class AwsApp(InfraApp):
                     "options": {
                         "awslogs-group": self.get_app_name(),
                         "awslogs-region": build_context.aws_region
-                        or (self.workspace_settings.aws_region if self.workspace_settings else None),
+                        or (self.os_settings.aws_region if self.os_settings else None),
                         "awslogs-create-group": "true",
                         "awslogs-stream-prefix": nginx_container_name,
                     },
@@ -685,7 +679,7 @@ class AwsApp(InfraApp):
                 mount_points=[
                     {
                         "sourceVolume": nginx_shared_volume.name,
-                        "containerPath": container_context.workspace_root,
+                        "containerPath": container_context.os_root,
                     }
                 ],
                 linux_parameters=ecs_container.linux_parameters,

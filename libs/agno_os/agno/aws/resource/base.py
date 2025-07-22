@@ -1,11 +1,13 @@
 from typing import Any, Optional
+from dataclasses import dataclass
 
 from agno.aws.api_client import AwsApiClient
 from agno.cli.console import print_info
 from agno.infra.resource import InfraResource
-from agno.utils.log import logger
+from agno.utils.logging import logger
 
 
+@dataclass
 class AwsResource(InfraResource):
     """Base class for AWS Resources."""
 
@@ -23,9 +25,9 @@ class AwsResource(InfraResource):
         if self.aws_region:
             return self.aws_region
 
-        # Priority 2: Get aws_region from workspace settings
-        if self.workspace_settings is not None and self.workspace_settings.aws_region is not None:
-            self.aws_region = self.workspace_settings.aws_region
+        # Priority 2: Get aws_region from os settings
+        if self.os_settings is not None and self.os_settings.aws_region is not None:
+            self.aws_region = self.os_settings.aws_region
             return self.aws_region
 
         # Priority 3: Get aws_region from env
@@ -44,9 +46,9 @@ class AwsResource(InfraResource):
         if self.aws_profile:
             return self.aws_profile
 
-        # Priority 2: Get aws_profile from workspace settings
-        if self.workspace_settings is not None and self.workspace_settings.aws_profile is not None:
-            self.aws_profile = self.workspace_settings.aws_profile
+        # Priority 2: Get aws_profile from os settings
+        if self.os_settings is not None and self.os_settings.aws_profile is not None:
+            self.aws_profile = self.os_settings.aws_profile
             return self.aws_profile
 
         # Priority 3: Get aws_profile from env

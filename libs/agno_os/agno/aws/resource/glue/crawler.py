@@ -1,13 +1,15 @@
 from typing import Any, Dict, List, Optional
+from dataclasses import dataclass
 
 from agno.aws.api_client import AwsApiClient
 from agno.aws.resource.base import AwsResource
 from agno.aws.resource.iam.role import IamRole
 from agno.aws.resource.s3.bucket import S3Bucket
 from agno.cli.console import print_info
-from agno.utils.log import logger
+from agno.utils.logging import logger
 
 
+@dataclass
 class GlueS3Target(AwsResource):
     # The directory path in the S3 bucket to target
     dir: str = ""
@@ -28,6 +30,7 @@ class GlueS3Target(AwsResource):
     dlq_event_queue_arn: Optional[str] = None
 
 
+@dataclass
 class GlueCrawler(AwsResource):
     """
     Reference:

@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from dataclasses import dataclass
 
 from pydantic import BaseModel
 from typing_extensions import Literal
@@ -7,7 +8,7 @@ from typing_extensions import Literal
 from agno.aws.api_client import AwsApiClient
 from agno.aws.resource.base import AwsResource
 from agno.cli.console import print_info, print_subheading
-from agno.utils.log import logger
+from agno.utils.logging import logger
 
 
 class CertificateSummary(BaseModel):
@@ -15,6 +16,7 @@ class CertificateSummary(BaseModel):
     DomainName: Optional[str] = None
 
 
+@dataclass
 class AcmCertificate(AwsResource):
     """
     You can use Amazon Web Services Certificate Manager (ACM) to manage SSL/TLS

@@ -1,9 +1,10 @@
+from dataclasses import dataclass
 from typing import Dict, Optional
 
 from agno.docker.app.base import ContainerContext, DockerApp  # noqa: F401
 from agno.infra.db_app import DbApp
 
-
+@dataclass
 class PostgresDb(DockerApp, DbApp):
     # -*- App Name
     name: str = "postgres"

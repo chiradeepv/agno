@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional
 from agno.infra.base import InfraBase
 from agno.infra.resources import InfraResources
 from agno.os.settings import OSSettings
-from agno.utils.log import logger
+from agno.utils.logging import logger
 
 # List of directories to ignore when loading the OS
 ignored_dirs = ["ignore", "test", "tests", "config"]
@@ -77,7 +77,7 @@ class OSConfig:
     def set_local_env(self) -> None:
         from os import environ
 
-        from agno.os.constants import (
+        from agno.constants import (
             AWS_REGION_ENV_VAR,
             AGNO_OS_INFRA_DIR,
             AGNO_OS_NAME,
@@ -113,7 +113,7 @@ class OSConfig:
 
         from sys import path as sys_path
 
-        from agno.utils.env import load_env
+        from agno.utils.load_env import load_env
         from agno.utils.py_io import get_python_objects_from_module
 
         logger.debug("**--> Loading OSConfig")
@@ -225,7 +225,7 @@ class OSConfig:
 
         from sys import path as sys_path
 
-        from agno.utils.env import load_env
+        from agno.utils.load_env import load_env
         from agno.utils.py_io import get_python_objects_from_module
 
         resource_file_parent_dir = resource_file.parent.resolve()

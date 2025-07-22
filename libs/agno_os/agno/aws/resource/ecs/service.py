@@ -1,4 +1,5 @@
 from typing import Any, Dict, List, Optional, Union
+from dataclasses import dataclass
 
 from typing_extensions import Literal
 
@@ -10,9 +11,10 @@ from agno.aws.resource.ecs.cluster import EcsCluster
 from agno.aws.resource.ecs.task_definition import EcsTaskDefinition
 from agno.aws.resource.elb.target_group import TargetGroup
 from agno.cli.console import print_info
-from agno.utils.log import logger
+from agno.utils.logging import logger
 
 
+@dataclass
 class EcsService(AwsResource):
     """
     Reference:

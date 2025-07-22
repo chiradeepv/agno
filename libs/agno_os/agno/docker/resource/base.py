@@ -1,11 +1,13 @@
+from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
 from agno.cli.console import print_info
 from agno.docker.api_client import DockerApiClient
 from agno.infra.resource import InfraResource
-from agno.utils.log import logger
+from agno.utils.logging import logger
 
 
+@dataclass
 class DockerResource(InfraResource):
     """Base class for Docker Resources."""
 

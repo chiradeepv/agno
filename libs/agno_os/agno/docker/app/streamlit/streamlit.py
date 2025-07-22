@@ -1,8 +1,9 @@
+from dataclasses import dataclass
 from typing import Dict, List, Optional, Union
 
 from agno.docker.app.base import ContainerContext, DockerApp  # noqa: F401
 
-
+@dataclass
 class Streamlit(DockerApp):
     # -*- App Name
     name: str = "streamlit"
@@ -17,11 +18,11 @@ class Streamlit(DockerApp):
     open_port: bool = True
     port_number: int = 8501
 
-    # -*- Workspace Configuration
-    # Path to the workspace directory inside the container
-    workspace_dir_container_path: str = "/app"
-    # Mount the workspace directory from host machine to the container
-    mount_workspace: bool = False
+    # -*- OS Configuration
+    # Path to the os directory inside the container
+    os_dir_container_path: str = "/app"
+    # Mount the infra directory from host machine to the container
+    mount_infra: bool = False
 
     # -*- Streamlit Configuration
     # Server settings

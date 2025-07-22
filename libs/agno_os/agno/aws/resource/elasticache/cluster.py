@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from dataclasses import dataclass
 
 from typing_extensions import Literal
 
@@ -8,9 +9,10 @@ from agno.aws.resource.base import AwsResource
 from agno.aws.resource.ec2.security_group import SecurityGroup
 from agno.aws.resource.elasticache.subnet_group import CacheSubnetGroup
 from agno.cli.console import print_info
-from agno.utils.log import logger
+from agno.utils.logging import logger
 
 
+@dataclass
 class CacheCluster(AwsResource):
     """
     Reference:

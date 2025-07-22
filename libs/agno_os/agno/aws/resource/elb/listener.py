@@ -1,4 +1,5 @@
 from typing import Any, Dict, List, Optional
+from dataclasses import dataclass
 
 from agno.aws.api_client import AwsApiClient
 from agno.aws.resource.acm.certificate import AcmCertificate
@@ -6,9 +7,10 @@ from agno.aws.resource.base import AwsResource
 from agno.aws.resource.elb.load_balancer import LoadBalancer
 from agno.aws.resource.elb.target_group import TargetGroup
 from agno.cli.console import print_info
-from agno.utils.log import logger
+from agno.utils.logging import logger
 
 
+@dataclass
 class Listener(AwsResource):
     """
     Reference:

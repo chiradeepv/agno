@@ -1,6 +1,9 @@
-from agno.docker.app.base import ContainerContext, DockerApp  # noqa: F401
+from dataclasses import dataclass
+
+from agno.docker.app.base import DockerApp  # noqa: F401
 
 
+@dataclass
 class Whoami(DockerApp):
     # -*- App Name
     name: str = "whoami"

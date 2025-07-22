@@ -3,10 +3,10 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from agno.cli.console import print_heading, print_info
-from agno.cli.os import OSConfig
+from agno.os.config import OSConfig
 from agno.cli.settings import agno_cli_settings
 from agno.utils.json_io import read_json_file, write_json_file
-from agno.utils.log import logger
+from agno.utils.logging import logger
 
 
 class AgnoCliConfig:

@@ -1,12 +1,14 @@
 from typing import Any, Dict, List, Optional, Union
+from dataclasses import dataclass
 
 from agno.aws.api_client import AwsApiClient
 from agno.aws.resource.base import AwsResource
 from agno.aws.resource.ec2.subnet import Subnet
 from agno.cli.console import print_info
-from agno.utils.log import logger
+from agno.utils.logging import logger
 
 
+@dataclass
 class TargetGroup(AwsResource):
     """
     Reference:

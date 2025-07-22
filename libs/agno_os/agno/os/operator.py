@@ -12,9 +12,9 @@ from agno.cli.console import (
     print_subheading,
 )
 from agno.infra.resources import InfraResources
-from agno.utils.common import str_to_int
-from agno.utils.log import logger
-from agno.os import OSConfig, OSStarterTemplate
+from agno.utils.logging import logger
+from agno.os.config import OSConfig
+from agno.constants import OSStarterTemplate
 
 TEMPLATE_TO_NAME_MAP: Dict[OSStarterTemplate, str] = {
     OSStarterTemplate.agent_api: "agent-api",
@@ -36,14 +36,14 @@ def create_os_from_template(
 
     import git
 
-    from agno.cli import initialize_agno_cli
+    from agno.cli.operator import initialize_agno_cli
     from agno.utils.filesystem import rmdir_recursive
     from agno.utils.git import GitCloneProgress
-    from agno.cli.os import get_os_infra_dir_path
+    from agno.os.helpers import get_os_infra_dir_path
 
     current_dir: Path = Path("").resolve()
 
-    # Initialize Agno before creating a workspace
+    # Initialize Agno before creating a OS
     agno_config: Optional[AgnoCliConfig] = AgnoCliConfig.from_saved_config()
     if not agno_config:
         agno_config = initialize_agno_cli()
@@ -70,7 +70,7 @@ def create_os_from_template(
             template_choices = [str(idx) for idx, _ in enumerate(templates, start=1)]
             template_inp_raw = Prompt.ask("Template Number", choices=template_choices, default="1", show_choices=False)
             # Convert input to int
-            template_inp = str_to_int(template_inp_raw)
+            template_inp = int(template_inp_raw) if template_inp_raw is not None else None
 
             if template_inp is not None:
                 template_inp_idx = template_inp - 1
@@ -108,7 +108,7 @@ def create_os_from_template(
     print_info(f"Creating {str(os_root_path)}")
     logger.debug("Cloning: {}".format(repo_to_clone))
     try:
-        _cloned_git_repo: git.Repo = git.Repo.clone_from(
+        git.Repo.clone_from(
             repo_to_clone,
             str(os_root_path),
             progress=GitCloneProgress(),  # type: ignore
@@ -143,8 +143,8 @@ def create_os_from_template(
             str(os_secrets_dir),
         )
     except Exception as e:
-        logger.warning(f"Could not create workspace/secrets: {e}")
-        logger.warning("Please manually copy workspace/example_secrets to workspace/secrets")
+        logger.warning(f"Could not create infra/secrets: {e}")
+        logger.warning("Please manually copy infra/example_secrets to infra/secrets")
 
     print_info(f"Your new os is available at {str(os_root_path)}\n")
     return setup_os(os_root_path=os_root_path)
@@ -160,9 +160,9 @@ def setup_os(os_root_path: Path) -> Optional[OSConfig]:
     1.4 Get the OS name
     1.5 Create or update OSConfig
     """
-    from agno.cli import initialize_agno
+    from agno.cli.operator import initialize_agno_cli
     from agno.utils.git import get_remote_origin_for_dir
-    from agno.cli.os import get_os_infra_dir_path
+    from agno.os.helpers import get_os_infra_dir_path
 
     print_heading("Setting up os\n")
 
@@ -178,7 +178,7 @@ def setup_os(os_root_path: Path) -> Optional[OSConfig]:
     # 1.2 Create AgnoCliConfig if needed
     agno_config: Optional[AgnoCliConfig] = AgnoCliConfig.from_saved_config()
     if not agno_config:
-        agno_config = initialize_agno()
+        agno_config = initialize_agno_cli()
         if not agno_config:
             log_config_not_available_msg()
             return None
@@ -214,7 +214,6 @@ def setup_os(os_root_path: Path) -> Optional[OSConfig]:
     os_config = agno_config.create_or_update_os_config(os_root_path=os_root_path, set_as_active=True)
 
     if os_config is not None:
-        # logger.debug("Workspace Config: {}".format(ws_config.model_dump_json(indent=2)))
         print_subheading("Setup complete! Next steps:")
         print_info("1. Start OS:")
         print_info("\tag os up")
@@ -227,12 +226,11 @@ def setup_os(os_root_path: Path) -> Optional[OSConfig]:
     return None
 
     ######################################################
-    ## End Workspace setup
+    ## End OS setup
     ######################################################
 
 
 def start_os(
-    agno_config: AgnoCliConfig,
     os_config: OSConfig,
     target_env: Optional[str] = None,
     target_infra: Optional[str] = None,
@@ -308,7 +306,6 @@ def start_os(
 
 
 def stop_os(
-    agno_config: AgnoCliConfig,
     os_config: OSConfig,
     target_env: Optional[str] = None,
     target_infra: Optional[str] = None,
@@ -381,7 +378,6 @@ def stop_os(
 
 
 def update_os(
-    agno_config: AgnoCliConfig,
     os_config: OSConfig,
     target_env: Optional[str] = None,
     target_infra: Optional[str] = None,
@@ -465,7 +461,7 @@ def delete_os(agno_config: AgnoCliConfig, os_to_delete: Optional[List[Path]]) ->
 
 
 def set_os_as_active(os_dir_name: Optional[str]) -> None:
-    from agno.cli import initialize_agno
+    from agno.cli.operator import initialize_agno_cli
 
     ######################################################
     ## 1. Validate Pre-requisites
@@ -475,18 +471,18 @@ def set_os_as_active(os_dir_name: Optional[str]) -> None:
     ######################################################
     agno_config: Optional[AgnoCliConfig] = AgnoCliConfig.from_saved_config()
     if not agno_config:
-        agno_config = initialize_agno()
+        agno_config = initialize_agno_cli()
         if not agno_config:
             log_config_not_available_msg()
             return
 
     ######################################################
-    # 1.2 Check ws_root_path is valid
+    # 1.2 Check os_root_path is valid
     ######################################################
-    # By default, we assume this command is run from the workspace directory
+    # By default, we assume this command is run from the infra directory
     if os_dir_name is None:
         # If the user does not provide a ws_name, that implies `ag set` is ran from
-        # the workspace directory.
+        # the infra directory.
         os_root_path = Path("").resolve()
     else:
         # If the user provides a os name manually, we find the dir for that os
@@ -502,7 +498,7 @@ def set_os_as_active(os_dir_name: Optional[str]) -> None:
         return
 
     ######################################################
-    # 1.3 Validate WorkspaceConfig is available i.e. a workspace is available at this directory
+    # 1.3 Validate OSConfig is available i.e. a OS is available at this directory
     ######################################################
     logger.debug(f"Checking for a os at path: {os_root_path}")
     active_os_config: Optional[OSConfig] = agno_config.get_os_config_by_path(os_root_path)
@@ -514,7 +510,7 @@ def set_os_as_active(os_dir_name: Optional[str]) -> None:
         return
 
     ######################################################
-    ## 2. Set workspace as active
+    ## 2. Set OS as active
     ######################################################
     print_heading(f"Setting os {active_os_config.os_root_path.stem} as active")
     agno_config.set_active_os_dir(active_os_config.os_root_path)

@@ -1,11 +1,12 @@
 from typing import Any, Callable, Dict, List, Optional, Union
+from dataclasses import dataclass
 
 from agno.aws.api_client import AwsApiClient
 from agno.aws.resource.base import AwsResource
 from agno.aws.resource.ec2.subnet import Subnet
 from agno.aws.resource.reference import AwsReference
 from agno.cli.console import print_info
-from agno.utils.log import logger
+from agno.utils.logging import logger
 
 
 def get_my_ip() -> str:
@@ -16,6 +17,7 @@ def get_my_ip() -> str:
     return f"{external_ip}/32"
 
 
+@dataclass
 class InboundRule(AwsResource):
     """
     Reference:
@@ -56,6 +58,7 @@ class InboundRule(AwsResource):
     ip_protocol: Optional[str] = None
 
 
+@dataclass
 class OutboundRule(AwsResource):
     """
     Reference:
@@ -96,6 +99,7 @@ class OutboundRule(AwsResource):
     ip_protocol: Optional[str] = None
 
 
+@dataclass
 class SecurityGroup(AwsResource):
     """
     Reference:

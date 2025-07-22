@@ -1,9 +1,11 @@
 from typing import Any, Dict, Optional
+from dataclasses import dataclass
 
 from agno.aws.resource.base import AwsResource
-from agno.utils.log import logger
+from agno.utils.logging import logger
 
 
+@dataclass
 class EcsVolume(AwsResource):
     """
     Reference:

@@ -1,8 +1,9 @@
+from dataclasses import dataclass
 from typing import Dict, List, Optional, Union
 
 from agno.aws.app.base import AwsApp, AwsBuildContext, ContainerContext  # noqa: F401
 
-
+@dataclass
 class Streamlit(AwsApp):
     # -*- App Name
     name: str = "streamlit"
@@ -17,9 +18,9 @@ class Streamlit(AwsApp):
     open_port: bool = True
     port_number: int = 8501
 
-    # -*- Workspace Configuration
-    # Path to the workspace directory inside the container
-    workspace_dir_container_path: str = "/app"
+    # -*- OS Configuration
+    # Path to the os directory inside the container
+    os_dir_container_path: str = "/app"
 
     # -*- ECS Configuration
     ecs_task_cpu: str = "1024"
