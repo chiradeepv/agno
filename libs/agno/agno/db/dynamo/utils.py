@@ -5,13 +5,9 @@ from typing import Any, Callable, Dict, List, Optional, Union
 from uuid import uuid4
 
 from agno.db.base import SessionType
-from agno.db.schemas import MemoryRow
 from agno.db.schemas.evals import EvalRunRecord
 from agno.db.schemas.knowledge import KnowledgeRow
-from agno.run.response import RunResponse
-from agno.run.team import TeamRunResponse
 from agno.session import Session
-from agno.session.summarizer import SessionSummary
 from agno.utils.log import log_debug, log_error, log_info
 
 # -- Serialization utils --
@@ -64,11 +60,6 @@ def deserialize_from_dynamodb_item(item: Dict[str, Any]) -> Dict[str, Any]:
         elif "L" in value:
             data[key] = [deserialize_from_dynamodb_item({"item": item})["item"] for item in value["L"]]
     return data
-
-
-def serialize_memory_row(memory: MemoryRow) -> Dict[str, Any]:
-    """Serialize a MemoryRow to a DynamoDB item."""
-    return serialize_to_dynamo_item(memory.to_dict())
 
 
 def serialize_knowledge_row(knowledge: KnowledgeRow) -> Dict[str, Any]:
@@ -144,8 +135,8 @@ def create_table_if_not_exists(dynamodb_client, table_name: str, schema: Dict[st
     """Create DynamoDB table if it doesn't exist."""
     try:
         dynamodb_client.describe_table(TableName=table_name)
-        log_debug(f"Table {table_name} already exists")
         return True
+
     except dynamodb_client.exceptions.ResourceNotFoundException:
         log_info(f"Creating table {table_name}")
         try:
@@ -153,8 +144,11 @@ def create_table_if_not_exists(dynamodb_client, table_name: str, schema: Dict[st
             # Wait for table to be created
             waiter = dynamodb_client.get_waiter("table_exists")
             waiter.wait(TableName=table_name)
-            log_info(f"Table {table_name} created successfully")
+
+            log_debug(f"Table {table_name} created successfully")
+
             return True
+
         except Exception as e:
             log_error(f"Failed to create table {table_name}: {e}")
             return False
@@ -271,27 +265,6 @@ def deserialize_session_result(
         return WorkflowSession.from_dict(serialized_session)
 
     return None
-
-
-def hydrate_session(session: dict) -> dict:
-    """Convert nested dictionaries to their corresponding object types.
-
-    Args:
-        session (dict): The session dictionary to hydrate.
-
-    Returns:
-        dict: The hydrated session dictionary.
-    """
-
-    if session.get("summary") is not None:
-        session["summary"] = SessionSummary.from_dict(session["summary"])
-    if session.get("runs") is not None:
-        if session["session_type"] == SessionType.AGENT:
-            session["runs"] = [RunResponse.from_dict(run) for run in session["runs"]]
-        elif session["session_type"] == SessionType.TEAM:
-            session["runs"] = [TeamRunResponse.from_dict(run) for run in session["runs"]]
-
-    return session
 
 
 def deserialize_session(session: Dict[str, Any]) -> Optional[Session]:

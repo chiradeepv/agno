@@ -7,11 +7,7 @@ from uuid import uuid4
 
 from sqlalchemy import Engine
 
-from agno.db.base import SessionType
 from agno.db.postgres.schemas import get_table_schema_definition
-from agno.run.response import RunResponse
-from agno.run.team import TeamRunResponse
-from agno.session.summary import SessionSummary
 from agno.utils.log import log_debug, log_error, log_warning
 
 try:
@@ -22,26 +18,6 @@ try:
     from sqlalchemy.sql.expression import text
 except ImportError:
     raise ImportError("`sqlalchemy` not installed. Please install it using `pip install sqlalchemy`")
-
-
-def hydrate_session(session: dict) -> dict:
-    """Convert nested dictionaries to their corresponding object types.
-
-    Args:
-        session (dict): The session dictionary to hydrate.
-
-    Returns:
-        dict: The hydrated session dictionary.
-    """
-    if session.get("summary") is not None:
-        session["summary"] = SessionSummary.from_dict(session["summary"])
-    if session.get("runs") is not None:
-        if session["session_type"] == SessionType.AGENT:
-            session["runs"] = [RunResponse.from_dict(run) for run in session["runs"]]
-        elif session["session_type"] == SessionType.TEAM:
-            session["runs"] = [TeamRunResponse.from_dict(run) for run in session["runs"]]
-
-    return session
 
 
 # -- DB util methods --
@@ -98,9 +74,6 @@ def is_table_available(session: Session, table_name: str, db_schema: str) -> boo
             "SELECT 1 FROM information_schema.tables WHERE table_schema = :schema AND table_name = :table"
         )
         exists = session.execute(exists_query, {"schema": db_schema, "table": table_name}).scalar() is not None
-        if not exists:
-            log_debug(f"Table {db_schema}.{table_name} {'exists' if exists else 'does not exist'}")
-
         return exists
 
     except Exception as e:

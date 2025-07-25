@@ -298,7 +298,7 @@ class AgentOS:
 
         # Create a panel with the Home and interface URLs
         panels = []
-        encoded_endpoint = f"{full_host}:{port}/home"
+        encoded_endpoint = f"http://{full_host}:{port}/home"
         panels.append(
             Panel(
                 f"[bold green]Home URL:[/bold green] {encoded_endpoint}",

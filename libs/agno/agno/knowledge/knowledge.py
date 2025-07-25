@@ -1,7 +1,10 @@
+import hashlib
 import io
 import time
 from dataclasses import dataclass
+from functools import cached_property
 from pathlib import Path
+from pprint import pprint
 from typing import Any, Dict, List, Optional, Tuple, Union, overload
 from uuid import uuid4
 
@@ -23,17 +26,41 @@ class Knowledge:
 
     name: Optional[str] = None
     description: Optional[str] = None
-    vector_store: Optional[VectorDb] = None
+    vector_db: Optional[VectorDb] = None
     contents_db: Optional[PostgresDb] = None
-    valid_metadata_filters: Optional[List[str]] = None
     max_results: int = 10
     readers: Optional[Dict[str, Reader]] = None
 
     def __post_init__(self):
-        if self.vector_store and not self.vector_store.exists():
-            self.vector_store.create()
+        if self.vector_db and not self.vector_db.exists():
+            self.vector_db.create()
 
         self.construct_readers()
+        self.valid_metadata_filters = set()
+
+    def _is_text_mime_type(self, mime_type: str) -> bool:
+        """
+        Check if a MIME type represents text content that can be safely encoded as UTF-8.
+
+        Args:
+            mime_type: The MIME type to check
+
+        Returns:
+            bool: True if it's a text type, False if binary
+        """
+        if not mime_type:
+            return False
+
+        text_types = [
+            "text/",
+            "application/json",
+            "application/xml",
+            "application/javascript",
+            "application/csv",
+            "application/sql",
+        ]
+
+        return any(mime_type.startswith(t) for t in text_types)
 
     # --- SDK Specific Methods ---
 
@@ -47,22 +74,24 @@ class Knowledge:
         paths: Optional[List[str]] = None,
         urls: Optional[List[str]] = None,
         metadata: Optional[Dict[str, str]] = None,
+        upsert: bool = False,
+        skip_if_exists: bool = False,
     ) -> None: ...
 
     def add_contents(self, *args, **kwargs) -> None:
         if args and isinstance(args[0], list):
-            contents = args[0]
-            print("Case 1: List of content dicts")
-            for content in contents:
-                print(f"Adding content: {content}")
+            arguments = args[0]
+            for argument in arguments:
                 self.add_content(
-                    name=content.get("name"),
-                    description=content.get("description"),
-                    path=content.get("path"),
-                    url=content.get("url"),
-                    metadata=content.get("metadata"),
-                    topics=content.get("topics"),
-                    reader=content.get("reader"),
+                    name=argument.get("name"),
+                    description=argument.get("description"),
+                    path=argument.get("path"),
+                    url=argument.get("url"),
+                    metadata=argument.get("metadata"),
+                    topics=argument.get("topics"),
+                    reader=argument.get("reader"),
+                    upsert=argument.get("upsert", False),
+                    skip_if_exists=argument.get("skip_if_exists", False),
                 )
 
         elif kwargs:
@@ -72,30 +101,35 @@ class Knowledge:
             topics = kwargs.get("topics", [])
             paths = kwargs.get("paths", [])
             urls = kwargs.get("urls", [])
+            upsert = kwargs.get("upsert", False)
+            skip_if_exists = kwargs.get("skip_if_exists", False)
 
-            print("Case 2: Structured inputs with kwargs")
             for path in paths:
                 self.add_content(
                     name=name,
                     description=description,
                     path=path,
                     metadata=metadata,
+                    upsert=upsert,
+                    skip_if_exists=skip_if_exists,
                 )
-                print(f"Adding path content: {path} with metadata: {metadata}")
             for url in urls:
                 self.add_content(
                     name=name,
                     description=description,
                     url=url,
                     metadata=metadata,
+                    upsert=upsert,
+                    skip_if_exists=skip_if_exists,
                 )
-                print(f"Adding url content: {url} with metadata: {metadata}")
             if topics:
                 self.add_content(
                     name=name,
                     description=description,
                     topics=topics,
                     metadata=metadata,
+                    upsert=upsert,
+                    skip_if_exists=skip_if_exists,
                 )
 
         else:
@@ -112,11 +146,17 @@ class Knowledge:
         topics: Optional[List[str]] = None,
         config: Optional[CloudStorageConfig] = None,
         reader: Optional[Reader] = None,
+        upsert: bool = True,
+        skip_if_exists: bool = True,
     ) -> None:
         # Validation: At least one of the parameters must be provided
         if all(argument is None for argument in [name, path, url, text_content, topics]):
             log_info("At least one of 'path', 'url', 'text_content', or 'topics' must be provided.")
             return
+
+        if not skip_if_exists:
+            log_info("skip_if_exists is disabled, disabling upsert")
+            upsert = False
 
         content = None
         if text_content:
@@ -134,23 +174,31 @@ class Knowledge:
             config=config,
             reader=reader,
         )
-        self._load_content(content)
+
+        self._load_content(content, upsert, skip_if_exists)
 
     def _load_from_path(
         self,
         content: Content,
+        upsert: bool,
+        skip_if_exists: bool,
     ):
         log_info(f"Adding content from path, {content.id}, {content.name}, {content.path}, {content.description}")
         path = Path(content.path)
         if path.is_file():
-            content.id = str(uuid4())
             self._add_to_contents_db(content)
+            content.content_hash = self._build_content_hash(content)
+            if self.vector_db.content_hash_exists(content.content_hash) and skip_if_exists:
+                log_info(f"Content {content.content_hash} already exists, skipping")
+                content.status = "Completed"
+                self._update_content(content)
+                return
 
             if content.reader:
                 read_documents = content.reader.read(path, name=content.name or path.name)
             else:
                 reader = ReaderFactory.get_reader_for_extension(path.suffix)
-                print(f"Using Reader: {reader.__class__.__name__}")
+                log_info(f"Using Reader: {reader.__class__.__name__}")
                 if reader:
                     read_documents = reader.read(path, name=content.name or path.name)
 
@@ -167,26 +215,28 @@ class Knowledge:
                     content.size = 0
 
             completed = True
+
             for read_document in read_documents:
                 read_document.content_id = content.id
-                if self.vector_store.upsert_available():
-                    try:
-                        self.vector_store.upsert(documents=[read_document], filters=content.metadata)
-                    except Exception as e:
-                        log_error(f"Error upserting document: {e}")
-                        content.status = "Failed"
-                        content.status_message = "Could not upsert embedding"
-                        completed = False
-                        self._update_content(content)
-                else:
-                    try:
-                        self.vector_store.insert(documents=[read_document], filters=content.metadata)
-                    except Exception as e:
-                        log_error(f"Error inserting document: {e}")
-                        content.status = "Failed"
-                        content.status_message = "Could not insert embedding"
-                        completed = False
-                        self._update_content(content)
+
+            if upsert:
+                try:
+                    self.vector_db.upsert(content.content_hash, read_documents, content.metadata)
+                except Exception as e:
+                    log_error(f"Error upserting document: {e}")
+                    content.status = "Failed"
+                    content.status_message = "Could not upsert embedding"
+                    completed = False
+                    self._update_content(content)
+            else:
+                try:
+                    self.vector_db.insert(content.content_hash, documents=read_documents, filters=content.metadata)
+                except Exception as e:
+                    log_error(f"Error inserting document: {e}")
+                    content.status = "Failed"
+                    content.status_message = "Could not insert embedding"
+                    completed = False
+                    self._update_content(content)
 
             if completed:
                 content.status = "Completed"
@@ -203,19 +253,33 @@ class Knowledge:
                     description=content.description,
                     reader=content.reader,
                 )
-                self._load_from_path(file_content)
+                self._load_from_path(file_content, upsert, skip_if_exists)
         else:
             log_warning(f"Invalid path: {path}")
 
-    def _load_from_url(self, content: Content):
-        log_info("Adding content from URL")
-        from urllib.parse import urlparse
+    def _load_from_url(
+        self,
+        content: Content,
+        upsert: bool,
+        skip_if_exists: bool,
+    ):
+        log_info(f"Adding content from URL {content.name}")
+        self._add_to_contents_db(content)
+
+        content.content_hash = self._build_content_hash(content)
+        if self.vector_db.content_hash_exists(content.content_hash) and skip_if_exists:
+            log_info(f"Content {content.content_hash} already exists, skipping")
+            content.status = "Completed"
+            self._update_content(content)
+
+            return
 
         content.file_type = "url"
-        self._add_to_contents_db(content)
 
         # Validate URL
         try:
+            from urllib.parse import urlparse
+
             parsed_url = urlparse(content.url)
             if not all([parsed_url.scheme, parsed_url.netloc]):
                 content.status = "Failed"
@@ -256,43 +320,61 @@ class Knowledge:
                 if read_document.size:
                     file_size += read_document.size
                 read_document.content_id = content.id
-                if self.vector_store.upsert_available():
-                    try:
-                        self.vector_store.upsert(documents=[read_document], filters=content.metadata)
-                    except Exception as e:
-                        log_error(f"Error upserting document: {e}")
-                        content.status = "Failed"
-                        content.status_message = "Could not upsert embedding"
-                        self._update_content(content)
-                else:
-                    try:
-                        self.vector_store.insert(documents=[read_document], filters=content.metadata)
-                    except Exception as e:
-                        log_error(f"Error inserting document: {e}")
-                        content.status = "Failed"
-                        content.status_message = "Could not insert embedding"
-                        self._update_content(content)
+
+        if self.vector_db.upsert_available() and upsert:
+            try:
+                self.vector_db.upsert(content.content_hash, documents=read_documents, filters=content.metadata)
+            except Exception as e:
+                log_error(f"Error upserting document: {e}")
+                content.status = "Failed"
+                content.status_message = "Could not upsert embedding"
+                self._update_content(content)
+        else:
+            try:
+                self.vector_db.insert(content.content_hash, documents=read_documents, filters=content.metadata)
+            except Exception as e:
+                log_error(f"Error inserting document: {e}")
+                content.status = "Failed"
+                content.status_message = "Could not insert embedding"
+                self._update_content(content)
 
         content.size = file_size
         content.status = "Completed"
         self._update_content(content)
 
-    def _load_from_content(self, content: Content):
-        log_info(f"Adding content from content: {content.size}")
+    def _load_from_content(
+        self,
+        content: Content,
+        upsert: bool = True,
+        skip_if_exists: bool = True,
+    ):
+        log_info(f"Adding content from {content.name}")
+
+        content.content_hash = self._build_content_hash(content)
+        if self.vector_db.content_hash_exists(content.content_hash) and skip_if_exists:
+            log_info(f"Content {content.content_hash} already exists, skipping")
+            content.status = "Completed"
+            self._update_content(content)
+            return
 
         completed = True
         read_documents = []
+
+        name = (
+            content.name
+            if content.name
+            else content.file_data[:10]
+            if len(content.file_data) >= 10
+            else content.file_data
+        )
+        content.name = name
         if isinstance(content.file_data, str):
-            if content.name is None:
-                content.name = content.file_data[:10] if len(content.file_data) >= 10 else content.file_data
-            content_io = io.BytesIO(content.file_data.encode("utf-8"))
-            name = (
-                content.name
-                if content.name
-                else content.file_data[:10]
-                if len(content.file_data) >= 10
-                else content.file_data
-            )
+            try:
+                content_bytes = content.file_data.encode("utf-8")
+            except UnicodeEncodeError:
+                content_bytes = content.file_data.encode("latin-1")
+            content_io = io.BytesIO(content_bytes)
+
             if content.reader:
                 log_info(f"Using reader: {content.reader.__class__.__name__} to read content")
                 read_documents = content.reader.read(content_io, name=name)
@@ -301,11 +383,18 @@ class Knowledge:
 
         elif isinstance(content.file_data, FileData):
             if content.file_data.type:
-                log_info(f"Content content type: {content.file_data.type}")
                 if isinstance(content.file_data.content, bytes):
                     content_io = io.BytesIO(content.file_data.content)
                 elif isinstance(content.file_data.content, str):
-                    content_io = io.BytesIO(content.file_data.content.encode("utf-8"))
+                    if self._is_text_mime_type(content.file_data.type):
+                        try:
+                            content_bytes = content.file_data.content.encode("utf-8")
+                        except UnicodeEncodeError:
+                            log_debug(f"UTF-8 encoding failed for {content.file_data.type}, using latin-1")
+                            content_bytes = content.file_data.content.encode("latin-1")
+                    else:
+                        content_bytes = content.file_data.content.encode("latin-1")
+                    content_io = io.BytesIO(content_bytes)
                 else:
                     content_io = content.file_data.content
 
@@ -313,32 +402,10 @@ class Knowledge:
                 name = content.name if content.name else f"content_{content.file_data.type}"
                 read_documents = reader.read(content_io, name=name)
 
-                # Process each document in the list
                 for read_document in read_documents:
-                    # Add the original metadata to each document
                     if content.metadata:
                         read_document.meta_data.update(content.metadata)
                     read_document.content_id = content.id
-
-                    # Add to vector store - pass as a list
-                    if self.vector_store and self.vector_store.upsert_available():
-                        try:
-                            self.vector_store.upsert(documents=[read_document], filters=content.metadata)
-                        except Exception as e:
-                            log_error(f"Error upserting document: {e}")
-                            content.status = "Failed"
-                            content.status_message = "Could not upsert embedding"
-                            completed = False
-                            self._update_content(content)
-                    else:
-                        try:
-                            self.vector_store.insert(documents=[read_document], filters=content.metadata)
-                        except Exception as e:
-                            log_error(f"Error inserting document: {e}")
-                            content.status = "Failed"
-                            content.status_message = "Could not insert embedding"
-                            completed = False
-                            self._update_content(content)
 
                 if len(read_documents) == 0:
                     content.status = "Failed"
@@ -352,64 +419,119 @@ class Knowledge:
             self._update_content(content)
             return
 
+        # Add to vector store - pass as a list
+        if self.vector_db and self.vector_db.upsert_available() and upsert:
+            try:
+                self.vector_db.upsert(content.content_hash, documents=read_documents, filters=content.metadata)
+            except Exception as e:
+                log_error(f"Error upserting document: {e}")
+                content.status = "Failed"
+                content.status_message = "Could not upsert embedding"
+                completed = False
+                self._update_content(content)
+        else:
+            try:
+                self.vector_db.insert(content.content_hash, documents=read_documents, filters=content.metadata)
+            except Exception as e:
+                log_error(f"Error inserting document: {e}")
+                content.status = "Failed"
+                content.status_message = "Could not insert embedding"
+                completed = False
+                self._update_content(content)
+
         if completed:
             content.status = "Completed"
             self._update_content(content)
 
-    def _load_from_topics(self, content: Content):
+    def _load_from_topics(
+        self,
+        content: Content,
+        upsert: bool,
+        skip_if_exists: bool,
+    ):
         log_info(f"Adding content from topics: {content.topics}")
 
         for topic in content.topics:
             id = str(uuid4())
-            self._add_to_contents_db(
-                Content(
-                    id=id,
-                    name=topic,
-                    metadata=content.metadata,
-                    reader=content.reader,
-                    status="Processing" if content.reader else "Failed: No reader provided",
-                    file_data=FileData(
-                        type="Topic",
-                    ),
-                )
+            content = Content(
+                id=id,
+                name=topic,
+                metadata=content.metadata,
+                reader=content.reader,
+                status="Processing" if content.reader else "Failed: No reader provided",
+                file_data=FileData(
+                    type="Topic",
+                ),
+                topics=[topic],
             )
+            self._add_to_contents_db(content)
+
+            content.content_hash = self._build_content_hash(content)
+            if self.vector_db.content_hash_exists(content.content_hash) and skip_if_exists:
+                log_info(f"Content {content.content_hash} already exists, skipping")
+                continue
 
             read_documents = content.reader.read(topic)
             if len(read_documents) > 0:
                 for read_document in read_documents:
+                    read_document.content_id = id
                     if read_document.content:
                         read_document.size = len(read_document.content.encode("utf-8"))
-                    if self.vector_store.upsert_available():
-                        self.vector_store.upsert(documents=[read_document], filters=content.metadata)
-                    else:
-                        self.vector_store.insert(documents=[read_document], filters=content.metadata)
-                content.status = "Completed"
-                self._update_content(content)
             else:
                 content.status = "Failed"
                 content.status_message = "No content found for topic"
                 self._update_content(content)
 
+            if self.vector_db.upsert_available() and upsert:
+                self.vector_db.upsert(content.content_hash, documents=read_documents, filters=content.metadata)
+            else:
+                self.vector_db.insert(content.content_hash, documents=read_documents, filters=content.metadata)
+            content.status = "Completed"
+            self._update_content(content)
+
     def _load_from_cloud_storage(self): ...
 
-    def _load_content(self, content: Content) -> None:
+    def _load_content(
+        self,
+        content: Content,
+        upsert: bool,
+        skip_if_exists: bool,
+    ) -> None:
         log_info(f"Loading content: {content.id}")
 
+        if content.metadata:
+            self.add_filters(content.metadata)
+
         if content.path:
-            self._load_from_path(content)
+            self._load_from_path(content, upsert, skip_if_exists)
 
         if content.url:
-            self._load_from_url(content)
+            self._load_from_url(content, upsert, skip_if_exists)
 
         if content.file_data:
             self._add_to_contents_db(content)
-            self._load_from_content(content)
+            self._load_from_content(content, upsert, skip_if_exists)
 
         if content.topics:
-            self._load_from_topics(content)
+            self._load_from_topics(content, upsert, skip_if_exists)
 
         # if content.config:
         #     self._load_from_cloud_storage(content)
+
+    def _build_content_hash(self, content: Content) -> str:
+        """
+        Build the content hash from the content.
+        """
+        if content.path:
+            return hashlib.sha256(content.path.encode()).hexdigest()
+        elif content.url:
+            return hashlib.sha256(content.url.encode()).hexdigest()
+        elif content.file_data and content.file_data.content:
+            return hashlib.sha256(content.name.encode()).hexdigest()
+        else:
+            topic = content.topics[0]
+            reader = type(content.reader).__name__ if content.reader else None
+            return hashlib.sha256(f"{topic}-{reader}".encode()).hexdigest()
 
     def _add_to_contents_db(self, content: Content):
         if self.contents_db:
@@ -423,7 +545,6 @@ class Knowledge:
                 if content.file_data and content.file_data.type
                 else None
             )
-
             content_row = KnowledgeRow(
                 id=content.id,
                 name=content.name if content.name else "",
@@ -469,14 +590,15 @@ class Knowledge:
         self, query: str, max_results: Optional[int] = None, filters: Optional[Dict[str, Any]] = None
     ) -> List[Document]:
         """Returns relevant documents matching a query"""
+
         try:
-            if self.vector_store is None:
+            if self.vector_db is None:
                 log_warning("No vector db provided")
                 return []
 
             _max_results = max_results or self.max_results
             log_debug(f"Getting {_max_results} relevant documents for query: {query}")
-            return self.vector_store.search(query=query, limit=_max_results, filters=filters)
+            return self.vector_db.search(query=query, limit=_max_results, filters=filters)
         except Exception as e:
             log_error(f"Error searching for documents: {e}")
             return []
@@ -485,15 +607,16 @@ class Knowledge:
         self, query: str, max_results: Optional[int] = None, filters: Optional[Dict[str, Any]] = None
     ) -> List[Document]:
         """Returns relevant documents matching a query"""
+
         try:
-            if self.vector_store is None:
+            if self.vector_db is None:
                 log_warning("No vector db provided")
                 return []
 
             _max_results = max_results or self.max_results
             log_debug(f"Getting {_max_results} relevant documents for query: {query}")
             try:
-                return await self.vector_store.async_search(query=query, limit=_max_results, filters=filters)
+                return await self.vector_db.async_search(query=query, limit=_max_results, filters=filters)
             except NotImplementedError:
                 log_info("Vector db does not support async search")
                 return self.search(query=query, max_results=_max_results, filters=filters)
@@ -502,6 +625,10 @@ class Knowledge:
             return []
 
     def validate_filters(self, filters: Optional[Dict[str, Any]]) -> Tuple[Dict[str, Any], List[str]]:
+        if self.valid_metadata_filters is None:
+            self.valid_metadata_filters = set()
+        self.valid_metadata_filters.update(self._get_filters_from_db)
+
         if not filters:
             return {}, []
 
@@ -525,23 +652,41 @@ class Knowledge:
 
         return valid_filters, invalid_keys
 
+    def add_filters(self, metadata: Dict[str, Any]) -> None:
+        if self.valid_metadata_filters is None:
+            self.valid_metadata_filters = set()
+
+        for key in metadata.keys():
+            self.valid_metadata_filters.add(key)
+
+    @cached_property
+    def _get_filters_from_db(self) -> set:
+        if self.contents_db is None:
+            return set()
+        contents, _ = self.get_content()
+        valid_filters = set()
+        for content in contents:
+            if content.metadata:
+                valid_filters.update(content.metadata.keys())
+        return valid_filters
+
     def remove_vector_by_id(self, id: str) -> bool:
-        if self.vector_store is None:
+        if self.vector_db is None:
             log_warning("No vector DB provided")
             return
-        return self.vector_store.delete_by_id(id)
+        return self.vector_db.delete_by_id(id)
 
     def remove_vectors_by_name(self, name: str) -> bool:
-        if self.vector_store is None:
+        if self.vector_db is None:
             log_warning("No vector DB provided")
             return
-        return self.vector_store.delete_by_name(name)
+        return self.vector_db.delete_by_name(name)
 
     def remove_vectors_by_metadata(self, metadata: Dict[str, Any]) -> bool:
-        if self.vector_store is None:
+        if self.vector_db is None:
             log_warning("No vector DB provided")
             return
-        return self.vector_store.delete_by_metadata(metadata)
+        return self.vector_db.delete_by_metadata(metadata)
 
     # --- API Only Methods ---
 
@@ -552,13 +697,14 @@ class Knowledge:
         # Validation:At least one of the parameters must be provided
         if not content.id:
             content.id = str(uuid4())
-
-        self._load_content(content)
+        print("PROCESSING", content.name)
+        pprint(content)
+        self._load_content(content, upsert=False, skip_if_exists=True)
 
     def patch_content(self, content: Content):
         self._update_content(content)
 
-    def get_content_by_id(self, content_id: str):
+    def get_content_by_id(self, content_id: str) -> Optional[Content]:
         if self.contents_db is None:
             raise ValueError("No contents db provided")
         content_row = self.contents_db.get_knowledge_content(content_id)
@@ -569,6 +715,7 @@ class Knowledge:
             name=content_row.name,
             description=content_row.description,
             metadata=content_row.metadata,
+            file_type=content_row.type,
             size=content_row.size,
             status=content_row.status,
             status_message=content_row.status_message,
@@ -599,6 +746,7 @@ class Knowledge:
                 description=content_row.description,
                 metadata=content_row.metadata,
                 size=content_row.size,
+                file_type=content_row.type,
                 status=content_row.status,
                 status_message=content_row.status_message,
                 created_at=content_row.created_at,
@@ -619,8 +767,8 @@ class Knowledge:
         if self.contents_db is not None:
             self.contents_db.delete_knowledge_content(content_id)
 
-        if self.vector_store is not None:
-            self.vector_store.delete_by_content_id(content_id)
+        if self.vector_db is not None:
+            self.vector_db.delete_by_content_id(content_id)
 
     def remove_all_content(self):
         contents, _ = self.get_content()

@@ -6,10 +6,6 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 from uuid import UUID, uuid4
 
-from agno.db.base import SessionType
-from agno.run.response import RunResponse
-from agno.run.team import TeamRunResponse
-from agno.session.summary import SessionSummary
 from agno.utils.log import log_warning
 
 try:
@@ -39,27 +35,6 @@ def serialize_data(data: dict) -> str:
 
 def deserialize_data(data: str) -> dict:
     return json.loads(data)
-
-
-def hydrate_session(session: dict) -> dict:
-    """Convert nested dictionaries to their corresponding object types.
-
-    Args:
-        session (dict): The session dictionary to deserialize.
-
-    Returns:
-        dict: A session dictionary with all relevant fields deserialized.
-    """
-
-    if session.get("summary") is not None:
-        session["summary"] = SessionSummary.from_dict(session["summary"])
-    if session.get("runs") is not None:
-        if session["session_type"] == SessionType.AGENT:
-            session["runs"] = [RunResponse.from_dict(run) for run in session["runs"]]
-        elif session["session_type"] == SessionType.TEAM:
-            session["runs"] = [TeamRunResponse.from_dict(run) for run in session["runs"]]
-
-    return session
 
 
 # -- Redis utils --

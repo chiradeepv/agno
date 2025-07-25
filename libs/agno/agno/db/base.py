@@ -24,14 +24,11 @@ class BaseDb(ABC):
         eval_table: Optional[str] = None,
         knowledge_table: Optional[str] = None,
     ):
-        if not session_table and not user_memory_table and not metrics_table and not eval_table and not knowledge_table:
-            raise ValueError("At least one of the tables must be provided")
-
-        self.session_table_name = session_table
-        self.user_memory_table_name = user_memory_table
-        self.metrics_table_name = metrics_table
-        self.eval_table_name = eval_table
-        self.knowledge_table_name = knowledge_table
+        self.session_table_name = session_table or "agno_sessions"
+        self.user_memory_table_name = user_memory_table or "agno_user_memories"
+        self.metrics_table_name = metrics_table or "agno_metrics"
+        self.eval_table_name = eval_table or "agno_eval_runs"
+        self.knowledge_table_name = knowledge_table or "agno_knowledge"
 
     # --- Sessions ---
     @abstractmethod

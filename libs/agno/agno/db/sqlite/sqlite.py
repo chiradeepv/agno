@@ -5,9 +5,9 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 from uuid import uuid4
 
 from agno.db.base import BaseDb, SessionType
-from agno.db.schemas import MemoryRow
 from agno.db.schemas.evals import EvalFilterType, EvalRunRecord, EvalType
 from agno.db.schemas.knowledge import KnowledgeRow
+from agno.db.schemas.memory import UserMemory
 from agno.db.sqlite.schemas import get_table_schema_definition
 from agno.db.sqlite.utils import (
     apply_sorting,
@@ -139,9 +139,9 @@ class SqliteDb(BaseDb):
             table_metadata = MetaData()
             table = Table(table_name, table_metadata, *columns)
 
-            # Add multi-column unique constraints
+            # Add multi-column unique constraints with table-specific names
             for constraint in schema_unique_constraints:
-                constraint_name = constraint["name"]
+                constraint_name = f"{table_name}_{constraint['name']}"
                 constraint_columns = constraint["columns"]
                 table.append_constraint(UniqueConstraint(*constraint_columns, name=constraint_name))
 
@@ -151,13 +151,7 @@ class SqliteDb(BaseDb):
                 table.append_constraint(Index(idx_name, idx_col))
 
             # Create table
-            table_without_indexes = Table(
-                table_name,
-                MetaData(),
-                *[c.copy() for c in table.columns],
-                *[c for c in table.constraints if not isinstance(c, Index)],
-            )
-            table_without_indexes.create(self.db_engine, checkfirst=True)
+            table.create(self.db_engine, checkfirst=True)
 
             # Create indexes
             for idx in table.indexes:
@@ -735,7 +729,7 @@ class SqliteDb(BaseDb):
 
     def get_user_memory(
         self, memory_id: str, deserialize: Optional[bool] = True
-    ) -> Optional[Union[MemoryRow, Dict[str, Any]]]:
+    ) -> Optional[Union[UserMemory, Dict[str, Any]]]:
         """Get a memory from the database.
 
         Args:
@@ -743,8 +737,8 @@ class SqliteDb(BaseDb):
             deserialize (Optional[bool]): Whether to serialize the memory. Defaults to True.
 
         Returns:
-            Optional[Union[MemoryRow, Dict[str, Any]]]:
-                - When deserialize=True: MemoryRow object
+            Optional[Union[UserMemory, Dict[str, Any]]]:
+                - When deserialize=True: UserMemory object
                 - When deserialize=False: Memory dictionary
 
         Raises:
@@ -763,12 +757,7 @@ class SqliteDb(BaseDb):
                 if not memory_raw or not deserialize:
                     return memory_raw
 
-            return MemoryRow(
-                id=memory_raw["memory_id"],
-                user_id=memory_raw["user_id"],
-                memory=memory_raw["memory"],
-                last_updated=memory_raw["last_updated"],
-            )
+            return UserMemory.from_dict(memory_raw)
 
         except Exception as e:
             log_debug(f"Exception reading from memorytable: {e}")
@@ -787,8 +776,8 @@ class SqliteDb(BaseDb):
         sort_by: Optional[str] = None,
         sort_order: Optional[str] = None,
         deserialize: Optional[bool] = True,
-    ) -> Union[List[MemoryRow], Tuple[List[Dict[str, Any]], int]]:
-        """Get all memories from the database as MemoryRow objects.
+    ) -> Union[List[UserMemory], Tuple[List[Dict[str, Any]], int]]:
+        """Get all memories from the database as UserMemory objects.
 
         Args:
             user_id (Optional[str]): The ID of the user to filter by.
@@ -804,9 +793,9 @@ class SqliteDb(BaseDb):
             deserialize (Optional[bool]): Whether to serialize the memories. Defaults to True.
 
         Returns:
-            Union[List[MemoryRow], Tuple[List[Dict[str, Any]], int]]:
-                - When deserialize=True: List of MemoryRow objects
-                - When deserialize=False: List of Memory dictionaries and total count
+            Union[List[UserMemory], Tuple[List[Dict[str, Any]], int]]:
+                - When deserialize=True: List of UserMemory objects
+                - When deserialize=False: List of UserMemory dictionaries and total count
 
         Raises:
             Exception: If an error occurs during retrieval.
@@ -846,25 +835,17 @@ class SqliteDb(BaseDb):
 
                 result = sess.execute(stmt).fetchall()
                 if not result:
-                    return [] if serialize else ([], 0)
+                    return [] if deserialize else ([], 0)
 
                 user_memories_raw = [record._mapping for record in result]
 
                 if not deserialize:
                     return user_memories_raw, total_count
 
-            return [
-                MemoryRow(
-                    id=record["memory_id"],
-                    user_id=record["user_id"],
-                    memory=record["memory"],
-                    last_updated=record["last_updated"],
-                )
-                for record in user_memories_raw
-            ]
+            return [UserMemory.from_dict(record) for record in user_memories_raw]
 
         except Exception as e:
-            log_debug(f"Exception reading from memory table: {e}")
+            log_error(f"Error reading from memory table: {e}")
             return []
 
     def get_user_memory_stats(
@@ -931,46 +912,46 @@ class SqliteDb(BaseDb):
                 ], total_count
 
         except Exception as e:
-            log_debug(f"Exception getting user memory stats: {e}")
+            log_error(f"Error getting user memory stats: {e}")
             return [], 0
 
     def upsert_user_memory(
-        self, memory: MemoryRow, deserialize: Optional[bool] = True
-    ) -> Optional[Union[MemoryRow, Dict[str, Any]]]:
+        self, memory: UserMemory, deserialize: Optional[bool] = True
+    ) -> Optional[Union[UserMemory, Dict[str, Any]]]:
         """Upsert a user memory in the database.
 
         Args:
-            memory (MemoryRow): The user memory to upsert.
+            memory (UserMemory): The user memory to upsert.
             deserialize (Optional[bool]): Whether to serialize the memory. Defaults to True.
 
         Returns:
-            Optional[Union[MemoryRow, Dict[str, Any]]]:
-                - When deserialize=True: MemoryRow object
-                - When deserialize=False: Memory dictionary
+            Optional[Union[UserMemory, Dict[str, Any]]]:
+                - When deserialize=True: UserMemory object
+                - When deserialize=False: UserMemory dictionary
 
         Raises:
             Exception: If an error occurs during upsert.
         """
         try:
             table = self._get_table(table_type="user_memories")
-            if memory.id is None:
-                memory.id = str(uuid4())
+            if memory.memory_id is None:
+                memory.memory_id = str(uuid4())
 
             with self.Session() as sess, sess.begin():
                 stmt = sqlite.insert(table).values(
                     user_id=memory.user_id,
                     agent_id=memory.agent_id,
                     team_id=memory.team_id,
-                    memory_id=memory.id,
+                    memory_id=memory.memory_id,
                     memory=memory.memory,
-                    topics=memory.memory.get("topics", []),
+                    topics=memory.topics,
                     last_updated=int(time.time()),
                 )
                 stmt = stmt.on_conflict_do_update(
                     index_elements=["memory_id"],
                     set_=dict(
                         memory=memory.memory,
-                        topics=memory.memory.get("topics", []),
+                        topics=memory.topics,
                         last_updated=int(time.time()),
                     ),
                 ).returning(table)
@@ -978,21 +959,19 @@ class SqliteDb(BaseDb):
                 result = sess.execute(stmt)
                 row = result.fetchone()
 
+                if row is None:
+                    return None
+
+            log_debug(f"Upserted user memory with id '{memory.memory_id}'")
+
             user_memory_raw = row._mapping
             if not user_memory_raw or not deserialize:
                 return user_memory_raw
 
-            return MemoryRow(
-                id=user_memory_raw["memory_id"],
-                user_id=user_memory_raw["user_id"],
-                agent_id=user_memory_raw["agent_id"],
-                team_id=user_memory_raw["team_id"],
-                memory=user_memory_raw["memory"],
-                last_updated=user_memory_raw["last_updated"],
-            )
+            return UserMemory.from_dict(user_memory_raw)
 
         except Exception as e:
-            log_error(f"Exception upserting user memory: {e}")
+            log_error(f"Error upserting user memory: {e}")
             return None
 
     # -- Metrics methods --
@@ -1034,7 +1013,7 @@ class SqliteDb(BaseDb):
                 return [record._mapping for record in result]
 
         except Exception as e:
-            log_debug(f"Exception reading from sessions table: {e}")
+            log_error(f"Error reading from sessions table: {e}")
             return []
 
     def _get_metrics_calculation_starting_date(self, table: Table) -> Optional[date]:
@@ -1126,10 +1105,12 @@ class SqliteDb(BaseDb):
                 with self.Session() as sess, sess.begin():
                     results = bulk_upsert_metrics(session=sess, table=table, metrics_records=metrics_records)
 
+            log_debug("Updated metrics calculations")
+
             return results
 
         except Exception as e:
-            log_error(f"Exception refreshing metrics: {e}")
+            log_error(f"Error refreshing metrics: {e}")
             raise e
 
     def get_metrics(
@@ -1167,7 +1148,7 @@ class SqliteDb(BaseDb):
             return [row._mapping for row in result], latest_updated_at
 
         except Exception as e:
-            log_error(f"Exception getting metrics: {e}")
+            log_error(f"Error getting metrics: {e}")
             return [], None
 
     # -- Knowledge methods --
@@ -1293,7 +1274,11 @@ class SqliteDb(BaseDb):
                 )
                 sess.execute(stmt)
                 sess.commit()
+
+            log_debug(f"Upserted knowledge document with id '{knowledge_row.id}'")
+
             return knowledge_row
+
         except Exception as e:
             log_error(f"Error upserting knowledge document: {e}")
             return None
@@ -1344,6 +1329,8 @@ class SqliteDb(BaseDb):
                 sess.execute(stmt)
                 sess.commit()
 
+            log_debug(f"Created eval run with id '{eval_run.run_id}'")
+
             return eval_run
 
         except Exception as e:
@@ -1368,7 +1355,7 @@ class SqliteDb(BaseDb):
                     log_debug(f"Deleted eval run with ID: {eval_run_id}")
 
         except Exception as e:
-            log_debug(f"Error deleting eval run {eval_run_id}: {e}")
+            log_error(f"Error deleting eval run {eval_run_id}: {e}")
             raise
 
     def delete_eval_runs(self, eval_run_ids: List[str]) -> None:
@@ -1384,12 +1371,12 @@ class SqliteDb(BaseDb):
                 stmt = table.delete().where(table.c.run_id.in_(eval_run_ids))
                 result = sess.execute(stmt)
                 if result.rowcount == 0:
-                    log_warning(f"No eval runs found with IDs: {eval_run_ids}")
+                    log_debug(f"No eval runs found with IDs: {eval_run_ids}")
                 else:
                     log_debug(f"Deleted {result.rowcount} eval runs")
 
         except Exception as e:
-            log_debug(f"Error deleting eval runs {eval_run_ids}: {e}")
+            log_error(f"Error deleting eval runs {eval_run_ids}: {e}")
             raise
 
     def get_eval_run(
@@ -1425,7 +1412,7 @@ class SqliteDb(BaseDb):
             return EvalRunRecord.model_validate(eval_run_raw)
 
         except Exception as e:
-            log_debug(f"Exception getting eval run {eval_run_id}: {e}")
+            log_error(f"Exception getting eval run {eval_run_id}: {e}")
             return None
 
     def get_eval_runs(
@@ -1507,7 +1494,7 @@ class SqliteDb(BaseDb):
 
                 result = sess.execute(stmt).fetchall()
                 if not result:
-                    return [] if serialize else ([], 0)
+                    return [] if deserialize else ([], 0)
 
                 eval_runs_raw = [row._mapping for row in result]
                 if not deserialize:
@@ -1516,18 +1503,18 @@ class SqliteDb(BaseDb):
             return [EvalRunRecord.model_validate(row) for row in eval_runs_raw]
 
         except Exception as e:
-            log_debug(f"Exception getting eval runs: {e}")
+            log_error(f"Exception getting eval runs: {e}")
             return []
 
     def rename_eval_run(
-        self, eval_run_id: str, name: str, serialize: bool = True
+        self, eval_run_id: str, name: str, deserialize: Optional[bool] = True
     ) -> Optional[Union[EvalRunRecord, Dict[str, Any]]]:
         """Upsert the name of an eval run in the database, returning raw dictionary.
 
         Args:
             eval_run_id (str): The ID of the eval run to update.
             name (str): The new name of the eval run.
-            serialize (bool): Whether to serialize the eval run. Defaults to True.
+            deserialize (Optional[bool]): Whether to serialize the eval run. Defaults to True.
 
         Returns:
             Optional[Union[EvalRunRecord, Dict[str, Any]]]:
@@ -1545,12 +1532,15 @@ class SqliteDb(BaseDb):
                 )
                 sess.execute(stmt)
 
-            eval_run_raw = self.get_eval_run_raw(eval_run_id=eval_run_id)
+            eval_run_raw = self.get_eval_run(eval_run_id=eval_run_id, deserialize=deserialize)
+
+            log_debug(f"Renamed eval run with id '{eval_run_id}' to '{name}'")
+
             if not eval_run_raw or not deserialize:
                 return eval_run_raw
 
             return EvalRunRecord.model_validate(eval_run_raw)
 
         except Exception as e:
-            log_debug(f"Error upserting eval run name {eval_run_id}: {e}")
+            log_error(f"Error renaming eval run {eval_run_id}: {e}")
             raise

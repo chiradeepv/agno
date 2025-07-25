@@ -9,12 +9,7 @@ from agno.os import AgentOS
 from agno.team.team import Team
 
 # Setup the DynamoDB database
-db = DynamoDb(
-    session_table="sessions",
-    eval_table="eval_runs",
-    user_memory_table="user_memories",
-    metrics_table="metrics",
-)
+db = DynamoDb()
 
 # Setup the memory
 memory = Memory(db=db)
@@ -22,7 +17,7 @@ memory = Memory(db=db)
 # Setup a basic agent and a basic team
 basic_agent = Agent(
     name="Basic Agent",
-    agent_id="basic",
+    agent_id="basic-agent",
     model=OpenAIChat(id="gpt-4o"),
     memory=memory,
     enable_user_memories=True,
@@ -33,7 +28,7 @@ basic_agent = Agent(
     markdown=True,
 )
 basic_team = Team(
-    team_id="basic",
+    team_id="basic-team",
     name="Team Agent",
     model=OpenAIChat(id="gpt-4o"),
     memory=memory,
