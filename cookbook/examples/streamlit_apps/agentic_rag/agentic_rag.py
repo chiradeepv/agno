@@ -64,6 +64,7 @@ def get_agentic_rag_agent(
     db = PostgresDb(
         db_url=db_url,
         session_table="sessions",
+        max_results=3,  # Retrieve 3 most relevant documents
     )
 
     agent = Agent(

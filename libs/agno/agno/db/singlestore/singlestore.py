@@ -40,7 +40,7 @@ class SingleStoreDb(BaseDb):
         db_schema: Optional[str] = None,
         db_url: Optional[str] = None,
         session_table: Optional[str] = None,
-        user_memory_table: Optional[str] = None,
+        memory_table: Optional[str] = None,
         metrics_table: Optional[str] = None,
         eval_table: Optional[str] = None,
         knowledge_table: Optional[str] = None,
@@ -58,7 +58,7 @@ class SingleStoreDb(BaseDb):
             db_schema (Optional[str]): The database schema to use.
             db_url (Optional[str]): The database URL to connect to.
             session_table (Optional[str]): Name of the table to store Agent, Team and Workflow sessions.
-            user_memory_table (Optional[str]): Name of the table to store user memories.
+            memory_table (Optional[str]): Name of the table to store memories.
             metrics_table (Optional[str]): Name of the table to store metrics.
             eval_table (Optional[str]): Name of the table to store evaluation runs data.
             knowledge_table (Optional[str]): Name of the table to store knowledge content.
@@ -69,7 +69,7 @@ class SingleStoreDb(BaseDb):
         """
         super().__init__(
             session_table=session_table,
-            user_memory_table=user_memory_table,
+            memory_table=memory_table,
             metrics_table=metrics_table,
             eval_table=eval_table,
             knowledge_table=knowledge_table,
@@ -266,12 +266,12 @@ class SingleStoreDb(BaseDb):
                 )
             return self.session_table
 
-        if table_type == "user_memories":
-            if not hasattr(self, "user_memory_table"):
-                self.user_memory_table = self._get_or_create_table(
-                    table_name=self.user_memory_table_name, table_type="user_memories", db_schema=self.db_schema
+        if table_type == "memories":
+            if not hasattr(self, "memory_table"):
+                self.memory_table = self._get_or_create_table(
+                    table_name=self.memory_table_name, table_type="memories", db_schema=self.db_schema
                 )
-            return self.user_memory_table
+                return self.memory_table
 
         if table_type == "metrics":
             if not hasattr(self, "metrics_table"):
@@ -772,7 +772,7 @@ class SingleStoreDb(BaseDb):
             Exception: If an error occurs during deletion.
         """
         try:
-            table = self._get_table(table_type="user_memories")
+            table = self._get_table(table_type="memories")
 
             with self.Session() as sess, sess.begin():
                 delete_stmt = table.delete().where(table.c.memory_id == memory_id)
@@ -780,14 +780,14 @@ class SingleStoreDb(BaseDb):
 
                 success = result.rowcount > 0
                 if success:
-                    log_debug(f"Successfully deleted user memory id: {memory_id}")
+                    log_debug(f"Successfully deleted memory id: {memory_id}")
                 else:
-                    log_debug(f"No user memory found with id: {memory_id}")
+                    log_debug(f"No memory found with id: {memory_id}")
 
                 return success
 
         except Exception as e:
-            log_error(f"Error deleting user memory: {e}")
+            log_error(f"Error deleting memory: {e}")
             return False
 
     def delete_user_memories(self, memory_ids: List[str]) -> None:
@@ -800,16 +800,16 @@ class SingleStoreDb(BaseDb):
             Exception: If an error occurs during deletion.
         """
         try:
-            table = self._get_table(table_type="user_memories")
+            table = self._get_table(table_type="memories")
 
             with self.Session() as sess, sess.begin():
                 delete_stmt = table.delete().where(table.c.memory_id.in_(memory_ids))
                 result = sess.execute(delete_stmt)
                 if result.rowcount == 0:
-                    log_debug(f"No user memories found with ids: {memory_ids}")
+                    log_debug(f"No memories found with ids: {memory_ids}")
 
         except Exception as e:
-            log_error(f"Error deleting user memories: {e}")
+            log_error(f"Error deleting memories: {e}")
 
     def get_all_memory_topics(self) -> List[str]:
         """Get all memory topics from the database.
@@ -818,7 +818,7 @@ class SingleStoreDb(BaseDb):
             List[str]: List of memory topics.
         """
         try:
-            table = self._get_table(table_type="user_memories")
+            table = self._get_table(table_type="memories")
 
             with self.Session() as sess, sess.begin():
                 stmt = select(table.c.topics)
@@ -853,7 +853,7 @@ class SingleStoreDb(BaseDb):
             Exception: If an error occurs during retrieval.
         """
         try:
-            table = self._get_table(table_type="user_memories")
+            table = self._get_table(table_type="memories")
 
             with self.Session() as sess, sess.begin():
                 stmt = select(table).where(table.c.memory_id == memory_id)
@@ -909,7 +909,7 @@ class SingleStoreDb(BaseDb):
             Exception: If an error occurs during retrieval.
         """
         try:
-            table = self._get_table(table_type="user_memories")
+            table = self._get_table(table_type="memories")
 
             with self.Session() as sess, sess.begin():
                 stmt = select(table)
@@ -946,11 +946,11 @@ class SingleStoreDb(BaseDb):
                 if not result:
                     return [] if deserialize else ([], 0)
 
-                user_memories_raw = [record._mapping for record in result]
+                memories_raw = [record._mapping for record in result]
                 if not deserialize:
-                    return user_memories_raw, total_count
+                    return memories_raw, total_count
 
-            return [UserMemory.from_dict(record) for record in user_memories_raw]
+            return [UserMemory.from_dict(record) for record in memories_raw]
 
         except Exception as e:
             log_error(f"Exception reading from memory table: {e}")
@@ -981,7 +981,7 @@ class SingleStoreDb(BaseDb):
         )
         """
         try:
-            table = self._get_table(table_type="user_memories")
+            table = self._get_table(table_type="memories")
 
             with self.Session() as sess, sess.begin():
                 stmt = (
@@ -1039,7 +1039,7 @@ class SingleStoreDb(BaseDb):
             Exception: If an error occurs during upsert.
         """
         try:
-            table = self._get_table(table_type="user_memories")
+            table = self._get_table(table_type="memories")
 
             with self.Session() as sess, sess.begin():
                 if memory.memory_id is None:
@@ -1077,15 +1077,29 @@ class SingleStoreDb(BaseDb):
 
             log_debug(f"Upserted user memory with id '{memory.memory_id}'")
 
-            user_memory_raw = row._mapping
-            if not user_memory_raw or not deserialize:
-                return user_memory_raw
+            memory_raw = row._mapping
+            if not memory_raw or not deserialize:
+                return memory_raw
 
-            return UserMemory.from_dict(user_memory_raw)
+            return UserMemory.from_dict(memory_raw)
 
         except Exception as e:
             log_error(f"Error upserting user memory: {e}")
             return None
+
+    def clear_memories(self) -> None:
+        """Delete all memories from the database.
+
+        Raises:
+            Exception: If an error occurs during deletion.
+        """
+        try:
+            table = self._get_table(table_type="memories")
+            with self.Session() as sess, sess.begin():
+                sess.execute(table.delete())
+
+        except Exception as e:
+            log_warning(f"Exception deleting all memories: {e}")
 
     # -- Metrics methods --
     def _get_all_sessions_for_metrics_calculation(
@@ -1267,30 +1281,14 @@ class SingleStoreDb(BaseDb):
 
     # -- Knowledge methods --
 
-    def _get_knowledge_table(self) -> Table:
-        """Get or create the knowledge table.
-
-        Returns:
-            Table: The knowledge table.
-        """
-        if not hasattr(self, "knowledge_table"):
-            if self.knowledge_table_name is None:
-                raise ValueError("Knowledge table was not provided on initialization")
-
-            log_info(f"Getting knowledge table: {self.knowledge_table_name}")
-            self.knowledge_table = self._get_or_create_table(
-                table_name=self.knowledge_table_name, table_type="knowledge_contents", db_schema=self.db_schema
-            )
-
-        return self.knowledge_table
-
     def delete_knowledge_content(self, id: str):
-        """Delete knowledge content from the database.
+        """Delete a knowledge row from the database.
 
         Args:
-            id (str): The ID of the knowledge content to delete.
+            id (str): The ID of the knowledge row to delete.
         """
-        table = self._get_knowledge_table()
+        table = self._get_table(table_type="knowledge")
+
         with self.Session() as sess, sess.begin():
             stmt = table.delete().where(table.c.id == id)
             sess.execute(stmt)
@@ -1298,16 +1296,16 @@ class SingleStoreDb(BaseDb):
         log_debug(f"Deleted knowledge content with id '{id}'")
 
     def get_knowledge_content(self, id: str) -> Optional[KnowledgeRow]:
-        """Get knowledge content from the database.
+        """Get a knowledge row from the database.
 
         Args:
-            id (str): The ID of the knowledge content to get.
+            id (str): The ID of the knowledge row to get.
 
         Returns:
-            Optional[KnowledgeRow]: The knowledge content, or None if not found.
+            Optional[KnowledgeRow]: The knowledge row, or None if it doesn't exist.
         """
-        table = self._get_knowledge_table()
-        print(f"Getting knowledge content: {id}, {table}")
+        table = self._get_table(table_type="knowledge")
+
         with self.Session() as sess, sess.begin():
             stmt = select(table).where(table.c.id == id)
             result = sess.execute(stmt).fetchone()
@@ -1331,28 +1329,40 @@ class SingleStoreDb(BaseDb):
             sort_order (Optional[str]): The order to sort by.
 
         Returns:
-            List[KnowledgeRow]: The knowledge contents.
+            Tuple[List[KnowledgeRow], int]: The knowledge contents and total count.
+
+        Raises:
+            Exception: If an error occurs during retrieval.
         """
-        table = self._get_knowledge_table()
-        with self.Session() as sess, sess.begin():
-            stmt = select(table)
+        table = self._get_table(table_type="knowledge")
 
-            # Apply sorting
-            if sort_by is not None:
-                stmt = stmt.order_by(getattr(table.c, sort_by) * (1 if sort_order == "asc" else -1))
+        try:
+            with self.Session() as sess, sess.begin():
+                stmt = select(table)
 
-            # Get total count before applying limit and pagination
-            count_stmt = select(func.count()).select_from(stmt.alias())
-            total_count = sess.execute(count_stmt).scalar()
+                # Apply sorting
+                if sort_by is not None:
+                    stmt = stmt.order_by(getattr(table.c, sort_by) * (1 if sort_order == "asc" else -1))
 
-            # Apply pagination after count
-            if limit is not None:
-                stmt = stmt.limit(limit)
-                if page is not None:
-                    stmt = stmt.offset((page - 1) * limit)
+                # Get total count before applying limit and pagination
+                count_stmt = select(func.count()).select_from(stmt.alias())
+                total_count = sess.execute(count_stmt).scalar()
 
-            result = sess.execute(stmt).fetchall()
-            return [KnowledgeRow.model_validate(record._mapping) for record in result], total_count
+                # Apply pagination after count
+                if limit is not None:
+                    stmt = stmt.limit(limit)
+                    if page is not None:
+                        stmt = stmt.offset((page - 1) * limit)
+
+                result = sess.execute(stmt).fetchall()
+                if result is None:
+                    return [], 0
+
+                return [KnowledgeRow.model_validate(record._mapping) for record in result], total_count
+
+        except Exception as e:
+            log_error(f"Error getting knowledge contents: {e}")
+            return [], 0
 
     def upsert_knowledge_content(self, knowledge_row: KnowledgeRow):
         """Upsert knowledge content in the database.
@@ -1364,7 +1374,8 @@ class SingleStoreDb(BaseDb):
             Optional[KnowledgeRow]: The upserted knowledge row, or None if the operation fails.
         """
         try:
-            table = self._get_knowledge_table()
+            table = self._get_table(table_type="knowledge")
+
             with self.Session() as sess, sess.begin():
                 # Only include fields that are not None in the update
                 update_fields = {

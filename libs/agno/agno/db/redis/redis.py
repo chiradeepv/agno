@@ -38,7 +38,7 @@ class RedisDb(BaseDb):
         db_prefix: str = "agno",
         expire: Optional[int] = None,
         session_table: Optional[str] = None,
-        user_memory_table: Optional[str] = None,
+        memory_table: Optional[str] = None,
         metrics_table: Optional[str] = None,
         eval_table: Optional[str] = None,
         knowledge_table: Optional[str] = None,
@@ -57,7 +57,7 @@ class RedisDb(BaseDb):
             db_prefix (str): Prefix for all Redis keys
             expire (Optional[int]): TTL for Redis keys in seconds
             session_table (Optional[str]): Name of the table to store sessions
-            user_memory_table (Optional[str]): Name of the table to store user memories
+            memory_table (Optional[str]): Name of the table to store memories
             metrics_table (Optional[str]): Name of the table to store metrics
             eval_table (Optional[str]): Name of the table to store evaluation runs
             knowledge_table (Optional[str]): Name of the table to store knowledge documents
@@ -67,7 +67,7 @@ class RedisDb(BaseDb):
         """
         super().__init__(
             session_table=session_table,
-            user_memory_table=user_memory_table,
+            memory_table=memory_table,
             metrics_table=metrics_table,
             eval_table=eval_table,
             knowledge_table=knowledge_table,
@@ -90,8 +90,8 @@ class RedisDb(BaseDb):
         if table_type == "sessions":
             return self.session_table_name
 
-        elif table_type == "user_memories":
-            return self.user_memory_table_name
+        elif table_type == "memories":
+            return self.memory_table_name
 
         elif table_type == "metrics":
             return self.metrics_table_name
@@ -596,7 +596,7 @@ class RedisDb(BaseDb):
         """
         try:
             if self._delete_record(
-                "user_memories", memory_id, index_fields=["user_id", "agent_id", "team_id", "workflow_id"]
+                "memories", memory_id, index_fields=["user_id", "agent_id", "team_id", "workflow_id"]
             ):
                 log_debug(f"Successfully deleted user memory id: {memory_id}")
                 return True
@@ -618,7 +618,7 @@ class RedisDb(BaseDb):
             # TODO: cant we optimize this?
             for memory_id in memory_ids:
                 self._delete_record(
-                    "user_memories",
+                    "memories",
                     memory_id,
                     index_fields=["user_id", "agent_id", "team_id", "workflow_id"],
                 )
@@ -633,7 +633,7 @@ class RedisDb(BaseDb):
             List[str]: The list of memory topics.
         """
         try:
-            all_memories = self._get_all_records("user_memories")
+            all_memories = self._get_all_records("memories")
 
             topics = set()
             for memory in all_memories:
@@ -659,7 +659,7 @@ class RedisDb(BaseDb):
             Optional[UserMemory]: The memory data if found, None otherwise.
         """
         try:
-            memory_raw = self._get_record("user_memories", memory_id)
+            memory_raw = self._get_record("memories", memory_id)
             if memory_raw is None:
                 return None
 
@@ -710,7 +710,7 @@ class RedisDb(BaseDb):
             Exception: If any error occurs while reading the memories.
         """
         try:
-            all_memories = self._get_all_records("user_memories")
+            all_memories = self._get_all_records("memories")
 
             # Apply filters
             conditions = {}
@@ -767,7 +767,7 @@ class RedisDb(BaseDb):
             Exception: If any error occurs while getting the user memory stats.
         """
         try:
-            all_memories = self._get_all_records("user_memories")
+            all_memories = self._get_all_records("memories")
 
             # Group by user_id
             user_stats = {}
@@ -830,7 +830,7 @@ class RedisDb(BaseDb):
             }
 
             success = self._store_record(
-                "user_memories", memory.memory_id, data, index_fields=["user_id", "agent_id", "team_id", "workflow_id"]
+                "memories", memory.memory_id, data, index_fields=["user_id", "agent_id", "team_id", "workflow_id"]
             )
 
             if not success:
@@ -844,6 +844,25 @@ class RedisDb(BaseDb):
         except Exception as e:
             log_error(f"Error upserting user memory: {e}")
             return None
+
+    def clear_memories(self) -> None:
+        """Delete all memories from the database.
+
+        Raises:
+            Exception: If an error occurs during deletion.
+        """
+        try:
+            # Get all keys for memories table
+            keys = get_all_keys_for_table(redis_client=self.redis_client, prefix=self.db_prefix, table_type="memories")
+
+            if keys:
+                # Delete all memory keys in a single batch operation
+                self.redis_client.delete(*keys)
+
+        except Exception as e:
+            from agno.utils.log import log_warning
+
+            log_warning(f"Exception deleting all memories: {e}")
 
     # -- Metrics methods --
 
@@ -1021,87 +1040,72 @@ class RedisDb(BaseDb):
 
     # -- Knowledge methods --
 
-    def delete_knowledge_source(self, source_id: str):
-        """Delete a knowledge document from Redis.
+    def delete_knowledge_content(self, id: str):
+        """Delete a knowledge row from the database.
 
         Args:
-            document_id (str): The ID of the document to delete.
+            id (str): The ID of the knowledge row to delete.
 
         Raises:
-            Exception: If any error occurs while deleting the document.
+            Exception: If any error occurs while deleting the knowledge content.
         """
         try:
-            self._delete_record("knowledge", source_id)
+            self._delete_record("knowledge", id)
 
         except Exception as e:
-            log_error(f"Error deleting knowledge source: {e}")
+            log_error(f"Error deleting knowledge content: {e}")
 
-    def get_document_status(self, document_id: str) -> Optional[str]:
-        """Get the status of a knowledge document.
-
-        Args:
-            document_id (str): The ID of the document to get the status of.
-
-        Returns:
-            Optional[str]: The status of the document.
-
-        Raises:
-            Exception: If any error occurs while getting the document status.
-        """
-        try:
-            document = self._get_record("knowledge", document_id)
-            return document.get("status") if document else None
-
-        except Exception as e:
-            log_error(f"Error getting document status: {e}")
-            return None
-
-    def get_knowledge_source(self, source_id: str) -> Optional[KnowledgeRow]:
-        """Get a knowledge document from Redis.
+    def get_knowledge_content(self, id: str) -> Optional[KnowledgeRow]:
+        """Get a knowledge row from the database.
 
         Args:
-            document_id (str): The ID of the document to get.
+            id (str): The ID of the knowledge row to get.
 
         Returns:
-            Optional[KnowledgeRow]: The document if found, None otherwise.
+            Optional[KnowledgeRow]: The knowledge row, or None if it doesn't exist.
 
         Raises:
-            Exception: If any error occurs while getting the document.
+            Exception: If any error occurs while getting the knowledge content.
         """
         try:
-            document_raw = self._get_record("knowledge", source_id)
+            document_raw = self._get_record("knowledge", id)
             if document_raw is None:
                 return None
 
             return KnowledgeRow.model_validate(document_raw)
 
         except Exception as e:
-            log_error(f"Error getting knowledge document: {e}")
+            log_error(f"Error getting knowledge content: {e}")
             return None
 
-    def get_knowledge_documents(
+    def get_knowledge_contents(
         self,
         limit: Optional[int] = None,
         page: Optional[int] = None,
         sort_by: Optional[str] = None,
         sort_order: Optional[str] = None,
     ) -> Tuple[List[KnowledgeRow], int]:
-        """Get all knowledge documents from Redis.
+        """Get all knowledge contents from the database.
 
         Args:
-            limit (Optional[int]): The maximum number of documents to return.
-            page (Optional[int]): The page number to return.
-            sort_by (Optional[str]): The field to sort by.
+            limit (Optional[int]): The maximum number of knowledge contents to return.
+            page (Optional[int]): The page number.
+            sort_by (Optional[str]): The column to sort by.
             sort_order (Optional[str]): The order to sort by.
 
         Returns:
-            Tuple[List[KnowledgeRow], int]: A tuple containing the list of documents and the total number of documents.
+            Tuple[List[KnowledgeRow], int]: The knowledge contents and total count.
 
         Raises:
-            Exception: If any error occurs while getting the documents.
+            Exception: If an error occurs during retrieval.
+
+        Raises:
+            Exception: If any error occurs while getting the knowledge contents.
         """
         try:
             all_documents = self._get_all_records("knowledge")
+            if len(all_documents) == 0:
+                return [], 0
 
             total_count = len(all_documents)
 
@@ -1112,44 +1116,33 @@ class RedisDb(BaseDb):
             paginated_documents = apply_pagination(records=sorted_documents, limit=limit, page=page)
 
             return [KnowledgeRow.model_validate(doc) for doc in paginated_documents], total_count
+
         except Exception as e:
-            log_error(f"Error getting knowledge documents: {e}")
+            log_error(f"Error getting knowledge contents: {e}")
             return [], 0
 
-    def get_source_status(self, source_id: str):
-        pass
-
-    def get_knowledge_sources(
-        self,
-        limit: int | None = None,
-        page: int | None = None,
-        sort_by: str | None = None,
-        sort_order: str | None = None,
-    ):
-        pass
-
-    def upsert_knowledge_source(self, knowledge_row: KnowledgeRow):
-        """Upsert a knowledge document in Redis.
+    def upsert_knowledge_content(self, knowledge_row: KnowledgeRow):
+        """Upsert knowledge content in the database.
 
         Args:
-            knowledge_row (KnowledgeRow): The document to upsert.
+            knowledge_row (KnowledgeRow): The knowledge row to upsert.
 
         Returns:
-            Optional[KnowledgeRow]: The upserted document if successful, None otherwise.
+            Optional[KnowledgeRow]: The upserted knowledge row, or None if the operation fails.
 
         Raises:
-            Exception: If any error occurs while upserting the document.
+            Exception: If any error occurs while upserting the knowledge content.
         """
         try:
             data = knowledge_row.model_dump()
-            success = self._store_record("knowledge", knowledge_row.id, data)
+            success = self._store_record("knowledge", knowledge_row.id, data)  # type: ignore
 
-            log_debug(f"Upserted knowledge source with id '{knowledge_row.id}'")
+            log_debug(f"Upserted knowledge content with id '{knowledge_row.id}'")
 
             return knowledge_row if success else None
 
         except Exception as e:
-            log_error(f"Error upserting knowledge source: {e}")
+            log_error(f"Error upserting knowledge content: {e}")
             return None
 
     # -- Eval methods --

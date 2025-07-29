@@ -31,6 +31,7 @@ SESSION_TABLE_SCHEMA = {
 USER_MEMORY_TABLE_SCHEMA = {
     "memory_id": {"type": String, "primary_key": True, "nullable": False},
     "memory": {"type": JSON, "nullable": False},
+    "input": {"type": String, "nullable": True},
     "agent_id": {"type": String, "nullable": True},
     "team_id": {"type": String, "nullable": True},
     "workflow_id": {"type": String, "nullable": True},
@@ -111,7 +112,7 @@ def get_table_schema_definition(table_type: str) -> dict[str, Any]:
         "evals": EVAL_TABLE_SCHEMA,
         "metrics": METRICS_TABLE_SCHEMA,
         "user_memories": USER_MEMORY_TABLE_SCHEMA,
-        "knowledge_documents": KNOWLEDGE_TABLE_SCHEMA,
+        "knowledge": KNOWLEDGE_TABLE_SCHEMA,
         "learnings": {},
     }
     schema = schemas.get(table_type, {})
