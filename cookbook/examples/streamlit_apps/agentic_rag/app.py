@@ -6,7 +6,7 @@ import streamlit as st
 from agentic_rag import get_agentic_rag_agent
 from agno.agent import Agent
 from agno.utils.log import logger
-from agno.utils.streamlit import (
+from streamlit_utils import (
     COMMON_CSS,
     add_message,
     display_tool_calls,
@@ -30,6 +30,11 @@ st.markdown(COMMON_CSS, unsafe_allow_html=True)
 
 def restart_agent():
     """Reset the agent and clear chat history"""
+    # Clear the agent's session_id when restarting
+    if "agentic_rag_agent" in st.session_state and st.session_state["agentic_rag_agent"]:
+        st.session_state["agentic_rag_agent"].session_id = None
+        st.session_state["agentic_rag_agent"].reset_session_state()
+    
     restart_session(
         agent="agentic_rag_agent",
         session_id="session_id",
@@ -85,8 +90,14 @@ def main():
     ####################################################################
     # Session management
     ####################################################################
-    if agentic_rag_agent.session_id:
-        st.session_state["session_id"] = agentic_rag_agent.session_id
+    # Only sync session_id if it's not already set in session state (e.g., after restart)
+    if "session_id" not in st.session_state or st.session_state["session_id"] is None:
+        if agentic_rag_agent.session_id:
+            st.session_state["session_id"] = agentic_rag_agent.session_id
+    else:
+        # If session state has a session_id but agent doesn't match, update the agent
+        if st.session_state["session_id"] != agentic_rag_agent.session_id:
+            agentic_rag_agent.session_id = st.session_state["session_id"]
 
     if "messages" not in st.session_state:
         st.session_state["messages"] = []
@@ -146,8 +157,8 @@ def main():
 
     # Clear knowledge base
     if st.sidebar.button("Clear Knowledge Base"):
-        if agentic_rag_agent.knowledge.vector_store:
-            agentic_rag_agent.knowledge.vector_store.delete()
+        if agentic_rag_agent.knowledge.vector_db:
+            agentic_rag_agent.knowledge.vector_db.delete()
         st.sidebar.success("Knowledge base cleared")
 
     ###############################################################

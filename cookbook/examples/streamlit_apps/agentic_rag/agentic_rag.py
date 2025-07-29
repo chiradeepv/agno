@@ -52,7 +52,7 @@ def get_agentic_rag_agent(
     knowledge_base = Knowledge(
         name="Agentic RAG Knowledge Base",
         description="Knowledge base for agentic RAG application",
-        vector_store=PgVector(
+        vector_db=PgVector(
             db_url=db_url,
             table_name="agentic_rag_documents",
             schema="ai",
@@ -63,8 +63,7 @@ def get_agentic_rag_agent(
 
     db = PostgresDb(
         db_url=db_url,
-        session_table="sessions",
-        max_results=3,  # Retrieve 3 most relevant documents
+        session_table="agentic_rag_sessions",
     )
 
     agent = Agent(
