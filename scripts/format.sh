@@ -10,6 +10,7 @@ REPO_ROOT="$(dirname "${CURR_DIR}")"
 AGNO_DIR="${REPO_ROOT}/libs/agno"
 AGNO_OS_DIR="${REPO_ROOT}/libs/agno_os"
 COOKBOOK_DIR="${REPO_ROOT}/cookbook"
+AGNO_TESTS_DIR="${AGNO_DIR}/tests"
 source ${CURR_DIR}/_utils.sh
 
 print_heading "Formatting all libraries"
