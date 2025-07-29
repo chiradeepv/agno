@@ -1,6 +1,6 @@
 # Agentic RAG Agent
 
-**Agentic RAG Agent** is a chat application that uses Agno Agents powered with Agentic Retrieval-Augmented Generation.
+**Agentic RAG Agent** is a chat application that combines models with retrieval-augmented generation.
 It allows users to ask questions based on custom knowledge bases, documents, and web data, retrieve context-aware answers, and maintain chat history across sessions.
 
 > Note: Fork and clone this repository if needed
@@ -24,9 +24,16 @@ pip install -r cookbook/examples/streamlit_apps/agentic_rag/requirements.txt
 
 Required:
 
+Required:
 ```bash
 export OPENAI_API_KEY=your_openai_key_here
+```
+
+Optional (for additional models):
+```bash
 export ANTHROPIC_API_KEY=your_anthropic_key_here
+export GOOGLE_API_KEY=your_google_key_here
+export GROQ_API_KEY=your_groq_key_here
 ```
 
 ### 4. Run PgVector
@@ -62,9 +69,10 @@ streamlit run cookbook/examples/streamlit_apps/agentic_rag/app.py
 ### Model Support
 
 The application supports multiple model providers:
-
-- **OpenAI**: o3-mini, gpt-4o
-- **Anthropic**: claude-sonnet-4-0
+- OpenAI (o3-mini, gpt-4o)
+- Anthropic (claude-3-5-sonnet)
+- Google (gemini-2.0-flash-exp)
+- Groq (llama-3.3-70b-versatile)
 
 ## How to Use
 

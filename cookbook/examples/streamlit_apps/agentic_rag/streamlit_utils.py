@@ -1,6 +1,6 @@
 import json
 from datetime import datetime
-from typing import Any, Dict, List, Optional, TypedDict, Union
+from typing import Any, Dict, List, Optional, Union
 
 try:
     import streamlit as st
@@ -14,20 +14,12 @@ from agno.models.response import ToolExecution
 from agno.utils.log import log_debug, log_error, log_warning
 
 
-class SessionMessage(TypedDict):
-    """Type definition for messages stored in Streamlit session state."""
-
-    role: str
-    content: str
-    tool_calls: Optional[List[ToolExecution]]
-
-
 def add_message(role: str, content: str, tool_calls: Optional[List[ToolExecution]] = None) -> None:
     """Add a message to the Streamlit session state."""
     if "messages" not in st.session_state:
         st.session_state["messages"] = []
 
-    message: SessionMessage = {
+    message = {
         "role": role,
         "content": content,
         "tool_calls": tool_calls,
@@ -173,8 +165,15 @@ def session_selector_widget(
             break
 
     if current_session_id:
-        display_options = session_options
-        selected_index = session_options.index(current_selection) if current_selection in session_options else 0
+        # If current session is found in the list, show it as selected
+        if current_selection and current_selection in session_options:
+            display_options = session_options
+            selected_index = session_options.index(current_selection)
+        else:
+            # Current session not found in list (likely new session not yet saved)
+            # Show "New Chat" as selected to avoid switching to wrong session
+            display_options = ["🆕 New Chat"] + session_options
+            selected_index = 0
     else:
         display_options = ["🆕 New Chat"] + session_options
         selected_index = 0
@@ -189,8 +188,12 @@ def session_selector_widget(
     if selected != "🆕 New Chat" and selected in session_dict:
         selected_session_id = session_dict[selected]
 
+        # Only switch if:
+        # 1. No current session exists, OR
+        # 2. User explicitly selected a different session (current_selection was found in options)
         _is_session_changed = (
-            current_session_id is None or current_session_id == "" or selected_session_id != current_session_id
+            (current_session_id is None or current_session_id == "") or 
+            (current_selection and current_selection in session_options and selected_session_id != current_session_id)
         )
 
         if _is_session_changed:
@@ -249,6 +252,8 @@ def _load_session(
         agent.session_id = session_id
         # Reset any session-specific state
         agent.reset_session_state()
+        # Properly load the session from storage
+        agent.load_session()
 
         # Update session state
         st.session_state[agent_name] = agent
@@ -332,13 +337,13 @@ def knowledge_base_info_widget(agent: Agent) -> None:
         st.sidebar.info("No knowledge base configured")
         return
 
-    vector_store = getattr(agent.knowledge, "vector_store", None)
-    if not vector_store:
+    vector_db = getattr(agent.knowledge, "vector_db", None)
+    if not vector_db:
         st.sidebar.info("No vector store configured")
         return
 
     try:
-        doc_count = vector_store.get_count()
+        doc_count = vector_db.get_count()
         if doc_count == 0:
             st.sidebar.info("💡 Upload documents to populate the knowledge base")
         else:
