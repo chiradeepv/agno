@@ -8,15 +8,16 @@ from typing import Optional
 import typer
 
 from agno.utils.logging import set_log_level_to_debug
+from agno.cli import os_cli
 
 agno_cli = typer.Typer(
     help="""\b
 Agno is a model-agnostic framework for building AI Agents.
 \b
 Usage:
-1. Run `ag ws create` to create a new workspace
-2. Run `ag ws up` to start the workspace
-3. Run `ag ws down` to stop the workspace
+1. Run `ag os create` to create a new OS
+2. Run `ag os up` to start the OS
+3. Run `ag os down` to stop the OS
 """,
     no_args_is_help=True,
     add_completion=False,
@@ -26,6 +27,50 @@ Usage:
     pretty_exceptions_show_locals=False,
 )
 
+
+@agno_cli.command(short_help="Create a new OS in the current directory.")
+def create(
+    name: Optional[str] = typer.Option(
+        None,
+        "-n",
+        "--name",
+        help="Name of the new OS.",
+        show_default=False,
+    ),
+    template: Optional[str] = typer.Option(
+        None,
+        "-t",
+        "--template",
+        help="Starter template for the OS.",
+        show_default=False,
+    ),
+    url: Optional[str] = typer.Option(
+        None,
+        "-u",
+        "--url",
+        help="URL of the starter template.",
+        show_default=False,
+    ),
+    print_debug_log: bool = typer.Option(
+        False,
+        "-d",
+        "--debug",
+        help="Print debug logs.",
+    ),
+):
+    """\b
+    Create a new OS in the current directory using a starter template or url
+    \b
+    Examples:
+    > ag os create -t agent-os-docker                -> Create an `agent-os-docker` in the current directory
+    > ag os create -t agent-os-docker -n my-agent-os   -> Create an `agent-os-docker` named `my-agent-os` in the current directory
+    """
+    if print_debug_log:
+        set_log_level_to_debug()
+
+    from agno.os.operator import create_os_from_template
+
+    create_os_from_template(name=name, template=template, url=url)
 
 @agno_cli.command(short_help="Initialize Agno, use -r to reset")
 def init(
@@ -185,8 +230,8 @@ def start(
     Start resources defined in a resources.py file
     \b
     Examples:
-    > `ag ws start`                -> Start resources defined in a resources.py file
-    > `ag ws start workspace.py`   -> Start resources defined in a workspace.py file
+    > `ag os start`                -> Start resources defined in a resources.py file
+    > `ag os start resources.py`   -> Start resources defined in a resources.py file
     """
     if print_debug_log:
         set_log_level_to_debug()
@@ -285,8 +330,8 @@ def stop(
     Stop resources defined in a resources.py file
     \b
     Examples:
-    > `ag ws stop`                -> Stop resources defined in a resources.py file
-    > `ag ws stop workspace.py`   -> Stop resources defined in a workspace.py file
+    > `ag os stop`                -> Stop resources defined in a resources.py file
+    > `ag os stop resources.py`   -> Stop resources defined in a resources.py file
     """
     if print_debug_log:
         set_log_level_to_debug()
@@ -344,7 +389,6 @@ def patch(
     ),
     env_filter: Optional[str] = typer.Option(None, "-e", "--env", metavar="", help="Filter the environment to deploy"),
     infra_filter: Optional[str] = typer.Option(None, "-i", "--infra", metavar="", help="Filter the infra to deploy."),
-    config_filter: Optional[str] = typer.Option(None, "-c", "--config", metavar="", help="Filter the config to deploy"),
     group_filter: Optional[str] = typer.Option(
         None, "-g", "--group", metavar="", help="Filter resources using group name."
     ),
@@ -385,7 +429,7 @@ def patch(
     Update resources defined in a resources.py file
     \b
     Examples:
-    > `ag ws patch`                -> Update resources defined in a resources.py file
+    > `ag os patch`                -> Update resources defined in a resources.py file
     """
     if print_debug_log:
         set_log_level_to_debug()
@@ -483,7 +527,7 @@ def restart(
     Restart resources defined in a resources.py file
     \b
     Examples:
-    > `ag ws restart`                -> Start resources defined in a resources.py file
+    > `ag os restart`                -> Start resources defined in a resources.py file
     """
     from time import sleep
 
@@ -516,5 +560,4 @@ def restart(
         force=force,
     )
 
-
-agno_cli.add_typer(agno_cli)
+agno_cli.add_typer(os_cli)
