@@ -5,8 +5,7 @@ import nest_asyncio
 import streamlit as st
 from agentic_rag import get_agentic_rag_agent
 from agno.agent import Agent
-from agno.utils.log import logger
-from streamlit_utils import (
+from agno.utils.streamlit import (
     COMMON_CSS,
     add_message,
     display_tool_calls,
@@ -30,7 +29,6 @@ st.markdown(COMMON_CSS, unsafe_allow_html=True)
 
 def restart_agent():
     """Reset the agent and clear chat history"""
-    # Clear the agent's session_id when restarting
     if "agentic_rag_agent" in st.session_state and st.session_state["agentic_rag_agent"]:
         st.session_state["agentic_rag_agent"].session_id = None
         st.session_state["agentic_rag_agent"].reset_session_state()
@@ -276,7 +274,7 @@ def main():
     ####################################################################
     # Session management widgets
     ####################################################################
-    session_selector_widget(agentic_rag_agent, model_id, agent_name=agent_name)
+    session_selector_widget(agentic_rag_agent, agent_name=agent_name)
 
     # Knowledge base information
     knowledge_base_info_widget(agentic_rag_agent)

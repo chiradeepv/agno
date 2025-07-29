@@ -4,7 +4,6 @@ from typing import Any, Dict, List, Optional, Union
 
 try:
     import streamlit as st
-    from streamlit.delta_generator import DeltaGenerator
 except ImportError:
     raise ImportError("Streamlit is not installed. Please install it with `pip install streamlit`")
 
@@ -27,7 +26,7 @@ def add_message(role: str, content: str, tool_calls: Optional[List[ToolExecution
     st.session_state["messages"].append(message)
 
 
-def display_tool_calls(container: DeltaGenerator, tools: List[Union[ToolExecution, Dict[str, Any]]]) -> None:
+def display_tool_calls(container, tools: List[Union[ToolExecution, Dict[str, Any]]]) -> None:
     """Display tool calls in expandable sections."""
     if not tools:
         log_debug("No tools calls to display")
@@ -52,23 +51,17 @@ def display_tool_calls(container: DeltaGenerator, tools: List[Union[ToolExecutio
                 if result:
                     st.markdown("**Result:**")
 
-                    # Try to parse and display as JSON first
                     try:
                         if isinstance(result, str):
-                            # Try to parse string as JSON
                             parsed_result = json.loads(result)
                         elif isinstance(result, (list, dict)):
-                            # Already a JSON-like structure
                             parsed_result = result
                         else:
-                            # Convert to string for non-JSON data
-                            raise ValueError("Not JSON data")
+                            log_warning(f"Failed to parse tool result: {result}")
 
-                        # Display as formatted JSON
                         st.json(parsed_result)
 
                     except (json.JSONDecodeError, ValueError, TypeError):
-                        # Fallback to text display for non-JSON content
                         log_warning(f"Failed to parse tool result: {result}")
 
 
@@ -103,11 +96,10 @@ def restart_session(**session_keys: str) -> None:
 
 def session_selector_widget(
     agent: Agent,
-    model_id: str,
     agent_name: str = "agent",
 ) -> None:
     if not agent or not agent.db:
-        st.sidebar.info("💡 Memory not configured. Sessions will not be saved.")
+        log_debug("Memory not configured. Sessions will not be saved.")
         return
 
     try:
@@ -119,7 +111,6 @@ def session_selector_widget(
         )
     except Exception as e:
         log_error(f"Error fetching sessions: {e}")
-        st.sidebar.error("Could not load sessions")
         return
 
     if not sessions:
@@ -141,20 +132,8 @@ def session_selector_widget(
 
         name = session_name or session_id
 
-        if hasattr(session, "created_at") and session.created_at:
-            try:
-                if hasattr(session.created_at, "strftime"):
-                    time_str = session.created_at.strftime("%m/%d %H:%M")
-                    display_name = f"{name} ({time_str})"
-                else:
-                    display_name = name
-            except (ValueError, TypeError, OSError):
-                display_name = name
-        else:
-            display_name = name
-
-        session_options.append(display_name)
-        session_dict[display_name] = session_id
+        session_options.append(name)
+        session_dict[name] = session_id
 
     current_session_id = st.session_state.get("session_id")
     current_selection = None
@@ -165,13 +144,10 @@ def session_selector_widget(
             break
 
     if current_session_id:
-        # If current session is found in the list, show it as selected
         if current_selection and current_selection in session_options:
             display_options = session_options
             selected_index = session_options.index(current_selection)
         else:
-            # Current session not found in list (likely new session not yet saved)
-            # Show "New Chat" as selected to avoid switching to wrong session
             display_options = ["🆕 New Chat"] + session_options
             selected_index = 0
     else:
@@ -188,12 +164,8 @@ def session_selector_widget(
     if selected != "🆕 New Chat" and selected in session_dict:
         selected_session_id = session_dict[selected]
 
-        # Only switch if:
-        # 1. No current session exists, OR
-        # 2. User explicitly selected a different session (current_selection was found in options)
-        _is_session_changed = (
-            (current_session_id is None or current_session_id == "") or 
-            (current_selection and current_selection in session_options and selected_session_id != current_session_id)
+        _is_session_changed = (current_session_id is None or current_session_id == "") or (
+            current_selection and current_selection in session_options and selected_session_id != current_session_id
         )
 
         if _is_session_changed:
@@ -248,26 +220,20 @@ def _load_session(
     agent_name: str = "agent",
 ):
     try:
-        # Use the existing agent and switch its session
         agent.session_id = session_id
-        # Reset any session-specific state
         agent.reset_session_state()
-        # Properly load the session from storage
         agent.load_session()
 
-        # Update session state
         st.session_state[agent_name] = agent
         st.session_state["session_id"] = session_id
         st.session_state["messages"] = []
 
         try:
-            # Load chat history using the standard method
             chat_history = agent.get_messages_for_session(session_id)
 
             if chat_history:
                 for message in chat_history:
                     if message.role == "user":
-                        # Check if this is a tool result message disguised as a user message
                         content_str = str(message.content).strip()
                         if content_str.startswith("[{'type': 'tool_result'") or content_str.startswith(
                             '[{"type": "tool_result"'
@@ -276,15 +242,8 @@ def _load_session(
 
                         add_message("user", str(message.content))
                     elif message.role == "assistant":
-                        # Get tool executions for this specific message
                         tool_executions = get_tool_executions_for_message(agent, message)
                         add_message("assistant", str(message.content), tool_executions)
-                    elif message.role == "tool":
-                        # Skip tool messages - these are internal and shouldn't be shown to users
-                        continue
-                    elif message.role == "system":
-                        # Skip system messages - these are internal prompts
-                        continue
 
         except Exception as e:
             log_warning(f"Could not load chat history: {e}")
@@ -300,7 +259,6 @@ def get_tool_executions_for_message(agent: Agent, message: Message) -> Optional[
     if not hasattr(message, "tool_calls") or not message.tool_calls:
         return None
 
-    # Extract tool call IDs from the message
     message_tool_call_ids = set()
     for tool_call in message.tool_calls:
         if isinstance(tool_call, dict) and "id" in tool_call:
@@ -309,15 +267,12 @@ def get_tool_executions_for_message(agent: Agent, message: Message) -> Optional[
     if not message_tool_call_ids:
         return None
 
-    # Find matching tool executions from agent session
     if hasattr(agent, "agent_session") and agent.agent_session and agent.agent_session.runs:
         matching_tools = []
 
-        # Search through runs to find tool executions that match this message's tool call IDs
         for run in agent.agent_session.runs:
             if hasattr(run, "tools") and run.tools:
                 for tool_exec in run.tools:
-                    # Match by tool_call_id to ensure we get the right tool execution
                     if (
                         hasattr(tool_exec, "tool_call_id")
                         and tool_exec.tool_call_id
@@ -325,7 +280,6 @@ def get_tool_executions_for_message(agent: Agent, message: Message) -> Optional[
                     ):
                         matching_tools.append(tool_exec)
 
-        # Return only the tools that match this specific message
         return matching_tools if matching_tools else None
 
     return None
