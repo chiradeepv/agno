@@ -1,12 +1,13 @@
 import json
 from datetime import datetime, timezone
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, List, Literal, Optional, Union
 from uuid import uuid4
 
 from pydantic import BaseModel
 
 from agno.agent import Agent
 from agno.db.base import SessionType
+from agno.models.message import Message
 from agno.os.apps.memory import MemoryApp
 from agno.os.utils import format_team_tools, format_tools, get_run_input, get_session_name
 from agno.session import AgentSession, TeamSession, WorkflowSession
@@ -81,20 +82,91 @@ class ModelResponse(BaseModel):
 class AgentResponse(BaseModel):
     agent_id: Optional[str] = None
     name: Optional[str] = None
+    model: Optional[ModelResponse] = None
+
+    # Tools
+    tools: Optional[List[Dict[str, Any]]] = None
+    tool_call_limit: Optional[int] = None
+    tool_choice: Optional[Union[str, Dict[str, Any]]] = None
+
+    # Sessions
+    session_table: Optional[str] = None
+    add_history_to_context: Optional[bool] = None
+    enable_session_summaries: Optional[bool] = None
+    num_history_runs: Optional[int] = None
+    search_session_history: Optional[bool] = None
+    num_history_sessions: Optional[int] = None
+    add_session_summary_references: Optional[bool] = None
+    cache_session: Optional[bool] = None
+
+    # Knowledge
+    knowledge_table: Optional[str] = None
+    enable_agentic_knowledge_filters: Optional[bool] = None
+    knowledge_filters: Optional[Dict[str, Any]] = None
+    add_references: Optional[bool] = None
+    references_format: Optional[Literal["json", "yaml"]] = None
+
+    # Memory
+    memory: Optional[Dict[str, Any]] = None
+    memory_table: Optional[str] = None
+
+    # Reasoning
+    reasoning_model: Optional[ModelResponse] = None
+    reasoning_agent_id: Optional[str] = None
+    reasoning_min_steps: Optional[int] = None
+    reasoning_max_steps: Optional[int] = None
+
+    # Default tools
+    read_chat_history: Optional[bool] = None
+    search_knowledge: Optional[bool] = None
+    update_knowledge: Optional[bool] = None
+    read_tool_call_history: Optional[bool] = None
+
+    # System message
+    system_message: Optional[str] = None
+    system_message_role: Optional[str] = None
+    build_context: Optional[bool] = None
     description: Optional[str] = None
     instructions: Optional[Union[List[str], str]] = None
-    model: Optional[ModelResponse] = None
-    tools: Optional[List[Dict[str, Any]]] = None
-    memory: Optional[Dict[str, Any]] = None
-    knowledge: Optional[Dict[str, Any]] = None
-    session_table: Optional[str] = None
-    memory_table: Optional[str] = None
-    knowledge_table: Optional[str] = None
+    expected_output: Optional[str] = None
+    additional_context: Optional[str] = None
+    markdown: Optional[bool] = None
+    add_name_to_context: Optional[bool] = None
+    add_datetime_to_context: Optional[bool] = None
+    add_location_to_context: Optional[bool] = None
+    timezone_identifier: Optional[str] = None
+    add_state_in_messages: Optional[bool] = None
+
+    # Extra messages
+    additional_messages: Optional[List[str]] = None
+    user_message: Optional[str] = None
+    user_message_role: Optional[str] = None
+    build_user_context: Optional[bool] = None
+
+    # Response settings
+    retries: Optional[int] = None
+    delay_between_retries: Optional[int] = None
+    exponential_backoff: Optional[bool] = None
+    response_model_name: Optional[str] = None
+    parser_model: Optional[ModelResponse] = None
+    parser_model_prompt: Optional[str] = None
+    parse_response: Optional[bool] = None
+    structured_outputs: Optional[bool] = None
+    use_json_mode: Optional[bool] = None
+    save_response_to_file: Optional[str] = None
+
+    # Streaming
+    stream: Optional[bool] = None
+    stream_intermediate_steps: Optional[bool] = None
 
     @classmethod
     def from_agent(cls, agent: Agent, memory_app: Optional[MemoryApp] = None) -> "AgentResponse":
         agent_tools = agent.get_tools(session_id=str(uuid4()), async_mode=True)
         formatted_tools = format_tools(agent_tools) if agent_tools else None
+
+        additional_messages = agent.additional_messages
+        if additional_messages and isinstance(additional_messages[0], Message):
+            additional_messages = [message.to_dict() for message in additional_messages]  # type: ignore
 
         model_name = agent.model.name or agent.model.__class__.__name__ if agent.model else None
         model_provider = agent.model.provider or agent.model.__class__.__name__ if agent.model else ""
@@ -112,7 +184,14 @@ class AgentResponse(BaseModel):
         memory_info: Optional[Dict[str, Any]] = None
         if agent.memory_manager is not None:
             memory_app_name = memory_app.display_name if memory_app else "Memory"
-            memory_info = {"app_name": memory_app_name, "app_url": memory_app.router_prefix if memory_app else None}
+            memory_info = {
+                "app_name": memory_app_name,
+                "app_url": memory_app.router_prefix if memory_app else None,
+                "enable_agentic_memory": agent.enable_agentic_memory,
+                "enable_user_memories": agent.enable_user_memories,
+                "add_memory_references": agent.add_memory_references,
+                "metadata": agent.extra_data,
+            }
 
             if agent.memory_manager.model is not None:
                 memory_info["model"] = ModelResponse(
@@ -122,25 +201,83 @@ class AgentResponse(BaseModel):
                 )
 
         session_table = agent.db.session_table_name if agent.db else None
-        memory_table = agent.db.memory_table_name if agent.db and agent.enable_user_memories else None
         knowledge_table = agent.db.knowledge_table_name if agent.db and agent.knowledge else None
 
         return AgentResponse(
             agent_id=agent.agent_id,
             name=agent.name,
+            tools=formatted_tools,
+            tool_call_limit=agent.tool_call_limit,
+            tool_choice=agent.tool_choice,
+            session_table=session_table,
+            add_history_to_context=agent.add_history_to_context,
+            enable_session_summaries=agent.enable_session_summaries,
+            num_history_runs=agent.num_history_runs,
+            search_session_history=agent.search_session_history,
+            num_history_sessions=agent.num_history_sessions,
+            add_session_summary_references=agent.add_session_summary_references,
+            cache_session=agent.cache_session,
             description=agent.description,
             instructions=str(agent.instructions) if agent.instructions else None,
+            expected_output=agent.expected_output,
+            additional_context=agent.additional_context,
+            markdown=agent.markdown,
+            add_name_to_context=agent.add_name_to_context,
+            add_datetime_to_context=agent.add_datetime_to_context,
+            add_location_to_context=agent.add_location_to_context,
+            timezone_identifier=agent.timezone_identifier,
+            add_state_in_messages=agent.add_state_in_messages,
+            additional_messages=additional_messages,  # type: ignore
+            user_message=str(agent.user_message) if agent.user_message else None,
+            user_message_role=agent.user_message_role,
+            build_user_context=agent.build_user_context,
+            retries=agent.retries,
+            delay_between_retries=agent.delay_between_retries,
+            exponential_backoff=agent.exponential_backoff,
+            response_model_name=agent.response_model.__name__ if agent.response_model else None,
+            parser_model_prompt=agent.parser_model_prompt,
+            parse_response=agent.parse_response,
+            structured_outputs=agent.structured_outputs,
+            use_json_mode=agent.use_json_mode,
+            save_response_to_file=agent.save_response_to_file,
+            stream=agent.stream,
+            stream_intermediate_steps=agent.stream_intermediate_steps,
+            memory=memory_info,
+            memory_table=agent.db.memory_table_name if agent.db and agent.enable_user_memories else None,
+            knowledge_table=knowledge_table,
+            enable_agentic_knowledge_filters=agent.enable_agentic_knowledge_filters,
+            knowledge_filters=agent.knowledge_filters,
+            add_references=agent.add_references,
+            references_format=agent.references_format,
+            reasoning_agent_id=agent.reasoning_agent.agent_id if agent.reasoning_agent else None,
+            reasoning_min_steps=agent.reasoning_min_steps,
+            reasoning_max_steps=agent.reasoning_max_steps,
+            read_chat_history=agent.read_chat_history,
+            search_knowledge=agent.search_knowledge,
+            update_knowledge=agent.update_knowledge,
+            read_tool_call_history=agent.read_tool_call_history,
+            system_message=str(agent.system_message) if agent.system_message else None,
+            system_message_role=agent.system_message_role,
+            build_context=agent.build_context,
             model=ModelResponse(
                 name=model_name,
                 model=model_id,
                 provider=model_provider,
             ),
-            tools=formatted_tools,
-            memory=memory_info,
-            knowledge={"name": agent.knowledge.__class__.__name__} if agent.knowledge else None,
-            session_table=session_table,
-            memory_table=memory_table,
-            knowledge_table=knowledge_table,
+            parser_model=ModelResponse(
+                name=agent.parser_model.name,
+                model=agent.parser_model.id,
+                provider=agent.parser_model.provider,
+            )
+            if agent.parser_model
+            else None,
+            reasoning_model=ModelResponse(
+                name=agent.reasoning_model.name,
+                model=agent.reasoning_model.id,
+                provider=agent.reasoning_model.provider,
+            )
+            if agent.reasoning_model
+            else None,
         )
 
 
