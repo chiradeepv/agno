@@ -108,7 +108,6 @@ class AgentSession:
 
     def get_messages_from_last_n_runs(
         self,
-        session_id: str,
         agent_id: Optional[str] = None,
         team_id: Optional[str] = None,
         last_n: Optional[int] = None,
@@ -170,7 +169,7 @@ class AgentSession:
         log_debug(f"Getting messages from previous runs: {len(messages_from_history)}")
         return messages_from_history
 
-    def get_tool_calls(self, session_id: str, num_calls: Optional[int] = None) -> List[Dict[str, Any]]:
+    def get_tool_calls(self, num_calls: Optional[int] = None) -> List[Dict[str, Any]]:
         """Returns a list of tool calls from the messages"""
 
         tool_calls = []

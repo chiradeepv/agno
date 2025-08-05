@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from collections import ChainMap, deque
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from os import getenv
 from textwrap import dedent
 from typing import (
@@ -113,6 +113,7 @@ class Agent:
     session_name: Optional[str] = None
     # Session state (stored in the database to persist across runs)
     session_state: Optional[Dict[str, Any]] = None
+
     search_session_history: Optional[bool] = False
     num_history_sessions: Optional[int] = None
     # If True, the agent creates/updates session summaries at the end of runs
@@ -122,7 +123,7 @@ class Agent:
     # Session summary manager
     session_summary_manager: Optional[SessionSummaryManager] = None
     # If True, cache the session in memory
-    cache_session: bool = True
+    cache_session: bool = False
 
     # --- Agent Dependencies ---
     # Dependencies available for tools and prompt functions
@@ -289,15 +290,8 @@ class Agent:
     # --- If this Agent is part of a team ---
     # If this Agent is part of a team, this is the role of the agent in the team
     role: Optional[str] = None
-
     # Optional team ID. Indicates this agent is part of a team.
     team_id: Optional[str] = None
-
-    # Optional app ID. Indicates this agent is part of an app.
-    app_id: Optional[str] = None
-
-    # Optional team session state. Set by the team leader agent.
-    team_session_state: Optional[Dict[str, Any]] = None
 
     # --- If this Agent is part of an OS ---
     # Optional OS ID. Indicates this agent is part of an OS.
@@ -306,8 +300,6 @@ class Agent:
     # --- If this Agent is part of a workflow ---
     # Optional workflow ID. Indicates this agent is part of a workflow.
     workflow_id: Optional[str] = None
-    # Optional workflow session state. Set by the workflow.
-    workflow_session_state: Optional[Dict[str, Any]] = None
 
     # --- Debug ---
     # Enable debug logs
@@ -328,7 +320,6 @@ class Agent:
         introduction: Optional[str] = None,
         user_id: Optional[str] = None,
         session_id: Optional[str] = None,
-        session_name: Optional[str] = None,
         session_state: Optional[Dict[str, Any]] = None,
         search_session_history: Optional[bool] = False,
         num_history_sessions: Optional[int] = None,
@@ -408,7 +399,6 @@ class Agent:
         self.user_id = user_id
 
         self.session_id = session_id
-        self.session_name = session_name
         self.session_state = session_state
         self.search_session_history = search_session_history
         self.num_history_sessions = num_history_sessions
@@ -508,8 +498,6 @@ class Agent:
         self.telemetry = telemetry
 
         # --- Params not to be set by user ---
-        self.session_metrics: Optional[Metrics] = None
-
         self.run_id: Optional[str] = None
         self.run_input: Optional[Union[str, List, Dict, Message, BaseModel]] = None
         self.run_messages: Optional[RunMessages] = None
@@ -521,8 +509,9 @@ class Agent:
         self.audio: Optional[List[AudioArtifact]] = None
         # Videos generated during this session
         self.videos: Optional[List[VideoArtifact]] = None
-        # Agent session
-        self.agent_session: Optional[AgentSession] = None
+
+        # If we are caching the agent session
+        self._agent_session: Optional[AgentSession] = None
 
         self._tool_instructions: Optional[List[str]] = None
         self._tools_for_model: Optional[List[Dict[str, Any]]] = None
@@ -636,7 +625,7 @@ class Agent:
         session_id: Optional[str] = None,
         user_id: Optional[str] = None,
         session_state: Optional[Dict[str, Any]] = None,
-    ) -> Tuple[str, Optional[str]]:
+    ) -> Tuple[str, Optional[str], Dict[str, Any]]:
         """Initialize the session for the agent."""
 
         if session_id is None:
@@ -644,7 +633,7 @@ class Agent:
                 session_id = self.session_id
             else:
                 session_id = str(uuid4())
-                
+
         log_debug(f"Session ID: {session_id}", center=True)
 
         # Use the default user_id when necessary
@@ -660,16 +649,15 @@ class Agent:
         if session_id is not None:
             session_state["current_session_id"] = session_id
 
-        return session_id, user_id, session_state
+        return session_id, user_id, session_state  # type: ignore
 
     def _run(
         self,
         run_response: RunResponse,
         run_messages: RunMessages,
-        session_id: str,
+        session: AgentSession,
         user_id: Optional[str] = None,
         response_format: Optional[Union[Dict, Type[BaseModel]]] = None,
-        refresh_session_before_write: Optional[bool] = False,
     ) -> RunResponse:
         """Run the Agent and return the RunResponse.
 
@@ -706,27 +694,25 @@ class Agent:
         self._update_run_response(model_response=model_response, run_response=run_response, run_messages=run_messages)
 
         # 4. Add the RunResponse to Agent Session
-        self.add_run_to_session(
-            run_response=run_response,
-        )
+        session.add_run(run=run_response)
 
         # We should break out of the run function
         if any(tool_call.is_paused for tool_call in run_response.tools or []):
             return self._handle_agent_run_paused(
-                run_response=run_response, run_messages=run_messages, session_id=session_id, user_id=user_id
+                run_response=run_response, run_messages=run_messages, session=session, user_id=user_id
             )
 
         # 5. Update Agent Memory
-        response_iterator = self.update_memory(
+        response_iterator = self._update_memory(
             run_messages=run_messages,
-            session_id=session_id,
+            session=session,
             user_id=user_id,
         )
         # Consume the response iterator to ensure the memory is updated before the run is completed
         deque(response_iterator, maxlen=0)
 
         # 6. Calculate session metrics
-        self.set_session_metrics(run_messages)
+        self.update_session_metrics(session=session, run_messages=run_messages)
 
         self.run_response = cast(RunResponse, self.run_response)
         self.run_response.status = RunStatus.completed
@@ -735,13 +721,13 @@ class Agent:
         self._convert_response_to_structured_format(run_response)
 
         # 7. Save session to memory
-        self.save_session(user_id=user_id, session_id=session_id)
+        self.save_session(session=session)
 
         # 8. Optional: Save output to file if save_response_to_file is set
-        self.save_run_response_to_file(message=run_messages.user_message, session_id=session_id)
+        self.save_run_response_to_file(message=run_messages.user_message, session_id=session.session_id, user_id=user_id)
 
         # Log Agent Run
-        self._log_agent_run(user_id=user_id, session_id=session_id)
+        self._log_agent_run(user_id=user_id, session_id=session.session_id)
 
         log_debug(f"Agent Run End: {run_response.run_id}", center=True, symbol="*")
 
@@ -751,11 +737,10 @@ class Agent:
         self,
         run_response: RunResponse,
         run_messages: RunMessages,
-        session_id: str,
+        session: AgentSession,
         user_id: Optional[str] = None,
         response_format: Optional[Union[Dict, Type[BaseModel]]] = None,
         stream_intermediate_steps: bool = False,
-        refresh_session_before_write: Optional[bool] = False,
     ) -> Iterator[RunResponseEvent]:
         """Run the Agent and yield the RunResponse.
 
@@ -792,26 +777,24 @@ class Agent:
         )
 
         # 3. Add RunResponse to Agent Session
-        self.add_run_to_session(
-            run_response=run_response,
-        )
+        session.add_run(run=run_response)
 
         # We should break out of the run function
         if any(tool_call.is_paused for tool_call in run_response.tools or []):
             yield from self._handle_agent_run_paused_stream(
-                run_response=run_response, run_messages=run_messages, session_id=session_id, user_id=user_id
+                run_response=run_response, run_messages=run_messages, session=session, user_id=user_id
             )
             return
 
         # 4. Update Agent Memory
-        yield from self.update_memory(
+        yield from self._update_memory(
             run_messages=run_messages,
-            session_id=session_id,
+            session=session,
             user_id=user_id,
         )
 
         # 5. Calculate session metrics
-        self.set_session_metrics(run_messages)
+        self.update_session_metrics(session=session, run_messages=run_messages)
 
         self.run_response = cast(RunResponse, self.run_response)
         self.run_response.status = RunStatus.completed
@@ -820,10 +803,13 @@ class Agent:
             yield self._handle_event(create_run_response_completed_event(from_run_response=run_response), run_response)
 
         # 6. Save session to storage
-        self.save_session(user_id=user_id, session_id=session_id)
+        self.save_session(session=session)
 
         # 7. Optional: Save output to file if save_response_to_file is set
-        self.save_run_response_to_file(message=run_messages.user_message, session_id=session_id)
+        self.save_run_response_to_file(message=run_messages.user_message, session_id=session.session_id, user_id=user_id)
+
+        # Log Agent Run
+        self._log_agent_run(user_id=user_id, session_id=session.session_id)
 
         log_debug(f"Agent Run End: {run_response.run_id}", center=True, symbol="*")
 
@@ -888,20 +874,23 @@ class Agent:
         retries: Optional[int] = None,
         knowledge_filters: Optional[Dict[str, Any]] = None,
         debug_mode: Optional[bool] = None,
-        refresh_session_before_write: Optional[bool] = False,
         **kwargs: Any,
     ) -> Union[RunResponse, Iterator[RunResponseEvent]]:
         """Run the Agent and return the response."""
-        
+
         session_id, user_id, session_state = self._initialize_session(
             session_id=session_id, user_id=user_id, session_state=session_state
         )
 
         # Initialize the Agent
         self.initialize_agent(debug_mode=debug_mode)
-        
+
         # Read existing session from database
-        self.get_agent_session(session_id=session_id, user_id=user_id)
+        agent_session = self.get_agent_session(session_id=session_id, user_id=user_id)
+
+        # Update session state from DB
+        # TODO: Make sure session state is available to functions
+        session_state = self.update_session_state(session=agent_session, session_state=session_state)
 
         # Resolve dependencies
         if self.dependencies is not None:
@@ -936,7 +925,7 @@ class Agent:
 
         self.determine_tools_for_model(
             model=self.model,
-            session_id=session_id,
+            session=agent_session,
             user_id=user_id,
             async_mode=False,
             knowledge_filters=effective_filters,
@@ -1001,10 +990,9 @@ class Agent:
                         run_response=run_response,
                         run_messages=run_messages,
                         user_id=user_id,
-                        session_id=session_id,
+                        session=agent_session,
                         response_format=response_format,
                         stream_intermediate_steps=stream_intermediate_steps,
-                        refresh_session_before_write=refresh_session_before_write,
                     )
                     return response_iterator
                 else:
@@ -1012,9 +1000,8 @@ class Agent:
                         run_response=run_response,
                         run_messages=run_messages,
                         user_id=user_id,
-                        session_id=session_id,
+                        session=agent_session,
                         response_format=response_format,
-                        refresh_session_before_write=refresh_session_before_write,
                     )
                     return response
             except ModelProviderError as e:
@@ -1040,8 +1027,6 @@ class Agent:
                     )
                 else:
                     return self.run_response
-            finally:
-                self._reset_session_state()
 
         # If we get here, all retries failed
         if last_exception is not None:
@@ -1061,10 +1046,9 @@ class Agent:
         self,
         run_response: RunResponse,
         run_messages: RunMessages,
-        session_id: str,
+        session: AgentSession,
         user_id: Optional[str] = None,
         response_format: Optional[Union[Dict, Type[BaseModel]]] = None,
-        refresh_session_before_write: Optional[bool] = False,
     ) -> RunResponse:
         """Run the Agent and yield the RunResponse.
 
@@ -1101,26 +1085,24 @@ class Agent:
         self._update_run_response(model_response=model_response, run_response=run_response, run_messages=run_messages)
 
         # 4. Add RunResponse to Agent Session
-        self.add_run_to_session(
-            run_response=run_response,
-        )
+        session.add_run(run=run_response)
 
         # We should break out of the run function
         if any(tool_call.is_paused for tool_call in run_response.tools or []):
             return self._handle_agent_run_paused(
-                run_response=run_response, run_messages=run_messages, session_id=session_id, user_id=user_id
+                run_response=run_response, run_messages=run_messages, session=session, user_id=user_id
             )
 
         # 5. Update Agent Memory
         async for _ in self._aupdate_memory(
             run_messages=run_messages,
-            session_id=session_id,
+            session=session,
             user_id=user_id,
         ):
             pass
 
         # 6. Calculate session metrics
-        self.set_session_metrics(run_messages)
+        self.update_session_metrics(session=session, run_messages=run_messages)
 
         self.run_response = cast(RunResponse, self.run_response)
         self.run_response.status = RunStatus.completed
@@ -1129,13 +1111,13 @@ class Agent:
         self._convert_response_to_structured_format(run_response)
 
         # 7. Save session to storage
-        self.save_session(user_id=user_id, session_id=session_id)
+        self.save_session(session=session)
 
         # 8. Optional: Save output to file if save_response_to_file is set
-        self.save_run_response_to_file(message=run_messages.user_message, session_id=session_id)
+        self.save_run_response_to_file(message=run_messages.user_message, session_id=session.session_id, user_id=user_id)
 
         # Log Agent Run
-        await self._alog_agent_run(user_id=user_id, session_id=session_id)
+        await self._alog_agent_run(user_id=user_id, session_id=session.session_id)
 
         log_debug(f"Agent Run End: {run_response.run_id}", center=True, symbol="*")
 
@@ -1145,11 +1127,10 @@ class Agent:
         self,
         run_response: RunResponse,
         run_messages: RunMessages,
-        session_id: str,
+        session: AgentSession,
         user_id: Optional[str] = None,
         response_format: Optional[Union[Dict, Type[BaseModel]]] = None,
         stream_intermediate_steps: bool = False,
-        refresh_session_before_write: Optional[bool] = False,
     ) -> AsyncIterator[RunResponseEvent]:
         """Run the Agent and yield the RunResponse.
 
@@ -1187,14 +1168,12 @@ class Agent:
             yield event
 
         # 3. Add RunResponse to Agent Session
-        self.add_run_to_session(
-            run_response=run_response,
-        )
+        session.add_run(run=run_response)
 
         # We should break out of the run function
         if any(tool_call.is_paused for tool_call in run_response.tools or []):
             for item in self._handle_agent_run_paused_stream(
-                run_response=run_response, run_messages=run_messages, session_id=session_id, user_id=user_id
+                run_response=run_response, run_messages=run_messages, session=session, user_id=user_id
             ):
                 yield item
             return
@@ -1202,13 +1181,13 @@ class Agent:
         # 5. Update Agent Memory
         async for event in self._aupdate_memory(
             run_messages=run_messages,
-            session_id=session_id,
+            session=session,
             user_id=user_id,
         ):
             yield event
 
         # 6. Calculate session metrics
-        self.set_session_metrics(run_messages)
+        self.update_session_metrics(session=session, run_messages=run_messages)
 
         self.run_response = cast(RunResponse, self.run_response)
         self.run_response.status = RunStatus.completed
@@ -1217,10 +1196,13 @@ class Agent:
             yield self._handle_event(create_run_response_completed_event(from_run_response=run_response), run_response)
 
         # 6. Save session to storage
-        self.save_session(user_id=user_id, session_id=session_id)
+        self.save_session(session=session)
 
         # 8. Optional: Save output to file if save_response_to_file is set
-        self.save_run_response_to_file(message=run_messages.user_message, session_id=session_id)
+        self.save_run_response_to_file(message=run_messages.user_message, session_id=session.session_id, user_id=user_id)
+
+        # Log Agent Run
+        await self._alog_agent_run(user_id=user_id, session_id=session.session_id)
 
         log_debug(f"Agent Run End: {run_response.run_id}", center=True, symbol="*")
 
@@ -1281,7 +1263,6 @@ class Agent:
         retries: Optional[int] = None,
         knowledge_filters: Optional[Dict[str, Any]] = None,
         debug_mode: Optional[bool] = None,
-        refresh_session_before_write: Optional[bool] = False,
         **kwargs: Any,
     ) -> Union[RunResponse, AsyncIterator[RunResponseEvent]]:
         """Async Run the Agent and return the response."""
@@ -1292,9 +1273,12 @@ class Agent:
 
         # Initialize the Agent
         self.initialize_agent(debug_mode=debug_mode)
-        
+
         # Read existing session from storage
-        self.get_agent_session(session_id=session_id, user_id=user_id)
+        agent_session = self.get_agent_session(session_id=session_id, user_id=user_id)
+
+        # Update session state from DB
+        session_state = self.update_session_state(session=agent_session, session_state=session_state)
 
         # Resolve dependencies
         if self.dependencies is not None:
@@ -1327,7 +1311,7 @@ class Agent:
 
         self.determine_tools_for_model(
             model=self.model,
-            session_id=session_id,
+            session=agent_session,
             user_id=user_id,
             async_mode=True,
             knowledge_filters=effective_filters,
@@ -1393,19 +1377,17 @@ class Agent:
                         run_response=run_response,
                         run_messages=run_messages,
                         user_id=user_id,
-                        session_id=session_id,
+                        session=agent_session,
                         response_format=response_format,
                         stream_intermediate_steps=stream_intermediate_steps,
-                        refresh_session_before_write=refresh_session_before_write,
                     )  # type: ignore[assignment]
                 else:
                     return self._arun(
                         run_response=run_response,
                         run_messages=run_messages,
                         user_id=user_id,
-                        session_id=session_id,
+                        session=agent_session,
                         response_format=response_format,
-                        refresh_session_before_write=refresh_session_before_write,
                     )
             except ModelProviderError as e:
                 log_warning(f"Attempt {attempt + 1}/{num_attempts} failed: {str(e)}")
@@ -1430,8 +1412,6 @@ class Agent:
                     )
                 else:
                     return self.run_response
-            finally:
-                self._reset_session_state()
 
         # If we get here, all retries failed
         if last_exception is not None:
@@ -1506,16 +1486,21 @@ class Agent:
             retries: The number of retries to continue the run for.
             knowledge_filters: The knowledge filters to use for the run.
         """
-        
+        if not run_response and not run_id:
+            raise ValueError("Either run_response or run_id must be provided.")
+
         session_id, user_id, session_state = self._initialize_session(
             session_id=session_id, user_id=user_id
         )
-        
+
         # Initialize the Agent
         self.initialize_agent(debug_mode=debug_mode)
-        
+
         # Read existing session from storage
-        self.get_agent_session(session_id=session_id, user_id=user_id)
+        agent_session = self.get_agent_session(session_id=session_id, user_id=user_id)
+
+        # Update session state from DB
+        session_state = self.update_session_state(session=agent_session, session_state=session_state)
 
         # Resolve dependencies
         if self.dependencies is not None:
@@ -1553,12 +1538,12 @@ class Agent:
             self.run_response = run_response
             self.run_id = run_response.run_id
         elif run_id is not None:
+
             # The run is continued from a run_id. This requires the updated tools to be passed.
             if updated_tools is None:
                 raise ValueError("Updated tools are required to continue a run from a run_id.")
 
-            self.agent_session = cast(AgentSession, self.agent_session)
-            runs = self.agent_session.runs
+            runs = agent_session.runs
             run_response = next((r for r in runs if r.run_id == run_id), None)  # type: ignore
             if run_response is None:
                 raise RuntimeError(f"No runs found for run ID {run_id}")
@@ -1567,12 +1552,7 @@ class Agent:
             self.run_response = run_response
             self.run_id = run_id
         else:
-            self.run_response = cast(RunResponse, self.run_response)
-            self.run_response.status = RunStatus.running
-            # We are continuing from a previous run_response in state
-            run_response = self.run_response
-            messages = self.run_response.messages or []
-            self.run_id = self.run_response.run_id
+            raise ValueError("Either run_response or run_id must be provided.")
 
         # Prepare arguments for the model
         self.set_default_model()
@@ -1581,7 +1561,7 @@ class Agent:
 
         self.determine_tools_for_model(
             model=self.model,
-            session_id=session_id,
+            session=agent_session,
             user_id=user_id,
             async_mode=False,
             knowledge_filters=effective_filters,
@@ -1617,7 +1597,7 @@ class Agent:
                         run_response=run_response,
                         run_messages=self.run_messages,
                         user_id=user_id,
-                        session_id=session_id,
+                        session=agent_session,
                         response_format=response_format,
                         stream_intermediate_steps=stream_intermediate_steps,
                     )
@@ -1627,7 +1607,7 @@ class Agent:
                         run_response=run_response,
                         run_messages=self.run_messages,
                         user_id=user_id,
-                        session_id=session_id,
+                        session=agent_session,
                         response_format=response_format,
                     )
                     return response
@@ -1653,8 +1633,6 @@ class Agent:
                     return self.create_run_response(
                         run_state=RunStatus.cancelled, content="Operation cancelled by user", run_response=run_response
                     )
-            finally:
-                self._reset_session_state()
 
         # If we get here, all retries failed
         if last_exception is not None:
@@ -1674,7 +1652,7 @@ class Agent:
         self,
         run_response: RunResponse,
         run_messages: RunMessages,
-        session_id: str,
+        session: AgentSession,
         user_id: Optional[str] = None,
         response_format: Optional[Union[Dict, Type[BaseModel]]] = None,
     ) -> RunResponse:
@@ -1708,27 +1686,25 @@ class Agent:
         self._update_run_response(model_response=model_response, run_response=run_response, run_messages=run_messages)
 
         # 3. Add the run to memory
-        self.add_run_to_session(
-            run_response=run_response,
-        )
+        session.add_run(run=run_response)
 
         # We should break out of the run function
         if any(tool_call.is_paused for tool_call in run_response.tools or []):
             return self._handle_agent_run_paused(
-                run_response=run_response, run_messages=run_messages, session_id=session_id, user_id=user_id
+                run_response=run_response, run_messages=run_messages, session=session, user_id=user_id
             )
 
         # 4. Update Agent Memory
-        response_iterator = self.update_memory(
+        response_iterator = self._update_memory(
             run_messages=run_messages,
-            session_id=session_id,
+            session=session,
             user_id=user_id,
         )
         # Consume the response iterator to ensure the memory is updated before the run is completed
         deque(response_iterator, maxlen=0)
 
         # 5. Calculate session metrics
-        self.set_session_metrics(run_messages)
+        self.update_session_metrics(session=session, run_messages=run_messages)
 
         self.run_response = cast(RunResponse, self.run_response)
         self.run_response.status = RunStatus.completed
@@ -1737,13 +1713,10 @@ class Agent:
         self._convert_response_to_structured_format(run_response)
 
         # 6. Save session to storage
-        self.save_session(user_id=user_id, session_id=session_id)
+        self.save_session(session=session)
 
         # 7. Save output to file if save_response_to_file is set
-        self.save_run_response_to_file(message=run_messages.user_message, session_id=session_id)
-
-        # Log Agent Run
-        self._log_agent_run(user_id=user_id, session_id=session_id)
+        self.save_run_response_to_file(message=run_messages.user_message, session_id=session.session_id, user_id=user_id)
 
         run_response.status = RunStatus.running
 
@@ -1753,7 +1726,7 @@ class Agent:
         self,
         run_response: RunResponse,
         run_messages: RunMessages,
-        session_id: str,
+        session: AgentSession,
         user_id: Optional[str] = None,
         response_format: Optional[Union[Dict, Type[BaseModel]]] = None,
         stream_intermediate_steps: bool = False,
@@ -1786,26 +1759,24 @@ class Agent:
             yield event
 
         # 3. Add the run to memory
-        self.add_run_to_session(
-            run_response=run_response,
-        )
+        session.add_run(run=run_response)
 
         # We should break out of the run function
         if any(tool_call.is_paused for tool_call in run_response.tools or []):
             yield from self._handle_agent_run_paused_stream(
-                run_response=run_response, run_messages=run_messages, session_id=session_id, user_id=user_id
+                run_response=run_response, run_messages=run_messages, session=session, user_id=user_id
             )
             return
 
         # 4. Update Agent Memory
-        yield from self.update_memory(
+        yield from self._update_memory(
             run_messages=run_messages,
-            session_id=session_id,
+            session=session,
             user_id=user_id,
         )
 
         # 5. Calculate session metrics
-        self.set_session_metrics(run_messages)
+        self.update_session_metrics(session=session, run_messages=run_messages)
 
         self.run_response = cast(RunResponse, self.run_response)
         self.run_response.status = RunStatus.completed
@@ -1814,10 +1785,10 @@ class Agent:
             yield self._handle_event(create_run_response_completed_event(run_response), run_response)
 
         # 6. Save session to storage
-        self.save_session(user_id=user_id, session_id=session_id)
+        self.save_session(session=session)
 
         # 7. Save output to file if save_response_to_file is set
-        self.save_run_response_to_file(message=run_messages.user_message, session_id=session_id)
+        self.save_run_response_to_file(message=run_messages.user_message, session_id=session.session_id, user_id=user_id)
 
         log_debug(f"Agent Run End: {run_response.run_id}", center=True, symbol="*")
 
@@ -1880,15 +1851,21 @@ class Agent:
             retries: The number of retries to continue the run for.
             knowledge_filters: The knowledge filters to use for the run.
         """
+        if not run_response and not run_id:
+            raise ValueError("Either run_response or run_id must be provided.")
+
         session_id, user_id, session_state = self._initialize_session(
             session_id=session_id, user_id=user_id
         )
-        
+
         # Initialize the Agent
         self.initialize_agent(debug_mode=debug_mode)
-        
+
         # Read existing session from storage
-        self.get_agent_session(session_id=session_id, user_id=user_id)
+        agent_session = self.get_agent_session(session_id=session_id, user_id=user_id)
+
+        # Update session state from DB
+        session_state = self.update_session_state(session=agent_session, session_state=session_state)
 
         # Resolve dependencies
         if self.dependencies is not None:
@@ -1930,8 +1907,7 @@ class Agent:
             if updated_tools is None:
                 raise ValueError("Updated tools are required to continue a run from a run_id.")
 
-            self.agent_session = cast(AgentSession, self.agent_session)
-            runs = self.agent_session.runs
+            runs = agent_session.runs
             run_response = next((r for r in runs if r.run_id == run_id), None)  # type: ignore
             if run_response is None:
                 raise RuntimeError(f"No runs found for run ID {run_id}")
@@ -1940,11 +1916,8 @@ class Agent:
             self.run_response = run_response
             self.run_id = run_id
         else:
-            # We are continuing from a previous run_response in state
-            self.run_response = cast(RunResponse, self.run_response)
-            run_response = self.run_response
-            messages = self.run_response.messages or []
-            self.run_id = self.run_response.run_id
+            raise ValueError("Either run_response or run_id must be provided.")
+
 
         # Prepare arguments for the model
         response_format = self._get_response_format()
@@ -1952,7 +1925,7 @@ class Agent:
 
         self.determine_tools_for_model(
             model=self.model,
-            session_id=session_id,
+            session=agent_session,
             user_id=user_id,
             async_mode=True,
             knowledge_filters=effective_filters,
@@ -1998,7 +1971,7 @@ class Agent:
                         run_response=run_response,
                         run_messages=run_messages,
                         user_id=user_id,
-                        session_id=session_id,
+                        session=agent_session,
                         response_format=response_format,
                         stream_intermediate_steps=stream_intermediate_steps,
                     )
@@ -2007,7 +1980,7 @@ class Agent:
                         run_response=run_response,
                         run_messages=run_messages,
                         user_id=user_id,
-                        session_id=session_id,
+                        session=agent_session,
                         response_format=response_format,
                     )
             except ModelProviderError as e:
@@ -2032,9 +2005,6 @@ class Agent:
                     return self.create_run_response(
                         run_state=RunStatus.cancelled, content="Operation cancelled by user", run_response=run_response
                     )
-            finally:
-                self._reset_session_state()
-
         # If we get here, all retries failed
         if last_exception is not None:
             log_error(
@@ -2052,7 +2022,7 @@ class Agent:
         self,
         run_response: RunResponse,
         run_messages: RunMessages,
-        session_id: str,
+        session: AgentSession,
         user_id: Optional[str] = None,
         response_format: Optional[Union[Dict, Type[BaseModel]]] = None,
     ) -> RunResponse:
@@ -2086,26 +2056,24 @@ class Agent:
         self._update_run_response(model_response=model_response, run_response=run_response, run_messages=run_messages)
 
         # 3. Add the run to memory
-        self.add_run_to_session(
-            run_response=run_response,
-        )
+        session.add_run(run=run_response)
 
         # We should break out of the run function
         if any(tool_call.is_paused for tool_call in run_response.tools or []):
             return self._handle_agent_run_paused(
-                run_response=run_response, run_messages=run_messages, session_id=session_id, user_id=user_id
+                run_response=run_response, run_messages=run_messages, session=session, user_id=user_id
             )
 
         # 4. Update Agent Memory
         async for _ in self._aupdate_memory(
             run_messages=run_messages,
-            session_id=session_id,
+            session=session,
             user_id=user_id,
         ):
             pass
 
         # 5. Calculate session metrics
-        self.set_session_metrics(run_messages)
+        self.update_session_metrics(session=session, run_messages=run_messages)
 
         self.run_response = cast(RunResponse, self.run_response)
         self.run_response.status = RunStatus.completed
@@ -2114,13 +2082,10 @@ class Agent:
         self._convert_response_to_structured_format(run_response)
 
         # 6. Save session to storage
-        self.save_session(user_id=user_id, session_id=session_id)
+        self.save_session(session=session)
 
         # 7. Save output to file if save_response_to_file is set
-        self.save_run_response_to_file(message=run_messages.user_message, session_id=session_id)
-
-        # Log Agent Run
-        await self._alog_agent_run(user_id=user_id, session_id=session_id)
+        self.save_run_response_to_file(message=run_messages.user_message, session_id=session.session_id, user_id=user_id)
 
         log_debug(f"Agent Run End: {run_response.run_id}", center=True, symbol="*")
 
@@ -2132,7 +2097,7 @@ class Agent:
         self,
         run_response: RunResponse,
         run_messages: RunMessages,
-        session_id: str,
+        session: AgentSession,
         user_id: Optional[str] = None,
         response_format: Optional[Union[Dict, Type[BaseModel]]] = None,
         stream_intermediate_steps: bool = False,
@@ -2166,14 +2131,12 @@ class Agent:
             yield event
 
         # 3. Add the run to memory
-        self.add_run_to_session(
-            run_response=run_response,
-        )
+        session.add_run(run=run_response)
 
         # We should break out of the run function
         if any(tool_call.is_paused for tool_call in run_response.tools or []):
             for item in self._handle_agent_run_paused_stream(
-                run_response=run_response, run_messages=run_messages, session_id=session_id, user_id=user_id
+                run_response=run_response, run_messages=run_messages, session=session, user_id=user_id
             ):
                 yield item
             return
@@ -2181,13 +2144,13 @@ class Agent:
         # 4. Update Agent Memory
         async for event in self._aupdate_memory(
             run_messages=run_messages,
-            session_id=session_id,
+            session=session,
             user_id=user_id,
         ):
             yield event
 
         # 5. Calculate session metrics
-        self.set_session_metrics(run_messages)
+        self.update_session_metrics(session=session, run_messages=run_messages)
 
         self.run_response = cast(RunResponse, self.run_response)
         self.run_response.status = RunStatus.completed
@@ -2196,10 +2159,10 @@ class Agent:
             yield self._handle_event(create_run_response_completed_event(run_response), run_response)
 
         # 6. Save session to storage
-        self.save_session(user_id=user_id, session_id=session_id)
+        self.save_session(session=session)
 
         # 6. Save output to file if save_response_to_file is set
-        self.save_run_response_to_file(message=run_messages.user_message, session_id=session_id)
+        self.save_run_response_to_file(message=run_messages.user_message, session_id=session.session_id, user_id=user_id)
 
         log_debug(f"Agent Run End: {run_response.run_id}", center=True, symbol="*")
 
@@ -2207,7 +2170,7 @@ class Agent:
         self,
         run_response: RunResponse,
         run_messages: RunMessages,
-        session_id: str,
+        session: AgentSession,
         user_id: Optional[str] = None,
     ) -> RunResponse:
         # Set the run response to paused
@@ -2217,12 +2180,12 @@ class Agent:
             run_response.content = get_paused_content(run_response)
 
         # Save session to storage
-        self.save_session(user_id=user_id, session_id=session_id)
+        self.save_session(session=session)
 
         log_debug(f"Agent Run Paused: {run_response.run_id}", center=True, symbol="*")
 
         # Save output to file if save_response_to_file is set
-        self.save_run_response_to_file(message=run_messages.user_message, session_id=session_id)
+        self.save_run_response_to_file(message=run_messages.user_message, session_id=session.session_id, user_id=user_id)
 
         # We return and await confirmation/completion for the tools that require it
         return run_response
@@ -2231,7 +2194,7 @@ class Agent:
         self,
         run_response: RunResponse,
         run_messages: RunMessages,
-        session_id: str,
+        session: AgentSession,
         user_id: Optional[str] = None,
     ) -> Iterator[RunResponseEvent]:
         # Set the run response to paused
@@ -2250,10 +2213,10 @@ class Agent:
         )
 
         # Save session to storage
-        self.save_session(user_id=user_id, session_id=session_id)
+        self.save_session(session=session)
 
         # Save output to file if save_response_to_file is set
-        self.save_run_response_to_file(message=run_messages.user_message, session_id=session_id)
+        self.save_run_response_to_file(message=run_messages.user_message, session_id=session.session_id, user_id=user_id)
 
         log_debug(f"Agent Run Paused: {run_response.run_id}", center=True, symbol="*")
 
@@ -2617,42 +2580,32 @@ class Agent:
         # Update the RunResponse metrics
         run_response.metrics = self.calculate_metrics(messages_for_run_response)
 
-    def add_run_to_session(self, run_response: RunResponse):
-        """Add the given RunResponse to memory, together with some calculated data"""
-        if self.agent_session is not None:
-            self.agent_session.add_run(run=run_response)
-
-    def set_session_metrics(self, run_messages: RunMessages):
+    def update_session_metrics(self, session: AgentSession, run_messages: RunMessages):
         """Calculate session metrics"""
-        # Calculate initial metrics
-        if self.session_metrics is None:
-            self.session_metrics = self.calculate_metrics(run_messages.messages)
-        # Update metrics
-        else:
-            self.session_metrics += self.calculate_metrics(run_messages.messages)
+        session_metrics = self.get_session_metrics(session=session)
+        session_metrics += self.calculate_metrics(run_messages.messages)
+        session.session_data["session_metrics"] = session_metrics
 
-    def update_memory(
+    def _update_memory(
         self,
         run_messages: RunMessages,
-        session_id: str,
+        session: AgentSession,
         user_id: Optional[str] = None,
-        messages: Optional[Sequence[Union[Dict, Message]]] = None,
     ) -> Iterator[RunResponseEvent]:
         self.run_response = cast(RunResponse, self.run_response)
 
-        yield from self._make_memories_and_summaries(run_messages=run_messages, session_id=session_id, user_id=user_id)
+        yield from self._make_memories_and_summaries(run_messages=run_messages, session=session, user_id=user_id)
 
     async def _aupdate_memory(
         self,
         run_messages: RunMessages,
-        session_id: str,
+        session: AgentSession,
         user_id: Optional[str] = None,
-        messages: Optional[Sequence[Union[Dict, Message]]] = None,
     ) -> AsyncIterator[RunResponseEvent]:
         self.run_response = cast(RunResponse, self.run_response)
 
         async for event in self._amake_memories_and_summaries(
-            run_messages=run_messages, session_id=session_id, user_id=user_id
+            run_messages=run_messages, session=session, user_id=user_id
         ):
             yield event
 
@@ -3052,7 +3005,6 @@ class Agent:
             run_id=self.run_id,
             status=run_state,
             session_id=session_id,
-            team_session_id=self.team_session_id,
             agent_id=self.agent_id,
             agent_name=self.name,
             content=content,
@@ -3080,7 +3032,7 @@ class Agent:
     def _make_memories_and_summaries(
         self,
         run_messages: RunMessages,
-        session_id: str,
+        session: AgentSession,
         user_id: Optional[str] = None,
     ) -> Iterator[RunResponseEvent]:
         from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -3142,7 +3094,7 @@ class Agent:
                 futures.append(
                     executor.submit(
                         self.session_summary_manager.create_session_summary,
-                        session=self.agent_session,
+                        session=session,
                     )
                 )
 
@@ -3167,7 +3119,7 @@ class Agent:
     async def _amake_memories_and_summaries(
         self,
         run_messages: RunMessages,
-        session_id: str,
+        session: AgentSession,
         user_id: Optional[str] = None,
     ) -> AsyncIterator[RunResponseEvent]:
         self.run_response = cast(RunResponse, self.run_response)
@@ -3212,7 +3164,7 @@ class Agent:
             log_debug("Creating session summary.")
             tasks.append(
                 self.session_summary_manager.acreate_session_summary(
-                    session=self.agent_session,
+                    session=session,
                 )
             )
 
@@ -3263,7 +3215,7 @@ class Agent:
 
     def get_tools(
         self,
-        session_id: str,
+        session: AgentSession,
         async_mode: bool = False,
         user_id: Optional[str] = None,
         knowledge_filters: Optional[Dict[str, Any]] = None,
@@ -3307,10 +3259,10 @@ class Agent:
 
         # Add tools for accessing memory
         if self.read_chat_history:
-            agent_tools.append(self.get_chat_history_function(session_id=session_id))
+            agent_tools.append(self.get_chat_history_function(session=session))
             self._rebuild_tools = True
         if self.read_tool_call_history:
-            agent_tools.append(self.get_tool_call_history_function(session_id=session_id))
+            agent_tools.append(self.get_tool_call_history_function(session=session))
             self._rebuild_tools = True
         if self.search_session_history:
             agent_tools.append(
@@ -3355,7 +3307,7 @@ class Agent:
     def determine_tools_for_model(
         self,
         model: Model,
-        session_id: str,
+        session: AgentSession,
         user_id: Optional[str] = None,
         async_mode: bool = False,
         knowledge_filters: Optional[Dict[str, Any]] = None,
@@ -3364,7 +3316,7 @@ class Agent:
             self._rebuild_tools = False
 
             agent_tools = self.get_tools(
-                session_id=session_id, async_mode=async_mode, user_id=user_id, knowledge_filters=knowledge_filters
+                session=session, async_mode=async_mode, user_id=user_id, knowledge_filters=knowledge_filters
             )
 
             self._tools_for_model = []
@@ -3538,25 +3490,21 @@ class Agent:
             agent_data["model"] = self.model.to_dict()
         return agent_data
 
-    def get_agent_session_data(self) -> Dict[str, Any]:
-        session_data: Dict[str, Any] = {}
-        if self.session_name is not None:
-            session_data["session_name"] = self.session_name
-        if self.session_state is not None and len(self.session_state) > 0:
-            session_data["session_state"] = self.session_state
-        if self.team_session_state is not None and len(self.team_session_state) > 0:
-            session_data["team_session_state"] = self.team_session_state
-        if self.workflow_session_state is not None and len(self.workflow_session_state) > 0:
-            session_data["workflow_session_state"] = self.workflow_session_state
-        if self.session_metrics is not None:
-            session_data["session_metrics"] = asdict(self.session_metrics) if self.session_metrics is not None else None
-        if self.images is not None:
-            session_data["images"] = [img.to_dict() for img in self.images]  # type: ignore
-        if self.videos is not None:
-            session_data["videos"] = [vid.to_dict() for vid in self.videos]  # type: ignore
-        if self.audio is not None:
-            session_data["audio"] = [aud.to_dict() for aud in self.audio]  # type: ignore
-        return session_data
+    # def get_agent_session_data(self) -> Dict[str, Any]:
+    #     session_data: Dict[str, Any] = {}
+    #     if self.session_name is not None:
+    #         session_data["session_name"] = self.session_name
+    #     if self.session_state is not None and len(self.session_state) > 0:
+    #         session_data["session_state"] = self.session_state
+    #     if self.session_metrics is not None:
+    #         session_data["session_metrics"] = asdict(self.session_metrics) if self.session_metrics is not None else None
+    #     if self.images is not None:
+    #         session_data["images"] = [img.to_dict() for img in self.images]  # type: ignore
+    #     if self.videos is not None:
+    #         session_data["videos"] = [vid.to_dict() for vid in self.videos]  # type: ignore
+    #     if self.audio is not None:
+    #         session_data["audio"] = [aud.to_dict() for aud in self.audio]  # type: ignore
+    #     return session_data
 
     # -*- Session Database Functions
     def read_session(self, session_id: str, session_type: SessionType) -> Optional[Session]:
@@ -3585,114 +3533,63 @@ class Agent:
             log_warning(f"Error upserting session into db: {e}")
             return None
 
-    def load_agent_session(self, session: AgentSession):
+    def update_session_state(self, session: AgentSession, session_state: Dict[str, Any]):
         """Load the existing Agent from an AgentSession (from the database)"""
 
-        if not hasattr(session, "memory"):
-            return
-
         from agno.utils.merge_dict import merge_dictionaries
-        
-        # TODO: This
 
-        # Read session_data from the database
-        if session.session_data is not None:
-            # Get the session_name from database and update the current session_name if not set
-            if self.session_name is None and "session_name" in session.session_data:
-                self.session_name = session.session_data.get("session_name")
+        # Get the session_state from the database and update the current session_state
+        if "session_state" in session.session_data:
+            session_state_from_db = session.session_data.get("session_state")
+            if (
+                session_state_from_db is not None
+                and isinstance(session_state_from_db, dict)
+                and len(session_state_from_db) > 0
+            ):
+                # This updates session_state_from_db
+                # If there are conflicting keys, values from provided session_state will take precedence
+                merge_dictionaries(session_state_from_db, session_state)
 
-            # Get the session_state from the database and update the current session_state
-            if "session_state" in session.session_data:
-                session_state_from_db = session.session_data.get("session_state")
-                if (
-                    session_state_from_db is not None
-                    and isinstance(session_state_from_db, dict)
-                    and len(session_state_from_db) > 0
-                ):
-                    # If the session_state is already set, merge the session_state from the database with the current session_state
-                    if self.session_state is not None and len(self.session_state) > 0:
-                        # This updates session_state_from_db
-                        # If there are conflicting keys, values from session_state_from_db will take precedence
-                        merge_dictionaries(self.session_state, session_state_from_db)
-                    else:
-                        # Update the current session_state
-                        self.session_state = session_state_from_db
+        # Update the session_state in the session
+        session.session_data["session_state"] = session_state
 
-            # Get the team_session_state from the database and update the current team_session_state
-            if "team_session_state" in session.session_data:
-                team_session_state_from_db = session.session_data.get("team_session_state")
-                if (
-                    team_session_state_from_db is not None
-                    and isinstance(team_session_state_from_db, dict)
-                    and len(team_session_state_from_db) > 0
-                ):
-                    # If the team_session_state is already set, merge the team_session_state from the database with the current team_session_state
-                    if self.team_session_state is not None and len(self.team_session_state) > 0:
-                        # This updates team_session_state_from_db
-                        # If there are conflicting keys, values from team_session_state_from_db will take precedence
-                        merge_dictionaries(self.team_session_state, team_session_state_from_db)
-                    else:
-                        # Update the current team_session_state
-                        self.team_session_state = team_session_state_from_db
+        return session_state
 
-            if "workflow_session_state" in session.session_data:
-                workflow_session_state_from_db = session.session_data.get("workflow_session_state")
-                if (
-                    workflow_session_state_from_db is not None
-                    and isinstance(workflow_session_state_from_db, dict)
-                    and len(workflow_session_state_from_db) > 0
-                ):
-                    # If the workflow_session_state is already set, merge the workflow_session_state from the database with the current workflow_session_state
-                    if self.workflow_session_state is not None and len(self.workflow_session_state) > 0:
-                        # This updates workflow_session_state_from_db
-                        # If there are conflicting keys, values from workflow_session_state_from_db will take precedence
-                        merge_dictionaries(self.workflow_session_state, workflow_session_state_from_db)
-                    else:
-                        # Update the current workflow_session_state
-                        self.workflow_session_state = workflow_session_state_from_db
+    def get_session_metrics(self, session: AgentSession):
+        # Get the session_metrics from the database
+        if "session_metrics" in session.session_data:
+            session_metrics_from_db = session.session_data.get("session_metrics")
+            if session_metrics_from_db is not None and isinstance(session_metrics_from_db, dict):
+                return Metrics(**session_metrics_from_db)
+        else:
+            return Metrics()
 
-            # Get the session_metrics from the database
-            if "session_metrics" in session.session_data:
-                session_metrics_from_db = session.session_data.get("session_metrics")
-                if session_metrics_from_db is not None and isinstance(session_metrics_from_db, dict):
-                    self.session_metrics = Metrics(**session_metrics_from_db)
+        # # Get images, videos, and audios from the database
+        # if "images" in session.session_data:
+        #     images_from_db = session.session_data.get("images")
+        #     if images_from_db is not None and isinstance(images_from_db, list):
+        #         if self.images is None:
+        #             self.images = []
+        #         self.images.extend([ImageArtifact.model_validate(img) for img in images_from_db])
+        # if "videos" in session.session_data:
+        #     videos_from_db = session.session_data.get("videos")
+        #     if videos_from_db is not None and isinstance(videos_from_db, list):
+        #         if self.videos is None:
+        #             self.videos = []
+        #         self.videos.extend([VideoArtifact.model_validate(vid) for vid in videos_from_db])
+        # if "audio" in session.session_data:
+        #     audio_from_db = session.session_data.get("audio")
+        #     if audio_from_db is not None and isinstance(audio_from_db, list):
+        #         if self.audio is None:
+        #             self.audio = []
+        #         self.audio.extend([AudioArtifact.model_validate(aud) for aud in audio_from_db])
 
-            # Get images, videos, and audios from the database
-            if "images" in session.session_data:
-                images_from_db = session.session_data.get("images")
-                if images_from_db is not None and isinstance(images_from_db, list):
-                    if self.images is None:
-                        self.images = []
-                    self.images.extend([ImageArtifact.model_validate(img) for img in images_from_db])
-            if "videos" in session.session_data:
-                videos_from_db = session.session_data.get("videos")
-                if videos_from_db is not None and isinstance(videos_from_db, list):
-                    if self.videos is None:
-                        self.videos = []
-                    self.videos.extend([VideoArtifact.model_validate(vid) for vid in videos_from_db])
-            if "audio" in session.session_data:
-                audio_from_db = session.session_data.get("audio")
-                if audio_from_db is not None and isinstance(audio_from_db, list):
-                    if self.audio is None:
-                        self.audio = []
-                    self.audio.extend([AudioArtifact.model_validate(aud) for aud in audio_from_db])
-
-        # Read extra_data from the database
-        if session.extra_data is not None:
-            # If extra_data is set in the agent, update the database extra_data with the agent's extra_data
-            if self.extra_data is not None:
-                # Updates agent_session.extra_data in place
-                merge_dictionaries(session.extra_data, self.extra_data)
-            # Update the current extra_data with the extra_data from the database which is updated in place
-            self.extra_data = session.extra_data
-
-        log_debug(f"-*- AgentSession loaded: {session.session_id}")
 
     def get_agent_session(
         self,
         session_id: str,
         user_id: Optional[str] = None,
-    ) -> Optional[AgentSession]:
+    ) -> AgentSession:
         """Load an AgentSession from database or create a new one if it does not exist.
 
         Args:
@@ -3706,36 +3603,38 @@ class Agent:
 
         from agno.db.base import SessionType
 
-        # Return existing session if we have one
-        if self.agent_session is not None and self.agent_session.session_id == session_id:
-            return self.agent_session
+        # Returning cached session if we have one
+        if self._agent_session is not None and self._agent_session.session_id == session_id:
+            return self._agent_session
 
         # Try to load from database
+        agent_session = None
         if self.db is not None and self.team_id is None:
             log_debug(f"Reading AgentSession: {session_id}")
-            self.agent_session = cast(
+            agent_session = cast(
                 AgentSession, self.read_session(session_id=session_id, session_type=SessionType.AGENT)
             )
 
-            if self.agent_session is not None:
-                self.load_agent_session(session=self.agent_session)
-                return self.agent_session
+        if agent_session is None:
+            # Creating new session if none found
+            log_debug(f"Creating new AgentSession: {session_id}")
+            agent_session = AgentSession(
+                session_id=session_id,
+                agent_id=self.agent_id,
+                user_id=user_id,
+                agent_data=self.get_agent_data(),
+                session_data={},
+                extra_data=self.extra_data,
+                created_at=int(time()),
+            )
 
-        # Create new session if none found
-        log_debug(f"Creating new AgentSession: {session_id}")
-        self.agent_session = AgentSession(
-            session_id=session_id,
-            agent_id=self.agent_id,
-            user_id=user_id,
-            team_session_id=self.team_session_id,
-            agent_data=self.get_agent_data(),
-            session_data=self.get_agent_session_data(),
-            extra_data=self.extra_data,
-            created_at=int(time()),
-        )
-        return self.agent_session
 
-    def save_session(self, session_id: str, user_id: Optional[str] = None) -> Optional[AgentSession]:
+        if self.cache_session:
+            self._agent_session = agent_session
+
+        return agent_session
+
+    def save_session(self, session: AgentSession) -> None:
         """Save the AgentSession to storage
 
         Returns:
@@ -3744,91 +3643,32 @@ class Agent:
 
         # If the agent is a member of a team, do not save the session to the database
         if self.db is not None and self.team_id is None:
-            session = self.get_agent_session(session_id=session_id, user_id=user_id)
-
-            if session is None:
-                log_error(f"Failed to save AgentSession. Cannot get it from the database: {session_id}")
-                return None
-
-            # Update the session_data with the latest data
-            session.session_data = self.get_agent_session_data()
-
             self.upsert_session(session=session)
+            log_debug(f"Created or updated AgentSession record: {session.session_id}")
 
-            log_debug(f"Created or updated AgentSession record: {session_id}")
 
-        return self.agent_session
-
-    def load_session(self, force: bool = False) -> Optional[str]:
-        """Load an existing session from the database and return the session_id.
-        If a session does not exist, create a new session.
-
-        - If a session exists in the database, load the session.
-        - If a session does not exist in the database, create a new session.
-        """
-        # If an agent_session is already loaded, return the session_id from the agent_session
-        #   if the session_id matches the session_id from the agent_session
-        if self.agent_session is not None and not force:
-            if self.session_id is not None and self.agent_session.session_id == self.session_id:
-                return self.agent_session.session_id
-
-        # Load an existing session or create a new session
-        if self.db is not None and self.team_id is None:
-            # Load existing session if session_id is provided
-            log_debug(f"Reading AgentSession: {self.session_id}")
-            self.get_agent_session(session_id=self.session_id)  # type: ignore
-
-            # Create a new session if it does not exist
-            if self.agent_session is None:
-                log_debug("-*- Creating new AgentSession")
-                # Initialize the agent_id and session_id if they are not set
-                if self.agent_id is None:
-                    self.initialize_agent()
-                if self.session_id is None or self.session_id == "":
-                    self.session_id = str(uuid4())
-                # save_session() will create a new AgentSession
-                # and populate self.agent_session with the new session
-                self.save_session(user_id=self.user_id, session_id=self.session_id)  # type: ignore
-                if self.agent_session is None:
-                    raise Exception("Failed to create new AgentSession in storage")
-                log_debug(f"-*- Created AgentSession: {self.agent_session.session_id}")
-        return self.session_id
-
-    def new_session(self) -> None:
-        """Create a new Agent session
-
-        - Clear the model
-        - Clear the memory
-        - Create a new session_id
-        - Load the new session
-        """
-        self.agent_session = None
-        self.session_id = str(uuid4())
-        self.load_session(force=True)
-
-    def get_chat_history(self) -> List[Message]:
+    def get_chat_history(self, session_id: str) -> List[Message]:
         """Read the chat history from the session"""
-        if self.agent_session is not None:
-            return self.agent_session.get_chat_history()
-        return []
+        session = self.get_agent_session(session_id=session_id)
 
-    def format_message_with_state_variables(self, msg: Any) -> Any:
+        return session.get_chat_history()
+
+    def format_message_with_state_variables(self, message: Any, user_id: Optional[str] = None, session_state: Optional[Dict[str, Any]] = None) -> Any:
         """Format a message with the session state variables."""
+        from copy import deepcopy
         import re
         import string
 
-        if not isinstance(msg, str):
-            return msg
+        if not isinstance(message, str):
+            return message
 
         format_variables = ChainMap(
-            self.session_state or {},
-            self.team_session_state or {},
-            self.workflow_session_state or {},
+            session_state or {},
             self.dependencies or {},
             self.extra_data or {},
-            {"user_id": self.user_id} if self.user_id is not None else {},
+            {"user_id": user_id} if user_id is not None else {},
         )
-        converted_msg = msg
+        converted_msg = deepcopy(message)
         for var_name in format_variables.keys():
             # Only convert standalone {var_name} patterns, not nested ones
             pattern = r"\{" + re.escape(var_name) + r"\}"
@@ -3842,9 +3682,9 @@ class Agent:
             return result
         except Exception as e:
             log_warning(f"Template substitution failed: {e}")
-            return msg
+            return message
 
-    def get_system_message(self, user_id: Optional[str] = None) -> Optional[Message]:
+    def get_system_message(self, session: AgentSession, user_id: Optional[str] = None) -> Optional[Message]:
         """Return the system message for the Agent.
 
         1. If the system_message is provided, use that.
@@ -3867,7 +3707,7 @@ class Agent:
 
             # Format the system message with the session state variables
             if self.add_state_in_messages:
-                sys_message_content = self.format_message_with_state_variables(sys_message_content)
+                sys_message_content = self.format_message_with_state_variables(sys_message_content, user_id=user_id, session_state=session.session_data.get("session_state"))
 
             # type: ignore
             return Message(role=self.system_message_role, content=sys_message_content)
@@ -3997,7 +3837,7 @@ class Agent:
 
         # Format the system message with the session state variables
         if self.add_state_in_messages:
-            system_message_content = self.format_message_with_state_variables(system_message_content)
+            system_message_content = self.format_message_with_state_variables(system_message_content, user_id=user_id, session_state=session.session_data.get("session_state"))
 
         # 3.3.7 Then add the expected output
         if self.expected_output is not None:
@@ -4049,12 +3889,11 @@ class Agent:
         # 3.3.11 Then add a summary of the interaction to the system prompt
         if (
             self.add_session_summary_references
-            and self.agent_session is not None
-            and self.agent_session.summary is not None
+            and session.summary is not None
         ):
             system_message_content += "Here is a brief summary of your previous interactions:\n\n"
             system_message_content += "<summary_of_previous_interactions>\n"
-            system_message_content += self.agent_session.summary.summary
+            system_message_content += session.summary.summary
             system_message_content += "\n</summary_of_previous_interactions>\n\n"
             system_message_content += (
                 "Note: this information is from previous interactions and may be outdated. "
@@ -4092,6 +3931,8 @@ class Agent:
     def get_user_message(
         self,
         *,
+        session: AgentSession,
+        user_id: Optional[str] = None,
         message: Optional[Union[str, List, Dict, Message, BaseModel]] = None,
         audio: Optional[Sequence[Audio]] = None,
         images: Optional[Sequence[Image]] = None,
@@ -4152,7 +3993,7 @@ class Agent:
                     raise Exception("user_message must return a string")
 
             if self.add_state_in_messages:
-                user_message_content = self.format_message_with_state_variables(user_message_content)
+                user_message_content = self.format_message_with_state_variables(user_message_content, user_id=user_id, session_state=session.session_data.get("session_state"))
 
             return Message(
                 role=self.user_message_role,
@@ -4214,7 +4055,7 @@ class Agent:
         user_msg_content = message
         # Format the message with the session state variables
         if self.add_state_in_messages:
-            user_msg_content = self.format_message_with_state_variables(message)
+            user_msg_content = self.format_message_with_state_variables(message, user_id=user_id, session_state=session.session_data.get("session_state"))
 
         # Convert to string for concatenation operations
         user_msg_content_str = get_text_from_message(user_msg_content) if user_msg_content is not None else ""
@@ -4254,7 +4095,7 @@ class Agent:
         self,
         *,
         message: Optional[Union[str, List, Dict, Message, BaseModel]] = None,
-        session_id: str,
+        session: AgentSession,
         user_id: Optional[str] = None,
         audio: Optional[Sequence[Audio]] = None,
         images: Optional[Sequence[Image]] = None,
@@ -4293,7 +4134,7 @@ class Agent:
         self.run_response = cast(RunResponse, self.run_response)
 
         # 1. Add system message to run_messages
-        system_message = self.get_system_message(user_id=user_id)
+        system_message = self.get_system_message(session=session, user_id=user_id)
         if system_message is not None:
             run_messages.system_message = system_message
             run_messages.messages.append(system_message)
@@ -4331,15 +4172,13 @@ class Agent:
                         self.run_response.extra_data.additional_messages.extend(messages_to_add_to_run_response)
 
         # 3. Add history to run_messages
-        if self.add_history_to_context and self.agent_session is not None:
+        if self.add_history_to_context:
             from copy import deepcopy
 
-            history: List[Message] = self.agent_session.get_messages_from_last_n_runs(
-                session_id=session_id,
+            history: List[Message] = session.get_messages_from_last_n_runs(
                 last_n=self.num_history_runs,
                 skip_role=self.system_message_role,
-                # Only filter by agent_id if this is part of a team
-                agent_id=self.agent_id if self.team_session_id is not None else None,
+                agent_id=self.agent_id if self.team_id is not None else None,
             )
 
             if len(history) > 0:
@@ -4485,10 +4324,9 @@ class Agent:
         if session_id is None:
             raise ValueError("Session ID is required")
 
-        self.get_agent_session(session_id=session_id)
+        session = self.get_agent_session(session_id=session_id)
 
-        if self.agent_session is not None:
-            return self.agent_session.get_session_summary()
+        return session.get_session_summary()
 
     def get_user_memories(self, user_id: Optional[str] = None) -> Optional[List[UserMemory]]:
         """Get the user memories for the given user ID."""
@@ -4770,7 +4608,7 @@ class Agent:
                 return str(context)
 
     def save_run_response_to_file(
-        self, message: Optional[Union[str, List, Dict, Message]] = None, session_id: Optional[str] = None
+        self, message: Optional[Union[str, List, Dict, Message]] = None, session_id: Optional[str] = None, user_id: Optional[str] = None
     ) -> None:
         if self.save_response_to_file is not None and self.run_response is not None:
             message_str = None
@@ -4785,7 +4623,7 @@ class Agent:
                 fn = self.save_response_to_file.format(
                     name=self.name,
                     session_id=session_id,
-                    user_id=self.user_id,
+                    user_id=user_id,
                     message=message_str,
                     run_id=self.run_id,
                 )
@@ -4852,41 +4690,46 @@ class Agent:
     def rename(self, name: str, session_id: Optional[str] = None) -> None:
         """Rename the Agent and save to storage"""
 
-        if self.session_id is None and session_id is None:
-            raise Exception("Session ID is not set")
-
         session_id = session_id or self.session_id
 
-        # -*- Read from storage
-        self.get_agent_session(session_id=session_id)  # type: ignore
+        if session_id is None:
+            raise Exception("Session ID is not set")
+
+        session = self.get_agent_session(session_id=session_id)  # type: ignore
+
         # -*- Rename Agent
         self.name = name
+        session.agent_data["name"] = name
+
         # -*- Save to storage
-        self.save_session(user_id=self.user_id, session_id=session_id)  # type: ignore
+        self.save_session(session=session)  # type: ignore
 
     def set_session_name(
         self, session_id: Optional[str] = None, autogenerate: bool = False, session_name: Optional[str] = None
     ) -> None:
         """Set the session name and save to storage"""
-        if self.session_id is None and session_id is None:
-            raise Exception("Session ID is not set")
         session_id = session_id or self.session_id
 
+        if session_id is None:
+            raise Exception("Session ID is not set")
+
+        # -*- Read from storage
+        session = self.get_agent_session(session_id=session_id)  # type: ignore
+
+        # -*- Generate name for session
         if autogenerate:
-            # -*- Generate name for session
-            session_name = self._generate_session_name(session_id=session_id)
+            session_name = self._generate_session_name(session=session)
             log_debug(f"Generated Session Name: {session_name}")
         elif session_name is None:
             raise Exception("Session Name is not set")
-        # -*- Read from storage
-        self.get_agent_session(session_id=session_id)  # type: ignore
+
         # -*- Rename session
-        self.session_name = session_name
+        session.session_data["session_name"] = session_name
 
         # -*- Save to storage
-        self.save_session(user_id=self.user_id, session_id=session_id)  # type: ignore
+        self.save_session(session=session)  # type: ignore
 
-    def _generate_session_name(self, session_id: str) -> str:
+    def _generate_session_name(self, session: AgentSession) -> str:
         """Generate a name for the session using the first 6 messages from the memory"""
 
         if self.model is None:
@@ -4894,10 +4737,7 @@ class Agent:
 
         gen_session_name_prompt = "Conversation\n"
 
-        if self.agent_session is not None:
-            messages_for_generating_session_name = self.agent_session.get_messages_for_session()
-        else:
-            messages_for_generating_session_name = []
+        messages_for_generating_session_name = session.get_messages_for_session()
 
         for message in messages_for_generating_session_name:
             gen_session_name_prompt += f"{message.role.upper()}: {message.content}\n"
@@ -4911,14 +4751,17 @@ class Agent:
         )
         user_message = Message(role=self.user_message_role, content=gen_session_name_prompt)
         generate_name_messages = [system_message, user_message]
+
+        # Generate name
         generated_name = self.model.response(messages=generate_name_messages)
         content = generated_name.content
         if content is None:
             log_error("Generated name is None. Trying again.")
-            return self._generate_session_name(session_id=session_id)
-        if len(content.split()) > 15:
-            log_error("Generated name is too long. Trying again.")
-            return self._generate_session_name(session_id=session_id)
+            return self._generate_session_name(session=session)
+
+        if len(content.split()) > 5:
+            log_error("Generated name is too long. It should be less than 5 words. Trying again.")
+            return self._generate_session_name(session=session)
         return content.replace('"', "").strip()
 
     def delete_session(self, session_id: str):
@@ -4930,20 +4773,16 @@ class Agent:
 
     def get_messages_for_session(self, session_id: Optional[str] = None) -> List[Message]:
         """Get messages for a session"""
-        _session_id = session_id or self.session_id
-        if _session_id is None:
+        session_id = session_id or self.session_id
+        if session_id is None:
             log_warning("Session ID is not set, cannot get messages for session")
             return []
 
-        if self.agent_session is None:
-            return []
-        else:
-            self.get_agent_session(session_id=_session_id)
+        session = self.get_agent_session(session_id=session_id)  # type: ignore
 
-        return self.agent_session.get_messages_from_last_n_runs(
-            session_id=_session_id,
-            # Only filter by agent_id if this is part of a team
-            agent_id=self.agent_id if self.team_session_id is not None else None,
+        # Only filter by agent_id if this is part of a team
+        return session.get_messages_from_last_n_runs(
+            agent_id=self.agent_id if self.team_id is not None else None,
         )
 
     ###########################################################################
@@ -5674,7 +5513,7 @@ class Agent:
 
         return Function.from_callable(update_user_memory_function, name="update_user_memory")
 
-    def get_chat_history_function(self, session_id: str) -> Callable:
+    def get_chat_history_function(self, session: AgentSession) -> Callable:
         def get_chat_history(num_chats: Optional[int] = None) -> str:
             """Use this function to get the chat history between the user and agent.
 
@@ -5695,26 +5534,22 @@ class Agent:
             import json
 
             history: List[Dict[str, Any]] = []
-            if self.agent_session:
-                all_chats = self.agent_session.get_messages_for_session()
+            all_chats = session.get_messages_for_session()
 
-                if len(all_chats) == 0:
-                    return ""
-
-                for chat in all_chats[::-1]:  # type: ignore
-                    history.insert(0, chat.to_dict())  # type: ignore
-
-                if num_chats is not None:
-                    history = history[:num_chats]
-
-            else:
+            if len(all_chats) == 0:
                 return ""
+
+            for chat in all_chats[::-1]:  # type: ignore
+                history.insert(0, chat.to_dict())  # type: ignore
+
+            if num_chats is not None:
+                history = history[:num_chats]
 
             return json.dumps(history)
 
         return get_chat_history
 
-    def get_tool_call_history_function(self, session_id: str) -> Callable:
+    def get_tool_call_history_function(self, session: AgentSession) -> Callable:
         def get_tool_call_history(num_calls: int = 3) -> str:
             """Use this function to get the tools called by the agent in reverse chronological order.
 
@@ -5731,13 +5566,9 @@ class Agent:
             """
             import json
 
-            if self.agent_session:
-                tool_calls = self.agent_session.get_tool_calls(session_id=session_id, num_calls=num_calls)
-            else:
-                return ""
+            tool_calls = session.get_tool_calls(num_calls=num_calls)
             if len(tool_calls) == 0:
                 return ""
-            log_debug(f"tool_calls: {tool_calls}")
             return json.dumps(tool_calls)
 
         return get_tool_call_history
