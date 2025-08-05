@@ -47,7 +47,6 @@ class BaseAgentRunResponseEvent(BaseRunResponseEvent):
     agent_name: str = ""
     run_id: Optional[str] = None
     session_id: Optional[str] = None
-    team_session_id: Optional[str] = None
 
     # For backwards compatibility
     content: Optional[Any] = None
@@ -243,7 +242,6 @@ class RunResponse:
     agent_id: Optional[str] = None
     agent_name: Optional[str] = None
     session_id: Optional[str] = None
-    team_session_id: Optional[str] = None
     parent_run_id: Optional[str] = None
     workflow_id: Optional[str] = None
     user_id: Optional[str] = None

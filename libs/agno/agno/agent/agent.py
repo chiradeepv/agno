@@ -290,8 +290,6 @@ class Agent:
     # If this Agent is part of a team, this is the role of the agent in the team
     role: Optional[str] = None
 
-    # Optional team session ID, set by the team leader agent.
-    team_session_id: Optional[str] = None
     # Optional team ID. Indicates this agent is part of a team.
     team_id: Optional[str] = None
 
@@ -308,8 +306,6 @@ class Agent:
     # --- If this Agent is part of a workflow ---
     # Optional workflow ID. Indicates this agent is part of a workflow.
     workflow_id: Optional[str] = None
-    # Set when this agent is part of a workflow.
-    workflow_session_id: Optional[str] = None
     # Optional workflow session state. Set by the workflow.
     workflow_session_state: Optional[Dict[str, Any]] = None
 
@@ -600,22 +596,6 @@ class Agent:
                 self.enable_session_summaries or self.session_summary_manager is not None
             )
 
-    def reset_session(self) -> None:
-        self.session_state = None
-        self.session_name = None
-        self.session_metrics = None
-        self.images = None
-        self.videos = None
-        self.audio = None
-        self.files = None
-        self.agent_session = None
-
-    def reset_run_state(self) -> None:
-        self.run_id = None
-        self.run_input = None
-        self.run_messages = None
-        self.run_response = None
-
     def initialize_agent(self, debug_mode: Optional[bool] = None) -> None:
         self.set_default_model()
         self.set_debug(debug_mode=debug_mode)
@@ -650,29 +630,6 @@ class Agent:
         self.tools = tools
         self._rebuild_tools = True
 
-    def _initialize_session_state(self, user_id: Optional[str] = None, session_id: Optional[str] = None) -> None:
-        self.session_state = self.session_state or {}
-        if user_id is not None:
-            self.session_state["current_user_id"] = user_id
-            if self.team_session_state is not None:
-                self.team_session_state["current_user_id"] = user_id
-            if self.workflow_session_state is not None:
-                self.workflow_session_state["current_user_id"] = user_id
-        if session_id is not None:
-            self.session_state["current_session_id"] = session_id
-            if self.team_session_state is not None:
-                self.team_session_state["current_session_id"] = session_id
-            if self.workflow_session_state is not None:
-                self.workflow_session_state["current_user_id"] = user_id
-
-    def _reset_session_state(self) -> None:
-        """Reset the session state for the agent."""
-        if self.team_session_state is not None:
-            self.team_session_state.pop("current_session_id", None)
-            self.team_session_state.pop("current_user_id", None)
-        if self.session_state is not None:
-            self.session_state.pop("current_session_id", None)
-            self.session_state.pop("current_user_id", None)
 
     def _initialize_session(
         self,
@@ -682,36 +639,28 @@ class Agent:
     ) -> Tuple[str, Optional[str]]:
         """Initialize the session for the agent."""
 
-        self.reset_run_state()
-
-        # Determine the session_id
-        if session_id is not None and session_id != "":
-            # Reset session state if a session_id is provided. Session name and session state will be loaded from storage.
-            # Only reset session state if the session_id is different from the current session_id
-            if self.session_id is not None and session_id != self.session_id:
-                self.reset_session()
-
-            self.session_id = session_id
-        else:
-            if not (self.session_id is None or self.session_id == ""):
+        if session_id is None:
+            if self.session_id:
                 session_id = self.session_id
             else:
-                # Generate a new session_id and store it in the agent
-                self.session_id = session_id = str(uuid4())
+                session_id = str(uuid4())
+                
+        log_debug(f"Session ID: {session_id}", center=True)
 
         # Use the default user_id when necessary
-        if user_id is not None and user_id != "":
-            user_id = user_id
-        else:
+        if user_id is None:
             user_id = self.user_id
 
         # Determine the session_state
-        if session_state is not None:
-            self.session_state = session_state
+        if session_state is None:
+            session_state = self.session_state or {}
 
-        self._initialize_session_state(user_id=user_id, session_id=session_id)
+        if user_id is not None:
+            session_state["current_user_id"] = user_id
+        if session_id is not None:
+            session_state["current_session_id"] = session_id
 
-        return session_id, user_id
+        return session_id, user_id, session_state
 
     def _run(
         self,
@@ -943,14 +892,20 @@ class Agent:
         **kwargs: Any,
     ) -> Union[RunResponse, Iterator[RunResponseEvent]]:
         """Run the Agent and return the response."""
-        session_id, user_id = self._initialize_session(
+        
+        session_id, user_id, session_state = self._initialize_session(
             session_id=session_id, user_id=user_id, session_state=session_state
         )
 
         # Initialize the Agent
         self.initialize_agent(debug_mode=debug_mode)
+        
+        # Read existing session from database
+        self.get_agent_session(session_id=session_id, user_id=user_id)
 
-        log_debug(f"Session ID: {session_id}", center=True)
+        # Resolve dependencies
+        if self.dependencies is not None:
+            self.resolve_run_dependencies()
 
         # Initialize Knowledge Filters
         effective_filters = knowledge_filters
@@ -975,15 +930,7 @@ class Agent:
         self.stream = self.stream or stream
         self.stream_intermediate_steps = self.stream_intermediate_steps or (stream_intermediate_steps and self.stream)
 
-        # Read existing session from database
-        self.get_agent_session(session_id=session_id, user_id=user_id)
-
-        # Resolve dependencies
-        if self.dependencies is not None:
-            self.resolve_run_dependencies()
-
         # Prepare arguments for the model
-        self.set_default_model()
         response_format = self._get_response_format() if self.parser_model is None else None
         self.model = cast(Model, self.model)
 
@@ -1004,7 +951,6 @@ class Agent:
             session_id=session_id,
             agent_id=self.agent_id,
             agent_name=self.name,
-            team_session_id=self.team_session_id,
         )
 
         run_response.model = self.model.id if self.model is not None else None
@@ -1340,14 +1286,19 @@ class Agent:
     ) -> Union[RunResponse, AsyncIterator[RunResponseEvent]]:
         """Async Run the Agent and return the response."""
 
-        session_id, user_id = self._initialize_session(
+        session_id, user_id, session_state = self._initialize_session(
             session_id=session_id, user_id=user_id, session_state=session_state
         )
 
-        log_debug(f"Session ID: {session_id}", center=True)
-
         # Initialize the Agent
         self.initialize_agent(debug_mode=debug_mode)
+        
+        # Read existing session from storage
+        self.get_agent_session(session_id=session_id, user_id=user_id)
+
+        # Resolve dependencies
+        if self.dependencies is not None:
+            self.resolve_run_dependencies()
 
         effective_filters = knowledge_filters
         # When filters are passed manually
@@ -1370,15 +1321,7 @@ class Agent:
         self.stream = self.stream or stream
         self.stream_intermediate_steps = self.stream_intermediate_steps or (stream_intermediate_steps and self.stream)
 
-        # Read existing session from storage
-        self.get_agent_session(session_id=session_id, user_id=user_id)
-
-        # Resolve dependencies
-        if self.dependencies is not None:
-            self.resolve_run_dependencies()
-
         # Prepare arguments for the model
-        self.set_default_model()
         response_format = self._get_response_format() if self.parser_model is None else None
         self.model = cast(Model, self.model)
 
@@ -1399,7 +1342,6 @@ class Agent:
             session_id=session_id,
             agent_id=self.agent_id,
             agent_name=self.name,
-            team_session_id=self.team_session_id,
         )
 
         run_response.model = self.model.id if self.model is not None else None
@@ -1564,34 +1506,20 @@ class Agent:
             retries: The number of retries to continue the run for.
             knowledge_filters: The knowledge filters to use for the run.
         """
+        
+        session_id, user_id, session_state = self._initialize_session(
+            session_id=session_id, user_id=user_id
+        )
+        
         # Initialize the Agent
         self.initialize_agent(debug_mode=debug_mode)
+        
+        # Read existing session from storage
+        self.get_agent_session(session_id=session_id, user_id=user_id)
 
-        if session_id is not None:
-            self.reset_run_state()
-            # Reset session state if a session_id is provided. Session name and session state will be loaded from storage.
-            self.reset_session()
-            # Only reset session state if the session_id is different from the current session_id
-            if self.session_id is not None and session_id != self.session_id:
-                self.session_state = None
-
-        # Initialize Session
-        # Use the default user_id and session_id when necessary
-        user_id = user_id if user_id is not None else self.user_id
-
-        if session_id is None or session_id == "":
-            if not (self.session_id is None or self.session_id == ""):
-                session_id = self.session_id
-            else:
-                # Generate a new session_id and store it in the agent
-                session_id = str(uuid4())
-                self.session_id = session_id
-        else:
-            self.session_id = session_id
-
-        self._initialize_session_state(user_id=user_id, session_id=session_id)
-
-        log_debug(f"Session ID: {session_id}", center=True)
+        # Resolve dependencies
+        if self.dependencies is not None:
+            self.resolve_run_dependencies()
 
         effective_filters = knowledge_filters
 
@@ -1617,9 +1545,6 @@ class Agent:
 
         self.stream = self.stream or stream
         self.stream_intermediate_steps = self.stream_intermediate_steps or (stream_intermediate_steps and self.stream)
-
-        # Read existing session from storage
-        self.get_agent_session(session_id=session_id, user_id=user_id)
 
         # Run can be continued from previous run response or from passed run_response context
         if run_response is not None:
@@ -1648,10 +1573,6 @@ class Agent:
             run_response = self.run_response
             messages = self.run_response.messages or []
             self.run_id = self.run_response.run_id
-
-        # Read existing session from storage
-        if self.dependencies is not None:
-            self.resolve_run_dependencies()
 
         # Prepare arguments for the model
         self.set_default_model()
@@ -1959,34 +1880,19 @@ class Agent:
             retries: The number of retries to continue the run for.
             knowledge_filters: The knowledge filters to use for the run.
         """
+        session_id, user_id, session_state = self._initialize_session(
+            session_id=session_id, user_id=user_id
+        )
+        
         # Initialize the Agent
         self.initialize_agent(debug_mode=debug_mode)
+        
+        # Read existing session from storage
+        self.get_agent_session(session_id=session_id, user_id=user_id)
 
-        if session_id is not None:
-            self.reset_run_state()
-            # Reset session state if a session_id is provided. Session name and session state will be loaded from storage.
-            self.reset_session()
-            # Only reset session state if the session_id is different from the current session_id
-            if self.session_id is not None and session_id != self.session_id:
-                self.session_state = None
-
-        # Initialize Session
-        # Use the default user_id and session_id when necessary
-        user_id = user_id if user_id is not None else self.user_id
-
-        if session_id is None or session_id == "":
-            if not (self.session_id is None or self.session_id == ""):
-                session_id = self.session_id
-            else:
-                # Generate a new session_id and store it in the agent
-                session_id = str(uuid4())
-                self.session_id = session_id
-        else:
-            self.session_id = session_id
-
-        self._initialize_session_state(user_id=user_id, session_id=session_id)
-
-        log_debug(f"Session ID: {session_id}", center=True)
+        # Resolve dependencies
+        if self.dependencies is not None:
+            self.resolve_run_dependencies()
 
         effective_filters = knowledge_filters
 
@@ -2012,9 +1918,6 @@ class Agent:
 
         self.stream = self.stream or stream
         self.stream_intermediate_steps = self.stream_intermediate_steps or (stream_intermediate_steps and self.stream)
-
-        # Read existing session from storage
-        self.get_agent_session(session_id=session_id, user_id=user_id)
 
         # Run can be continued from previous run response or from passed run_response context
         if run_response is not None:
@@ -2043,12 +1946,7 @@ class Agent:
             messages = self.run_response.messages or []
             self.run_id = self.run_response.run_id
 
-        # Read existing session from storage
-        if self.dependencies is not None:
-            self.resolve_run_dependencies()
-
         # Prepare arguments for the model
-        self.set_default_model()
         response_format = self._get_response_format()
         self.model = cast(Model, self.model)
 
@@ -3694,20 +3592,8 @@ class Agent:
             return
 
         from agno.utils.merge_dict import merge_dictionaries
-
-        # Get the agent_id, user_id and session_id from the database
-        if self.agent_id is None and session.agent_id is not None:
-            self.agent_id = session.agent_id
-        # if self.user_id is None and session.user_id is not None:
-        #     self.user_id = session.user_id
-        if self.session_id is None and session.session_id is not None:
-            self.session_id = session.session_id
-
-        # Read agent_data from the database
-        if session.agent_data is not None:
-            # Get name from database and update the agent name if not set
-            if self.name is None and "name" in session.agent_data:
-                self.name = session.agent_data.get("name")
+        
+        # TODO: This
 
         # Read session_data from the database
         if session.session_data is not None:
