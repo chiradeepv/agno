@@ -970,7 +970,7 @@ class Agent:
                 # Prepare run messages
                 run_messages: RunMessages = self.get_run_messages(
                     message=message,
-                    session_id=session_id,
+                    session=agent_session,
                     user_id=user_id,
                     audio=audio,
                     images=images,
@@ -1356,7 +1356,7 @@ class Agent:
                 # Prepare run messages
                 run_messages: RunMessages = self.get_run_messages(
                     message=message,
-                    session_id=session_id,
+                    session=agent_session,
                     user_id=user_id,
                     audio=audio,
                     images=images,
@@ -1485,6 +1485,7 @@ class Agent:
             session_id: The session id to continue the run for.
             retries: The number of retries to continue the run for.
             knowledge_filters: The knowledge filters to use for the run.
+            debug_mode: Whether to enable debug mode.
         """
         if not run_response and not run_id:
             raise ValueError("Either run_response or run_id must be provided.")
@@ -4198,6 +4199,7 @@ class Agent:
         # 4.1 Build user message if message is None, str or list
         if message is None or isinstance(message, str) or isinstance(message, list) and messages is None:
             user_message = self.get_user_message(
+                session=session,
                 message=message,
                 audio=audio,
                 images=images,
@@ -6805,7 +6807,7 @@ class Agent:
                 metrics_message = Message(
                     role="assistant",
                     content=self.run_response.reasoning_content,
-                    metrics={"time": reasoning_time_taken},
+                    metrics=Metrics(time=reasoning_time_taken),
                 )
 
                 # Add the metrics message to the reasoning_messages
