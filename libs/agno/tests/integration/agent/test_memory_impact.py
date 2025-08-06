@@ -94,7 +94,7 @@ class MemoryMonitor:
         }
 
 
-def test_agent_memory_impact_with_gc_monitoring(agent_storage, memory):
+def test_agent_memory_impact_with_gc_monitoring(shared_db, memory):
     """
     Test that creates an agent with memory and storage, runs a series of prompts,
     and monitors memory usage to verify garbage collection is working correctly.
@@ -102,7 +102,7 @@ def test_agent_memory_impact_with_gc_monitoring(agent_storage, memory):
     # Create agent with memory and storage
     agent = Agent(
         model=OpenAIChat(id="gpt-4o-mini"),
-        storage=agent_storage,
+        storage=shared_db,
         memory=memory,
         enable_user_memories=True,
     )
@@ -189,7 +189,7 @@ def test_agent_memory_impact_with_gc_monitoring(agent_storage, memory):
         assert len(user_memories) > 0, "No user memories were created"
 
         # Check that sessions were stored
-        session_from_storage = agent_storage.read(session_id=session_id)
+        session_from_storage = shared_db.read(session_id=session_id)
         assert session_from_storage is not None, "Session was not stored"
 
         # Check that runs are in memory
@@ -206,13 +206,13 @@ def test_agent_memory_impact_with_gc_monitoring(agent_storage, memory):
         monitor.stop_monitoring()
 
 
-def test_agent_memory_cleanup_after_session_switch(agent_storage, memory):
+def test_agent_memory_cleanup_after_session_switch(shared_db, memory):
     """
     Test that verifies memory is properly cleaned up when switching between sessions.
     """
     agent = Agent(
         model=OpenAIChat(id="gpt-4o-mini"),
-        storage=agent_storage,
+        storage=shared_db,
         memory=memory,
         enable_user_memories=True,
     )
@@ -261,7 +261,7 @@ def test_agent_memory_cleanup_after_session_switch(agent_storage, memory):
 
         # Verify all sessions are properly stored
         for session_id in sessions:
-            session_from_storage = agent_storage.read(session_id=session_id)
+            session_from_storage = shared_db.read(session_id=session_id)
             assert session_from_storage is not None, f"Session {session_id} was not stored"
             assert session_id in memory.runs, f"Session {session_id} runs not found in memory"
 

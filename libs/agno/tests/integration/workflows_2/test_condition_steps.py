@@ -151,29 +151,29 @@ def test_condition_direct_multiple_steps():
 # ============================================================================
 
 
-def test_basic_condition_true(workflow_storage):
+def test_basic_condition_true(shared_db):
     """Test basic condition that evaluates to True."""
     workflow = Workflow(
         name="Basic Condition",
-        db=workflow_storage,
+        db=shared_db,
         steps=[research_step, Condition(name="stats_check", evaluator=has_statistics, steps=[fact_check_step])],
     )
 
     response = workflow.run(message="Market shows 40% growth")
     assert isinstance(response, WorkflowRunResponse)
-    assert len(response.step_responses) == 2
+    assert len(response.step_results) == 2
     # Condition output is a list
-    assert isinstance(response.step_responses[1], list)
+    assert isinstance(response.step_results[1], list)
     # One step executed in condition
-    assert len(response.step_responses[1]) == 1
-    assert "Fact check complete" in response.step_responses[1][0].content
+    assert len(response.step_results[1]) == 1
+    assert "Fact check complete" in response.step_results[1][0].content
 
 
-def test_basic_condition_false(workflow_storage):
+def test_basic_condition_false(shared_db):
     """Test basic condition that evaluates to False."""
     workflow = Workflow(
         name="Basic Condition False",
-        db=workflow_storage,
+        db=shared_db,
         steps=[research_step, Condition(name="stats_check", evaluator=has_statistics, steps=[fact_check_step])],
     )
 
@@ -182,15 +182,15 @@ def test_basic_condition_false(workflow_storage):
     assert isinstance(response, WorkflowRunResponse)
 
     # Should have 2 step responses: research_step + empty condition result
-    assert len(response.step_responses) == 2
-    assert response.step_responses[1] == []  # Condition returned empty list
+    assert len(response.step_results) == 2
+    assert response.step_results[1] == []  # Condition returned empty list
 
 
-def test_parallel_with_conditions(workflow_storage):
+def test_parallel_with_conditions(shared_db):
     """Test parallel containing multiple conditions."""
     workflow = Workflow(
         name="Parallel with Conditions",
-        db=workflow_storage,
+        db=shared_db,
         steps=[
             research_step,  # Add a step before parallel to ensure proper chaining
             Parallel(
@@ -203,20 +203,20 @@ def test_parallel_with_conditions(workflow_storage):
 
     response = workflow.run(message="AI market shows 40% growth")
     assert isinstance(response, WorkflowRunResponse)
-    assert len(response.step_responses) == 2  # research_step + parallel
+    assert len(response.step_results) == 2  # research_step + parallel
 
     # Check the parallel output structure
-    parallel_output = response.step_responses[1]
+    parallel_output = response.step_results[1]
     assert parallel_output.success is True
     assert "SUCCESS: analysis_step" in parallel_output.content
     assert "SUCCESS: fact_check_step" in parallel_output.content
 
 
-def test_condition_streaming(workflow_storage):
+def test_condition_streaming(shared_db):
     """Test condition with streaming."""
     workflow = Workflow(
         name="Streaming Condition",
-        db=workflow_storage,
+        db=shared_db,
         steps=[Condition(name="tech_check", evaluator=is_tech_topic, steps=[research_step, analysis_step])],
     )
 
@@ -233,7 +233,7 @@ def test_condition_streaming(workflow_storage):
     assert condition_started[0].condition_result is True
 
 
-def test_condition_error_handling(workflow_storage):
+def test_condition_error_handling(shared_db):
     """Test condition error handling."""
 
     def failing_evaluator(_: StepInput) -> bool:
@@ -241,7 +241,7 @@ def test_condition_error_handling(workflow_storage):
 
     workflow = Workflow(
         name="Error Condition",
-        db=workflow_storage,
+        db=shared_db,
         steps=[Condition(name="failing_check", evaluator=failing_evaluator, steps=[research_step])],
     )
 
@@ -251,11 +251,11 @@ def test_condition_error_handling(workflow_storage):
     assert "Evaluator failed" in response.content
 
 
-def test_nested_conditions(workflow_storage):
+def test_nested_conditions(shared_db):
     """Test nested conditions."""
     workflow = Workflow(
         name="Nested Conditions",
-        db=workflow_storage,
+        db=shared_db,
         steps=[
             Condition(
                 name="outer",
@@ -267,35 +267,35 @@ def test_nested_conditions(workflow_storage):
 
     response = workflow.run(message="AI market shows 40% growth")
     assert isinstance(response, WorkflowRunResponse)
-    assert len(response.step_responses) == 1
-    outer_condition = response.step_responses[0]
+    assert len(response.step_results) == 1
+    outer_condition = response.step_results[0]
     assert isinstance(outer_condition, list)
     # research_step + inner condition result
     assert len(outer_condition) == 2
 
 
 @pytest.mark.asyncio
-async def test_async_condition(workflow_storage):
+async def test_async_condition(shared_db):
     """Test async condition."""
     workflow = Workflow(
         name="Async Condition",
-        db=workflow_storage,
+        db=shared_db,
         steps=[Condition(name="async_check", evaluator=async_evaluator, steps=[research_step])],
     )
 
     response = await workflow.arun(message="AI technology")
     assert isinstance(response, WorkflowRunResponse)
-    assert len(response.step_responses) == 1
-    assert isinstance(response.step_responses[0], list)
-    assert len(response.step_responses[0]) == 1
+    assert len(response.step_results) == 1
+    assert isinstance(response.step_results[0], list)
+    assert len(response.step_results[0]) == 1
 
 
 @pytest.mark.asyncio
-async def test_async_condition_streaming(workflow_storage):
+async def test_async_condition_streaming(shared_db):
     """Test async condition with streaming."""
     workflow = Workflow(
         name="Async Streaming Condition",
-        db=workflow_storage,
+        db=shared_db,
         steps=[Condition(name="async_check", evaluator=async_evaluator, steps=[research_step])],
     )
 

@@ -12,6 +12,7 @@ from typing import (
     List,
     Literal,
     Optional,
+    Type,
     Union,
     overload,
 )
@@ -50,7 +51,6 @@ from agno.session.workflow import WorkflowSession
 from agno.team.team import Team
 from agno.utils.log import (
     log_debug,
-    log_error,
     logger,
     set_log_level_to_debug,
     set_log_level_to_info,
@@ -135,6 +135,11 @@ class Workflow:
 
     websocket_handler: Optional[WebSocketHandler] = None
 
+    input_schema: Optional[Type[BaseModel]] = None
+
+    # Control whether to store executor responses (agent/team responses) in flattened runs
+    store_executor_responses: bool = True
+
     def __init__(
         self,
         workflow_id: Optional[str] = None,
@@ -151,6 +156,8 @@ class Workflow:
         stream_intermediate_steps: bool = False,
         store_events: bool = False,
         events_to_skip: Optional[List[WorkflowRunEvent]] = None,
+        input_schema: Optional[Type[BaseModel]] = None,
+        store_executor_responses: bool = True,
     ):
         self.workflow_id = workflow_id
         self.name = name
@@ -166,6 +173,45 @@ class Workflow:
         self.events_to_skip = events_to_skip or []
         self.stream = stream
         self.stream_intermediate_steps = stream_intermediate_steps
+        self.store_executor_responses = store_executor_responses
+        self.input_schema = input_schema
+
+    def _validate_input(
+        self, message: Optional[Union[str, Dict[str, Any], List[Any], BaseModel]]
+    ) -> Optional[BaseModel]:
+        """Parse and validate input against input_schema if provided"""
+        if self.input_schema is None:
+            return None
+
+        if message is None:
+            raise ValueError("Input required when input_schema is set")
+
+        # Case 1: Message is already a BaseModel instance
+        if isinstance(message, BaseModel):
+            if isinstance(message, self.input_schema):
+                try:
+                    # Re-validate to catch any field validation errors
+                    message.model_validate(message.model_dump())
+                    return message
+                except Exception as e:
+                    raise ValueError(f"BaseModel validation failed: {str(e)}")
+            else:
+                # Different BaseModel types
+                raise ValueError(f"Expected {self.input_schema.__name__} but got {type(message).__name__}")
+
+        # Case 2: Message is a dict
+        elif isinstance(message, dict):
+            try:
+                validated_model = self.input_schema(**message)
+                return validated_model
+            except Exception as e:
+                raise ValueError(f"Failed to parse dict into {self.input_schema.__name__}: {str(e)}")
+
+        # Case 3: Other types not supported for structured input
+        else:
+            raise ValueError(
+                f"Cannot validate {type(message)} against input_schema. Expected dict or {self.input_schema.__name__} instance."
+            )
 
     @property
     def run_parameters(self) -> Dict[str, Any]:
@@ -400,7 +446,7 @@ class Workflow:
             else:
                 return len(self.steps)
 
-    def _aggregate_workflow_metrics(self, step_responses: List[Union[StepOutput, List[StepOutput]]]) -> WorkflowMetrics:
+    def _aggregate_workflow_metrics(self, step_results: List[Union[StepOutput, List[StepOutput]]]) -> WorkflowMetrics:
         """Aggregate metrics from all step responses into structured workflow metrics"""
         steps_dict = {}
         total_steps = 0
@@ -445,15 +491,15 @@ class Workflow:
 
                 steps_dict[step_output.step_name] = step_metrics
 
-        # Process all step responses
-        for step_response in step_responses:
-            if isinstance(step_response, list):
+        # Process all step results
+        for step_result in step_results:
+            if isinstance(step_result, list):
                 # Handle List[StepOutput] from workflow components
-                for sub_step_output in step_response:
+                for sub_step_output in step_result:
                     process_step_output(sub_step_output)
             else:
                 # Handle single StepOutput
-                process_step_output(step_response)
+                process_step_output(step_result)
 
         return WorkflowMetrics(
             total_steps=total_steps,
@@ -547,7 +593,13 @@ class Workflow:
                         shared_audio=shared_audio,
                     )
 
-                    step_output = step.execute(step_input, session_id=self.session_id, user_id=self.user_id)  # type: ignore[union-attr]
+                    step_output = step.execute(
+                        step_input,
+                        session_id=self.session_id,
+                        user_id=self.user_id,
+                        workflow_run_response=workflow_run_response,
+                        store_executor_responses=self.store_executor_responses,
+                    )  # type: ignore[union-attr]
 
                     # Update the workflow-level previous_step_outputs dictionary
                     if isinstance(step_output, list):
@@ -599,7 +651,7 @@ class Workflow:
                 else:
                     workflow_run_response.content = "No steps executed"
 
-                workflow_run_response.step_responses = collected_step_outputs
+                workflow_run_response.step_results = collected_step_outputs
                 workflow_run_response.images = output_images
                 workflow_run_response.videos = output_videos
                 workflow_run_response.audio = output_audio
@@ -692,6 +744,7 @@ class Workflow:
                         stream_intermediate_steps=stream_intermediate_steps,
                         workflow_run_response=workflow_run_response,
                         step_index=i,
+                        store_executor_responses=self.store_executor_responses,
                     ):
                         # Handle events
                         if isinstance(event, StepOutput):
@@ -742,6 +795,7 @@ class Workflow:
                         else:
                             # Yield other internal events
                             yield self._handle_event(event, workflow_run_response)  # type: ignore
+
                     # Break out of main step loop if early termination was requested
                     if "early_termination" in locals() and early_termination:
                         break
@@ -761,7 +815,7 @@ class Workflow:
                 else:
                     workflow_run_response.content = "No steps executed"
 
-                workflow_run_response.step_responses = collected_step_outputs
+                workflow_run_response.step_results = collected_step_outputs
                 workflow_run_response.images = output_images
                 workflow_run_response.videos = output_videos
                 workflow_run_response.audio = output_audio
@@ -793,8 +847,8 @@ class Workflow:
             workflow_name=workflow_run_response.workflow_name,
             workflow_id=workflow_run_response.workflow_id,
             session_id=workflow_run_response.session_id,
-            step_responses=workflow_run_response.step_responses,  # type: ignore
-            extra_data=workflow_run_response.extra_data,
+            step_results=workflow_run_response.step_results,  # type: ignore
+            metadata=workflow_run_response.metadata,
         )
         yield self._handle_event(workflow_completed_event, workflow_run_response)
 
@@ -910,7 +964,13 @@ class Workflow:
                         shared_audio=shared_audio,
                     )
 
-                    step_output = await step.aexecute(step_input, session_id=self.session_id, user_id=self.user_id)  # type: ignore[union-attr]
+                    step_output = await step.aexecute(
+                        step_input,
+                        session_id=self.session_id,
+                        user_id=self.user_id,
+                        workflow_run_response=workflow_run_response,
+                        store_executor_responses=self.store_executor_responses,
+                    )  # type: ignore[union-attr]
 
                     # Update the workflow-level previous_step_outputs dictionary
                     if isinstance(step_output, list):
@@ -961,7 +1021,7 @@ class Workflow:
                 else:
                     workflow_run_response.content = "No steps executed"
 
-                workflow_run_response.step_responses = collected_step_outputs
+                workflow_run_response.step_results = collected_step_outputs
                 workflow_run_response.images = output_images
                 workflow_run_response.videos = output_videos
                 workflow_run_response.audio = output_audio
@@ -1061,6 +1121,7 @@ class Workflow:
                         stream_intermediate_steps=stream_intermediate_steps,
                         workflow_run_response=workflow_run_response,
                         step_index=i,
+                        store_executor_responses=self.store_executor_responses,
                     ):
                         if isinstance(event, StepOutput):
                             step_output = event
@@ -1129,7 +1190,7 @@ class Workflow:
                 else:
                     workflow_run_response.content = "No steps executed"
 
-                workflow_run_response.step_responses = collected_step_outputs
+                workflow_run_response.step_results = collected_step_outputs
                 workflow_run_response.images = output_images
                 workflow_run_response.videos = output_videos
                 workflow_run_response.audio = output_audio
@@ -1161,8 +1222,8 @@ class Workflow:
             workflow_name=workflow_run_response.workflow_name,
             workflow_id=workflow_run_response.workflow_id,
             session_id=workflow_run_response.session_id,
-            step_responses=workflow_run_response.step_responses,  # type: ignore[arg-type]
-            extra_data=workflow_run_response.extra_data,
+            step_results=workflow_run_response.step_results,  # type: ignore[arg-type]
+            metadata=workflow_run_response.metadata,
         )
         yield self._handle_event(workflow_completed_event, workflow_run_response, websocket_handler=websocket_handler)
 
@@ -1412,6 +1473,10 @@ class Workflow:
     ) -> Union[WorkflowRunResponse, Iterator[WorkflowRunResponseEvent]]:
         """Execute the workflow synchronously with optional streaming"""
 
+        validated_input = self._validate_input(message)
+        if validated_input is not None:
+            message = validated_input
+
         if background:
             raise RuntimeError("Background execution is not supported for sync run()")
 
@@ -1531,6 +1596,10 @@ class Workflow:
         **kwargs: Any,
     ) -> Union[WorkflowRunResponse, AsyncIterator[WorkflowRunResponseEvent]]:
         """Execute the workflow synchronously with optional streaming"""
+
+        validated_input = self._validate_input(message)
+        if validated_input is not None:
+            message = validated_input
 
         websocket_handler = None
         if websocket:
@@ -1953,8 +2022,8 @@ class Workflow:
 
                 response_timer.stop()
 
-                if show_step_details and workflow_response.step_responses:
-                    for i, step_output in enumerate(workflow_response.step_responses):
+                if show_step_details and workflow_response.step_results:
+                    for i, step_output in enumerate(workflow_response.step_results):
                         # Handle both single StepOutput and List[StepOutput] (from loop/parallel steps)
                         if isinstance(step_output, list):
                             # This is a loop or parallel step with multiple outputs
@@ -1978,7 +2047,7 @@ class Workflow:
                                 )
                                 console.print(step_panel)  # type: ignore
 
-                # For callable functions, show the content directly since there are no step_responses
+                # For callable functions, show the content directly since there are no step_results
                 elif show_step_details and callable(self.steps) and workflow_response.content:
                     step_panel = create_panel(
                         content=Markdown(workflow_response.content) if markdown else workflow_response.content,  # type: ignore
@@ -1988,11 +2057,11 @@ class Workflow:
                     console.print(step_panel)  # type: ignore
 
                 # Show final summary
-                if workflow_response.extra_data:
+                if workflow_response.metadata:
                     status = workflow_response.status.value  # type: ignore
                     summary_content = ""
                     summary_content += f"""\n\n**Status:** {status}"""
-                    summary_content += f"""\n\n**Steps Completed:** {len(workflow_response.step_responses) if workflow_response.step_responses else 0}"""
+                    summary_content += f"""\n\n**Steps Completed:** {len(workflow_response.step_results) if workflow_response.step_results else 0}"""
                     summary_content = summary_content.strip()
 
                     summary_panel = create_panel(
@@ -2098,7 +2167,7 @@ class Workflow:
         current_step_content = ""
         current_step_name = ""
         current_step_index = 0
-        step_responses = []
+        step_results = []
         step_started_printed = False
         is_callable_function = callable(self.steps)
 
@@ -2189,7 +2258,7 @@ class Workflow:
                         status.update(f"Completed {step_display}: {step_name}")
 
                         if response.content:
-                            step_responses.append(
+                            step_results.append(
                                 {
                                     "step_name": step_name,
                                     "step_index": step_index,
@@ -2416,12 +2485,12 @@ class Workflow:
 
                         status.update(f"Completed steps: {step_name}")
 
-                        # Add results from executed steps to step_responses
+                        # Add results from executed steps to step_results
                         if response.step_results:
                             for i, step_result in enumerate(response.step_results):
                                 # Use the same numbering system as other primitives
                                 step_display_number = get_step_display_number(step_index, step_result.step_name or "")
-                                step_responses.append(
+                                step_results.append(
                                     {
                                         "step_name": f"{step_display_number}: {step_result.step_name}",
                                         "step_index": step_index,
@@ -2466,11 +2535,11 @@ class Workflow:
                         live_log.update(status, refresh=True)
 
                         # Show final summary
-                        if response.extra_data:
+                        if response.metadata:
                             status = response.status
                             summary_content = ""
                             summary_content += f"""\n\n**Status:** {status}"""
-                            summary_content += f"""\n\n**Steps Completed:** {len(response.step_responses) if response.step_responses else 0}"""
+                            summary_content += f"""\n\n**Steps Completed:** {len(response.step_results) if response.step_results else 0}"""
                             summary_content = summary_content.strip()
 
                             summary_panel = create_panel(
@@ -2726,8 +2795,8 @@ class Workflow:
                 response_timer.stop()
 
                 # Show individual step responses if available
-                if show_step_details and workflow_response.step_responses:
-                    for i, step_output in enumerate(workflow_response.step_responses):
+                if show_step_details and workflow_response.step_results:
+                    for i, step_output in enumerate(workflow_response.step_results):
                         # Handle both single StepOutput and List[StepOutput] (from loop/parallel steps)
                         if isinstance(step_output, list):
                             # This is a loop or parallel step with multiple outputs
@@ -2751,7 +2820,7 @@ class Workflow:
                                 )
                                 console.print(step_panel)  # type: ignore
 
-                # For callable functions, show the content directly since there are no step_responses
+                # For callable functions, show the content directly since there are no step_results
                 elif show_step_details and callable(self.steps) and workflow_response.content:
                     step_panel = create_panel(
                         content=Markdown(workflow_response.content) if markdown else workflow_response.content,  # type: ignore
@@ -2761,11 +2830,11 @@ class Workflow:
                     console.print(step_panel)  # type: ignore
 
                 # Show final summary
-                if workflow_response.extra_data:
+                if workflow_response.metadata:
                     status = workflow_response.status.value  # type: ignore
                     summary_content = ""
                     summary_content += f"""\n\n**Status:** {status}"""
-                    summary_content += f"""\n\n**Steps Completed:** {len(workflow_response.step_responses) if workflow_response.step_responses else 0}"""
+                    summary_content += f"""\n\n**Steps Completed:** {len(workflow_response.step_results) if workflow_response.step_results else 0}"""
                     summary_content = summary_content.strip()
 
                     summary_panel = create_panel(
@@ -2871,7 +2940,7 @@ class Workflow:
         current_step_content = ""
         current_step_name = ""
         current_step_index = 0
-        step_responses = []
+        step_results = []
         step_started_printed = False
         is_callable_function = callable(self.steps)
 
@@ -2962,7 +3031,7 @@ class Workflow:
                         status.update(f"Completed {step_display}: {step_name}")
 
                         if response.content:
-                            step_responses.append(
+                            step_results.append(
                                 {
                                     "step_name": step_name,
                                     "step_index": step_index,
@@ -3189,12 +3258,12 @@ class Workflow:
 
                         status.update(f"Completed steps: {step_name}")
 
-                        # Add results from executed steps to step_responses
+                        # Add results from executed steps to step_results
                         if response.step_results:
                             for i, step_result in enumerate(response.step_results):
                                 # Use the same numbering system as other primitives
                                 step_display_number = get_step_display_number(step_index, step_result.step_name or "")
-                                step_responses.append(
+                                step_results.append(
                                     {
                                         "step_name": f"{step_display_number}: {step_result.step_name}",
                                         "step_index": step_index,
@@ -3239,11 +3308,11 @@ class Workflow:
                         live_log.update(status, refresh=True)
 
                         # Show final summary
-                        if response.extra_data:
+                        if response.metadata:
                             status = response.status
                             summary_content = ""
                             summary_content += f"""\n\n**Status:** {status}"""
-                            summary_content += f"""\n\n**Steps Completed:** {len(response.step_responses) if response.step_responses else 0}"""
+                            summary_content += f"""\n\n**Steps Completed:** {len(response.step_results) if response.step_results else 0}"""
                             summary_content = summary_content.strip()
 
                             summary_panel = create_panel(

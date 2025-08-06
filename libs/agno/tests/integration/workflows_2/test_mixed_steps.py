@@ -52,11 +52,11 @@ def route_b_step(step_input: StepInput) -> StepOutput:
     return StepOutput(content="Processed via Route B", success=True)
 
 
-def test_loop_with_parallel(workflow_storage):
+def test_loop_with_parallel(shared_db):
     """Test Loop containing Parallel steps."""
     workflow = Workflow(
         name="Loop with Parallel",
-        db=workflow_storage,
+        db=shared_db,
         steps=[
             Loop(
                 name="research_loop",
@@ -69,17 +69,17 @@ def test_loop_with_parallel(workflow_storage):
 
     response = workflow.run(message="test topic")
     assert isinstance(response, WorkflowRunResponse)
-    assert len(response.step_responses) == 1  # One loop output
-    loop_outputs = response.step_responses[0]
+    assert len(response.step_results) == 1  # One loop output
+    loop_outputs = response.step_results[0]
     assert isinstance(loop_outputs, list)
     assert len(loop_outputs) >= 2  # At least two iterations
 
 
-def test_loop_with_condition(workflow_storage):
+def test_loop_with_condition(shared_db):
     """Test Loop containing Condition steps."""
     workflow = Workflow(
         name="Loop with Condition",
-        db=workflow_storage,
+        db=shared_db,
         steps=[
             Loop(
                 name="research_loop",
@@ -95,15 +95,15 @@ def test_loop_with_condition(workflow_storage):
 
     response = workflow.run(message="test data")
     assert isinstance(response, WorkflowRunResponse)
-    assert len(response.step_responses) == 1
+    assert len(response.step_results) == 1
     assert "Analysis" in response.content
 
 
-def test_condition_with_loop(workflow_storage):
+def test_condition_with_loop(shared_db):
     """Test Condition containing Loop steps."""
     workflow = Workflow(
         name="Condition with Loop",
-        db=workflow_storage,
+        db=shared_db,
         steps=[
             research_step,
             Condition(
@@ -123,14 +123,14 @@ def test_condition_with_loop(workflow_storage):
 
     response = workflow.run(message="test topic")
     assert isinstance(response, WorkflowRunResponse)
-    assert len(response.step_responses) == 2  # Research + Condition
+    assert len(response.step_results) == 2  # Research + Condition
 
 
-def test_parallel_with_loops(workflow_storage):
+def test_parallel_with_loops(shared_db):
     """Test Parallel containing multiple Loops."""
     workflow = Workflow(
         name="Parallel with Loops",
-        db=workflow_storage,
+        db=shared_db,
         steps=[
             Parallel(
                 Loop(
@@ -152,14 +152,14 @@ def test_parallel_with_loops(workflow_storage):
 
     response = workflow.run(message="test topic")
     assert isinstance(response, WorkflowRunResponse)
-    assert len(response.step_responses) == 1  # One parallel output
+    assert len(response.step_results) == 1  # One parallel output
 
 
-def test_nested_conditions_and_loops(workflow_storage):
+def test_nested_conditions_and_loops(shared_db):
     """Test nested Conditions and Loops."""
     workflow = Workflow(
         name="Nested Conditions and Loops",
-        db=workflow_storage,
+        db=shared_db,
         steps=[
             Condition(
                 name="outer_condition",
@@ -181,14 +181,14 @@ def test_nested_conditions_and_loops(workflow_storage):
 
     response = workflow.run(message="test data")
     assert isinstance(response, WorkflowRunResponse)
-    assert len(response.step_responses) == 1  # One condition output
+    assert len(response.step_results) == 1  # One condition output
 
 
-def test_parallel_with_conditions_and_loops(workflow_storage):
+def test_parallel_with_conditions_and_loops(shared_db):
     """Test Parallel with mix of Conditions and Loops."""
     workflow = Workflow(
         name="Mixed Parallel",
-        db=workflow_storage,
+        db=shared_db,
         steps=[
             Parallel(
                 Loop(
@@ -206,15 +206,15 @@ def test_parallel_with_conditions_and_loops(workflow_storage):
 
     response = workflow.run(message="test data")
     assert isinstance(response, WorkflowRunResponse)
-    assert len(response.step_responses) == 2  # Parallel + Summary
+    assert len(response.step_results) == 2  # Parallel + Summary
 
 
 @pytest.mark.asyncio
-async def test_async_complex_combination(workflow_storage):
+async def test_async_complex_combination(shared_db):
     """Test async execution of complex step combinations."""
     workflow = Workflow(
         name="Async Complex",
-        db=workflow_storage,
+        db=shared_db,
         steps=[
             Loop(
                 name="outer_loop",
@@ -237,11 +237,11 @@ async def test_async_complex_combination(workflow_storage):
     assert "Summary" in response.content
 
 
-def test_complex_streaming(workflow_storage):
+def test_complex_streaming(shared_db):
     """Test streaming with complex step combinations."""
     workflow = Workflow(
         name="Complex Streaming",
-        db=workflow_storage,
+        db=shared_db,
         steps=[
             Loop(
                 name="main_loop",
@@ -268,7 +268,7 @@ def test_complex_streaming(workflow_storage):
     assert len(completed_events) == 1
 
 
-def test_router_with_loop(workflow_storage):
+def test_router_with_loop(shared_db):
     """Test Router with Loop in routes."""
     research_loop = Loop(
         name="research_loop",
@@ -285,7 +285,7 @@ def test_router_with_loop(workflow_storage):
 
     workflow = Workflow(
         name="Router with Loop",
-        db=workflow_storage,
+        db=shared_db,
         steps=[
             Router(
                 name="research_router",
@@ -298,11 +298,11 @@ def test_router_with_loop(workflow_storage):
 
     response = workflow.run(message="test data")
     assert isinstance(response, WorkflowRunResponse)
-    assert len(response.step_responses) == 1
+    assert len(response.step_results) == 1
     assert "Research" in response.content
 
 
-def test_loop_with_router(workflow_storage):
+def test_loop_with_router(shared_db):
     """Test Loop containing Router."""
 
     def route_selector(step_input: StepInput):
@@ -320,7 +320,7 @@ def test_loop_with_router(workflow_storage):
 
     workflow = Workflow(
         name="Loop with Router",
-        db=workflow_storage,
+        db=shared_db,
         steps=[
             Loop(
                 name="main_loop",
@@ -336,11 +336,11 @@ def test_loop_with_router(workflow_storage):
 
     response = workflow.run(message="test data")
     assert isinstance(response, WorkflowRunResponse)
-    assert len(response.step_responses) == 1
-    assert isinstance(response.step_responses[0], list)
+    assert len(response.step_results) == 1
+    assert isinstance(response.step_results[0], list)
 
 
-def test_parallel_with_routers(workflow_storage):
+def test_parallel_with_routers(shared_db):
     """Test Parallel execution of multiple Routers."""
 
     def research_selector(step_input: StepInput):
@@ -353,7 +353,7 @@ def test_parallel_with_routers(workflow_storage):
 
     workflow = Workflow(
         name="Parallel Routers",
-        db=workflow_storage,
+        db=shared_db,
         steps=[
             Parallel(
                 Router(
@@ -375,10 +375,10 @@ def test_parallel_with_routers(workflow_storage):
 
     response = workflow.run(message="test data complete")
     assert isinstance(response, WorkflowRunResponse)
-    assert len(response.step_responses) == 1
+    assert len(response.step_results) == 1
 
 
-def test_router_with_condition_and_loop(workflow_storage):
+def test_router_with_condition_and_loop(shared_db):
     """Test Router with Condition and Loop in routes."""
     research_loop = Loop(
         name="research_loop",
@@ -396,7 +396,7 @@ def test_router_with_condition_and_loop(workflow_storage):
 
     workflow = Workflow(
         name="Complex Router",
-        db=workflow_storage,
+        db=shared_db,
         steps=[
             Router(
                 name="complex_router",
@@ -410,10 +410,10 @@ def test_router_with_condition_and_loop(workflow_storage):
 
     response = workflow.run(message="test research data")
     assert isinstance(response, WorkflowRunResponse)
-    assert len(response.step_responses) == 2
+    assert len(response.step_results) == 2
 
 
-def test_nested_routers(workflow_storage):
+def test_nested_routers(shared_db):
     """Test nested Routers."""
 
     def outer_selector(step_input: StepInput):
@@ -437,7 +437,7 @@ def test_nested_routers(workflow_storage):
 
     workflow = Workflow(
         name="Nested Routers",
-        db=workflow_storage,
+        db=shared_db,
         steps=[
             Router(
                 name="outer_router",
@@ -450,10 +450,10 @@ def test_nested_routers(workflow_storage):
 
     response = workflow.run(message="test research data")
     assert isinstance(response, WorkflowRunResponse)
-    assert len(response.step_responses) == 1
+    assert len(response.step_results) == 1
 
 
-def test_router_streaming(workflow_storage):
+def test_router_streaming(shared_db):
     """Test streaming with Router combinations."""
     parallel_research = Parallel(research_step, analysis_step, name="parallel_research")
     research_loop = Loop(
@@ -472,7 +472,7 @@ def test_router_streaming(workflow_storage):
 
     workflow = Workflow(
         name="Streaming Router",
-        db=workflow_storage,
+        db=shared_db,
         steps=[
             Router(
                 name="stream_router",

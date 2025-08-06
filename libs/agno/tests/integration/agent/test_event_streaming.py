@@ -73,11 +73,11 @@ def test_basic_intermediate_steps_events():
     assert len(events[RunEvent.run_completed]) == 1
 
 
-def test_basic_intermediate_steps_events_persisted(agent_storage):
+def test_basic_intermediate_steps_events_persisted(shared_db):
     """Test that the agent streams events."""
     agent = Agent(
         model=OpenAIChat(id="gpt-4o-mini"),
-        storage=agent_storage,
+        storage=shared_db,
         store_events=True,
         telemetry=False,
     )
@@ -92,7 +92,7 @@ def test_basic_intermediate_steps_events_persisted(agent_storage):
 
     assert events.keys() == {RunEvent.run_started, RunEvent.run_response_content, RunEvent.run_completed}
 
-    run_response_from_storage = agent_storage.get_all_sessions()[0].memory["runs"][0]
+    run_response_from_storage = shared_db.get_all_sessions()[0].memory["runs"][0]
 
     assert run_response_from_storage["events"] is not None
     assert len(run_response_from_storage["events"]) == 2, "We should only have the run started and run completed events"
@@ -134,12 +134,12 @@ def test_intermediate_steps_with_tools():
     assert events[RunEvent.tool_call_completed][0].tool.result is not None
 
 
-def test_intermediate_steps_with_tools_events_persisted(agent_storage):
+def test_intermediate_steps_with_tools_events_persisted(shared_db):
     """Test that the agent streams events."""
     agent = Agent(
         model=OpenAIChat(id="gpt-4o-mini"),
         tools=[YFinanceTools(cache_results=True)],
-        storage=agent_storage,
+        storage=shared_db,
         store_events=True,
         telemetry=False,
     )
@@ -160,7 +160,7 @@ def test_intermediate_steps_with_tools_events_persisted(agent_storage):
         RunEvent.run_completed,
     }
 
-    run_response_from_storage = agent_storage.get_all_sessions()[0].memory["runs"][0]
+    run_response_from_storage = shared_db.get_all_sessions()[0].memory["runs"][0]
 
     assert run_response_from_storage["events"] is not None
     assert len(run_response_from_storage["events"]) == 4
@@ -219,7 +219,7 @@ def test_intermediate_steps_with_reasoning():
     assert events[RunEvent.reasoning_step][0].reasoning_content is not None
 
 
-def test_intermediate_steps_with_user_confirmation(agent_storage):
+def test_intermediate_steps_with_user_confirmation(shared_db):
     """Test that the agent streams events."""
 
     @tool(requires_confirmation=True)
@@ -229,7 +229,7 @@ def test_intermediate_steps_with_user_confirmation(agent_storage):
     agent = Agent(
         model=OpenAIChat(id="gpt-4o-mini"),
         tools=[get_the_weather],
-        storage=agent_storage,
+        storage=shared_db,
         store_events=True,
         add_history_to_context=True,
         num_history_responses=2,
@@ -261,7 +261,7 @@ def test_intermediate_steps_with_user_confirmation(agent_storage):
     updated_tools[0].confirmed = True
 
     # Check stored events
-    stored_session = agent_storage.get_all_sessions()[0]
+    stored_session = shared_db.get_all_sessions()[0]
     assert stored_session.memory["runs"][0]["events"] is not None
     assert len(stored_session.memory["runs"][0]["events"]) == 2
     assert stored_session.memory["runs"][0]["events"][0]["event"] == RunEvent.run_started
@@ -300,7 +300,7 @@ def test_intermediate_steps_with_user_confirmation(agent_storage):
     assert agent.run_response.is_paused is False
 
     # Check stored events
-    stored_session = agent_storage.get_all_sessions()[0]
+    stored_session = shared_db.get_all_sessions()[0]
     assert stored_session.memory["runs"][0]["events"] is not None
     assert len(stored_session.memory["runs"][0]["events"]) == 6
     assert stored_session.memory["runs"][0]["events"][0]["event"] == RunEvent.run_started
@@ -311,12 +311,12 @@ def test_intermediate_steps_with_user_confirmation(agent_storage):
     assert stored_session.memory["runs"][0]["events"][5]["event"] == RunEvent.run_completed
 
 
-def test_intermediate_steps_with_memory(agent_storage, memory):
+def test_intermediate_steps_with_memory(shared_db, memory):
     """Test that the agent streams events."""
     agent = Agent(
         model=OpenAIChat(id="gpt-4o-mini"),
         memory=memory,
-        storage=agent_storage,
+        storage=shared_db,
         enable_user_memories=True,
         telemetry=False,
     )
@@ -344,7 +344,7 @@ def test_intermediate_steps_with_memory(agent_storage, memory):
     assert len(events[RunEvent.memory_update_completed]) == 1
 
 
-def test_intermediate_steps_with_structured_output(agent_storage):
+def test_intermediate_steps_with_structured_output(shared_db):
     """Test that the agent streams events."""
 
     class Person(BaseModel):
@@ -354,7 +354,7 @@ def test_intermediate_steps_with_structured_output(agent_storage):
 
     agent = Agent(
         model=OpenAIChat(id="gpt-4o-mini"),
-        storage=agent_storage,
+        storage=shared_db,
         response_model=Person,
         telemetry=False,
     )
@@ -392,7 +392,7 @@ def test_intermediate_steps_with_structured_output(agent_storage):
     assert agent.run_response.content.name == "Elon Musk"
 
 
-def test_intermediate_steps_with_parser_model(agent_storage):
+def test_intermediate_steps_with_parser_model(shared_db):
     """Test that the agent streams events."""
 
     class Person(BaseModel):
@@ -402,7 +402,7 @@ def test_intermediate_steps_with_parser_model(agent_storage):
 
     agent = Agent(
         model=OpenAIChat(id="gpt-4o-mini"),
-        storage=agent_storage,
+        storage=shared_db,
         response_model=Person,
         parser_model=OpenAIChat(id="gpt-4o-mini"),
         telemetry=False,

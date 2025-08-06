@@ -179,7 +179,7 @@ def test_router_direct_chaining():
 # ============================================================================
 
 
-def test_basic_routing(workflow_storage):
+def test_basic_routing(shared_db):
     """Test basic routing based on input."""
     tech_step = Step(name="tech", executor=lambda x: StepOutput(content="Tech content"))
     general_step = Step(name="general", executor=lambda x: StepOutput(content="General content"))
@@ -192,7 +192,7 @@ def test_basic_routing(workflow_storage):
 
     workflow = Workflow(
         name="Basic Router",
-        db=workflow_storage,
+        db=shared_db,
         steps=[
             Router(
                 name="router",
@@ -204,13 +204,13 @@ def test_basic_routing(workflow_storage):
     )
 
     tech_response = workflow.run(message="tech topic")
-    assert tech_response.step_responses[0][0].content == "Tech content"
+    assert tech_response.step_results[0][0].content == "Tech content"
 
     general_response = workflow.run(message="general topic")
-    assert general_response.step_responses[0][0].content == "General content"
+    assert general_response.step_results[0][0].content == "General content"
 
 
-def test_streaming(workflow_storage):
+def test_streaming(shared_db):
     """Test router with streaming."""
     stream_step = Step(name="stream", executor=lambda x: StepOutput(content="Stream content"))
     alt_step = Step(name="alt", executor=lambda x: StepOutput(content="Alt content"))
@@ -220,7 +220,7 @@ def test_streaming(workflow_storage):
 
     workflow = Workflow(
         name="Stream Router",
-        db=workflow_storage,
+        db=shared_db,
         steps=[
             Router(
                 name="router",
@@ -237,7 +237,7 @@ def test_streaming(workflow_storage):
     assert "Stream content" in completed_events[0].content
 
 
-def test_agent_routing(workflow_storage, test_agent):
+def test_agent_routing(shared_db, test_agent):
     """Test routing to agent steps."""
     agent_step = Step(name="agent_step", agent=test_agent)
     function_step = Step(name="function_step", executor=lambda x: StepOutput(content="Function output"))
@@ -247,7 +247,7 @@ def test_agent_routing(workflow_storage, test_agent):
 
     workflow = Workflow(
         name="Agent Router",
-        db=workflow_storage,
+        db=shared_db,
         steps=[
             Router(
                 name="router",
@@ -259,10 +259,10 @@ def test_agent_routing(workflow_storage, test_agent):
     )
 
     response = workflow.run(message="test")
-    assert response.step_responses[0][0].success
+    assert response.step_results[0][0].success
 
 
-def test_mixed_routing(workflow_storage, test_agent, test_team):
+def test_mixed_routing(shared_db, test_agent, test_team):
     """Test routing to mix of function, agent, and team."""
     function_step = Step(name="function", executor=lambda x: StepOutput(content="Function output"))
     agent_step = Step(name="agent", agent=test_agent)
@@ -277,7 +277,7 @@ def test_mixed_routing(workflow_storage, test_agent, test_team):
 
     workflow = Workflow(
         name="Mixed Router",
-        db=workflow_storage,
+        db=shared_db,
         steps=[
             Router(
                 name="router",
@@ -290,18 +290,18 @@ def test_mixed_routing(workflow_storage, test_agent, test_team):
 
     # Test function route
     function_response = workflow.run(message="test function")
-    assert "Function output" in function_response.step_responses[0][0].content
+    assert "Function output" in function_response.step_results[0][0].content
 
     # Test agent route
     agent_response = workflow.run(message="test agent")
-    assert agent_response.step_responses[0][0].success
+    assert agent_response.step_results[0][0].success
 
     # Test team route
     team_response = workflow.run(message="test team")
-    assert team_response.step_responses[0][0].success
+    assert team_response.step_results[0][0].success
 
 
-def test_multiple_step_routing(workflow_storage):
+def test_multiple_step_routing(shared_db):
     """Test routing to multiple steps."""
     research_step = Step(name="research", executor=lambda x: StepOutput(content="Research output"))
     analysis_step = Step(name="analysis", executor=lambda x: StepOutput(content="Analysis output"))
@@ -314,7 +314,7 @@ def test_multiple_step_routing(workflow_storage):
 
     workflow = Workflow(
         name="Multiple Steps Router",
-        db=workflow_storage,
+        db=shared_db,
         steps=[
             Router(
                 name="router",
@@ -326,12 +326,12 @@ def test_multiple_step_routing(workflow_storage):
     )
 
     response = workflow.run(message="test research")
-    assert len(response.step_responses[0]) == 2
-    assert "Research output" in response.step_responses[0][0].content
-    assert "Analysis output" in response.step_responses[0][1].content
+    assert len(response.step_results[0]) == 2
+    assert "Research output" in response.step_results[0][0].content
+    assert "Analysis output" in response.step_results[0][1].content
 
 
-def test_route_steps(workflow_storage):
+def test_route_steps(shared_db):
     """Test routing to multiple steps."""
     research_step = Step(name="research", executor=lambda x: StepOutput(content="Research output"))
     analysis_step = Step(name="analysis", executor=lambda x: StepOutput(content="Analysis output"))
@@ -346,7 +346,7 @@ def test_route_steps(workflow_storage):
 
     workflow = Workflow(
         name="Multiple Steps Router",
-        db=workflow_storage,
+        db=shared_db,
         steps=[
             Router(
                 name="router",
@@ -359,7 +359,7 @@ def test_route_steps(workflow_storage):
 
     response = workflow.run(message="test research")
 
-    router_results = response.step_responses[0]
+    router_results = response.step_results[0]
 
     # Check that we got results from both steps in the sequence
     assert len(router_results) == 2

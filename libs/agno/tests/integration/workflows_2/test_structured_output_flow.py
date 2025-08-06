@@ -83,11 +83,11 @@ def final_function(step_input: StepInput) -> StepOutput:
     return StepOutput(content=final_report)
 
 
-def test_structured_output_function_flow_sync(workflow_storage):
+def test_structured_output_function_flow_sync(shared_db):
     """Test structured output flow between functions - sync."""
     workflow = Workflow(
         name="Structured Function Flow",
-        db=workflow_storage,
+        db=shared_db,
         steps=[
             Step(name="research", executor=research_function),
             Step(name="analysis", executor=analysis_function),
@@ -98,12 +98,12 @@ def test_structured_output_function_flow_sync(workflow_storage):
     response = workflow.run(message="test structured flow")
 
     # Verify we have all step responses
-    assert len(response.step_responses) == 3
+    assert len(response.step_results) == 3
 
     # Verify each step received and produced structured data
-    research_output = response.step_responses[0]
-    analysis_output = response.step_responses[1]
-    final_output = response.step_responses[2]
+    research_output = response.step_results[0]
+    analysis_output = response.step_results[1]
+    final_output = response.step_results[2]
 
     # Check types
     assert isinstance(research_output.content, ResearchData)
@@ -116,11 +116,11 @@ def test_structured_output_function_flow_sync(workflow_storage):
     assert final_output.content.title == "AI Testing Report"
 
 
-def test_structured_output_function_flow_streaming(workflow_storage):
+def test_structured_output_function_flow_streaming(shared_db):
     """Test structured output flow between functions - streaming."""
     workflow = Workflow(
         name="Structured Function Flow Streaming",
-        db=workflow_storage,
+        db=shared_db,
         steps=[
             Step(name="research", executor=research_function),
             Step(name="analysis", executor=analysis_function),
@@ -143,11 +143,11 @@ def test_structured_output_function_flow_streaming(workflow_storage):
 
 
 @pytest.mark.asyncio
-async def test_structured_output_function_flow_async(workflow_storage):
+async def test_structured_output_function_flow_async(shared_db):
     """Test structured output flow between functions - async."""
     workflow = Workflow(
         name="Async Structured Function Flow",
-        db=workflow_storage,
+        db=shared_db,
         steps=[
             Step(name="research", executor=research_function),
             Step(name="analysis", executor=analysis_function),
@@ -158,20 +158,20 @@ async def test_structured_output_function_flow_async(workflow_storage):
     response = await workflow.arun(message="test structured flow")
 
     # Verify we have all step responses
-    assert len(response.step_responses) == 3
+    assert len(response.step_results) == 3
 
     # Verify final output is structured
-    final_output = response.step_responses[2]
+    final_output = response.step_results[2]
     assert isinstance(final_output.content, FinalReport)
     assert final_output.content.title == "AI Testing Report"
 
 
 @pytest.mark.asyncio
-async def test_structured_output_function_flow_async_streaming(workflow_storage):
+async def test_structured_output_function_flow_async_streaming(shared_db):
     """Test structured output flow between functions - async streaming."""
     workflow = Workflow(
         name="Async Structured Function Flow Streaming",
-        db=workflow_storage,
+        db=shared_db,
         steps=[
             Step(name="research", executor=research_function),
             Step(name="analysis", executor=analysis_function),
@@ -195,7 +195,7 @@ async def test_structured_output_function_flow_async_streaming(workflow_storage)
     assert final_content.title == "AI Testing Report"
 
 
-def test_structured_output_agent_flow_sync(workflow_storage):
+def test_structured_output_agent_flow_sync(shared_db):
     """Test structured output flow between agents - sync."""
     # Create agents with structured response models
     research_agent = Agent(
@@ -221,7 +221,7 @@ def test_structured_output_agent_flow_sync(workflow_storage):
 
     workflow = Workflow(
         name="Structured Agent Flow",
-        db=workflow_storage,
+        db=shared_db,
         steps=[
             Step(name="research", agent=research_agent),
             Step(name="analysis", agent=analysis_agent),
@@ -232,12 +232,12 @@ def test_structured_output_agent_flow_sync(workflow_storage):
     response = workflow.run(message="Research AI testing methodologies")
 
     # Verify we have all step responses
-    assert len(response.step_responses) == 3
+    assert len(response.step_results) == 3
 
     # Verify each step produced structured data
-    research_output = response.step_responses[0]
-    analysis_output = response.step_responses[1]
-    final_output = response.step_responses[2]
+    research_output = response.step_results[0]
+    analysis_output = response.step_results[1]
+    final_output = response.step_results[2]
 
     # Check that outputs are structured (BaseModel instances)
     assert isinstance(research_output.content, ResearchData)
@@ -245,7 +245,7 @@ def test_structured_output_agent_flow_sync(workflow_storage):
     assert isinstance(final_output.content, FinalReport)
 
 
-def test_structured_output_agent_flow_streaming(workflow_storage):
+def test_structured_output_agent_flow_streaming(shared_db):
     """Test structured output flow between agents - streaming."""
     # Create agents with structured response models
     research_agent = Agent(
@@ -264,7 +264,7 @@ def test_structured_output_agent_flow_streaming(workflow_storage):
 
     workflow = Workflow(
         name="Structured Agent Flow Streaming",
-        db=workflow_storage,
+        db=shared_db,
         steps=[
             Step(name="research", agent=research_agent),
             Step(name="analysis", agent=analysis_agent),
@@ -285,7 +285,7 @@ def test_structured_output_agent_flow_streaming(workflow_storage):
 
 
 @pytest.mark.asyncio
-async def test_structured_output_agent_flow_async(workflow_storage):
+async def test_structured_output_agent_flow_async(shared_db):
     """Test structured output flow between agents - async."""
     # Create agents with structured response models
     research_agent = Agent(
@@ -304,7 +304,7 @@ async def test_structured_output_agent_flow_async(workflow_storage):
 
     workflow = Workflow(
         name="Async Structured Agent Flow",
-        db=workflow_storage,
+        db=shared_db,
         steps=[
             Step(name="research", agent=research_agent),
             Step(name="analysis", agent=analysis_agent),
@@ -314,18 +314,18 @@ async def test_structured_output_agent_flow_async(workflow_storage):
     response = await workflow.arun(message="Research AI testing methodologies")
 
     # Verify we have all step responses
-    assert len(response.step_responses) == 2
+    assert len(response.step_results) == 2
 
     # Verify structured outputs
-    research_output = response.step_responses[0]
-    analysis_output = response.step_responses[1]
+    research_output = response.step_results[0]
+    analysis_output = response.step_results[1]
 
     assert isinstance(research_output.content, ResearchData)
     assert isinstance(analysis_output.content, AnalysisResult)
 
 
 @pytest.mark.asyncio
-async def test_structured_output_agent_flow_async_streaming(workflow_storage):
+async def test_structured_output_agent_flow_async_streaming(shared_db):
     """Test structured output flow between agents - async streaming."""
     # Create agents with structured response models
     research_agent = Agent(
@@ -344,7 +344,7 @@ async def test_structured_output_agent_flow_async_streaming(workflow_storage):
 
     workflow = Workflow(
         name="Async Structured Agent Flow Streaming",
-        db=workflow_storage,
+        db=shared_db,
         steps=[
             Step(name="research", agent=research_agent),
             Step(name="analysis", agent=analysis_agent),
@@ -366,7 +366,7 @@ async def test_structured_output_agent_flow_async_streaming(workflow_storage):
     assert isinstance(final_content, AnalysisResult)
 
 
-def test_structured_output_team_flow_sync(workflow_storage):
+def test_structured_output_team_flow_sync(shared_db):
     """Test structured output flow with team - sync (simplified)."""
     # Create minimal team with structured response model
     researcher = Agent(
@@ -385,7 +385,7 @@ def test_structured_output_team_flow_sync(workflow_storage):
 
     workflow = Workflow(
         name="Simple Team Flow",
-        db=workflow_storage,
+        db=shared_db,
         steps=[
             Step(name="research", team=research_team),
         ],
@@ -394,12 +394,12 @@ def test_structured_output_team_flow_sync(workflow_storage):
     response = workflow.run(message="Brief AI research")
 
     # Verify structured output
-    assert len(response.step_responses) == 1
-    research_output = response.step_responses[0]
+    assert len(response.step_results) == 1
+    research_output = response.step_results[0]
     assert isinstance(research_output.content, ResearchData)
 
 
-def test_structured_output_team_flow_streaming(workflow_storage):
+def test_structured_output_team_flow_streaming(shared_db):
     """Test structured output flow with team - streaming (simplified)."""
     # Create minimal team
     researcher = Agent(
@@ -418,7 +418,7 @@ def test_structured_output_team_flow_streaming(workflow_storage):
 
     workflow = Workflow(
         name="Simple Team Flow Streaming",
-        db=workflow_storage,
+        db=shared_db,
         steps=[
             Step(name="research", team=research_team),
         ],
@@ -438,7 +438,7 @@ def test_structured_output_team_flow_streaming(workflow_storage):
 
 
 @pytest.mark.asyncio
-async def test_structured_output_team_flow_async(workflow_storage):
+async def test_structured_output_team_flow_async(shared_db):
     """Test structured output flow with team - async (simplified)."""
     # Create minimal team
     researcher = Agent(
@@ -457,7 +457,7 @@ async def test_structured_output_team_flow_async(workflow_storage):
 
     workflow = Workflow(
         name="Simple Async Team Flow",
-        db=workflow_storage,
+        db=shared_db,
         steps=[
             Step(name="research", team=research_team),
         ],
@@ -466,13 +466,13 @@ async def test_structured_output_team_flow_async(workflow_storage):
     response = await workflow.arun(message="Brief AI research")
 
     # Verify structured output
-    assert len(response.step_responses) == 1
-    research_output = response.step_responses[0]
+    assert len(response.step_results) == 1
+    research_output = response.step_results[0]
     assert isinstance(research_output.content, ResearchData)
 
 
 @pytest.mark.asyncio
-async def test_structured_output_team_flow_async_streaming(workflow_storage):
+async def test_structured_output_team_flow_async_streaming(shared_db):
     """Test structured output flow with team - async streaming (simplified)."""
     # Create minimal team
     researcher = Agent(
@@ -491,7 +491,7 @@ async def test_structured_output_team_flow_async_streaming(workflow_storage):
 
     workflow = Workflow(
         name="Simple Async Team Flow Streaming",
-        db=workflow_storage,
+        db=shared_db,
         steps=[
             Step(name="research", team=research_team),
         ],
@@ -512,7 +512,7 @@ async def test_structured_output_team_flow_async_streaming(workflow_storage):
     assert isinstance(final_content, ResearchData)
 
 
-def test_mixed_structured_output_flow(workflow_storage):
+def test_mixed_structured_output_flow(shared_db):
     """Test mixed structured output flow (function -> agent -> team) - simplified."""
     # Create minimal agent
     analysis_agent = Agent(
@@ -539,7 +539,7 @@ def test_mixed_structured_output_flow(workflow_storage):
 
     workflow = Workflow(
         name="Mixed Structured Flow",
-        db=workflow_storage,
+        db=shared_db,
         steps=[
             Step(name="research", executor=research_function),  # Function (fast)
             Step(name="analysis", agent=analysis_agent),  # Agent
@@ -550,12 +550,12 @@ def test_mixed_structured_output_flow(workflow_storage):
     response = workflow.run(message="test mixed flow")
 
     # Verify we have all step responses
-    assert len(response.step_responses) == 3
+    assert len(response.step_results) == 3
 
     # Verify each step produced structured data
-    research_output = response.step_responses[0]
-    analysis_output = response.step_responses[1]
-    final_output = response.step_responses[2]
+    research_output = response.step_results[0]
+    analysis_output = response.step_results[1]
+    final_output = response.step_results[2]
 
     # Check that outputs are structured
     assert isinstance(research_output.content, ResearchData)
@@ -563,7 +563,7 @@ def test_mixed_structured_output_flow(workflow_storage):
     assert isinstance(final_output.content, FinalReport)
 
 
-def test_structured_output_with_workflow_components(workflow_storage):
+def test_structured_output_with_workflow_components(shared_db):
     """Test structured output flow with workflow components (Steps, Loop, Condition)."""
     from agno.workflow.v2 import Condition, Loop, Steps
 
@@ -580,7 +580,7 @@ def test_structured_output_with_workflow_components(workflow_storage):
     # Create a workflow with structured data flowing through different components
     workflow = Workflow(
         name="Simple Component Flow",
-        db=workflow_storage,
+        db=shared_db,
         steps=[
             Steps(
                 name="research_steps",
@@ -605,12 +605,12 @@ def test_structured_output_with_workflow_components(workflow_storage):
     response = workflow.run(message="test simple component flow")
 
     # Verify we have all step responses
-    assert len(response.step_responses) == 3
+    assert len(response.step_results) == 3
 
     # Handle the actual structure - some might be lists
-    steps_output = response.step_responses[0]
-    condition_output = response.step_responses[1]
-    loop_output = response.step_responses[2]
+    steps_output = response.step_results[0]
+    condition_output = response.step_results[1]
+    loop_output = response.step_results[2]
 
     # If steps_output is a list, get the first item
     if isinstance(steps_output, list):

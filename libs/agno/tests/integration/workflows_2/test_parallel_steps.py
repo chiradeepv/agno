@@ -108,30 +108,30 @@ def test_parallel_direct_single_step():
 # ============================================================================
 
 
-def test_basic_parallel(workflow_storage):
+def test_basic_parallel(shared_db):
     """Test basic parallel execution."""
     workflow = Workflow(
         name="Basic Parallel",
-        db=workflow_storage,
+        db=shared_db,
         steps=[Parallel(step_a, step_b, name="Parallel Phase"), final_step],
     )
 
     response = workflow.run(message="test")
     assert isinstance(response, WorkflowRunResponse)
-    assert len(response.step_responses) == 2
+    assert len(response.step_results) == 2
 
     # Check parallel output
-    parallel_output = response.step_responses[0]
+    parallel_output = response.step_results[0]
     assert isinstance(parallel_output, StepOutput)
     assert "Output A" in parallel_output.content
     assert "Output B" in parallel_output.content
 
 
-def test_parallel_streaming(workflow_storage):
+def test_parallel_streaming(shared_db):
     """Test parallel execution with streaming."""
     workflow = Workflow(
         name="Streaming Parallel",
-        db=workflow_storage,
+        db=shared_db,
         steps=[Parallel(step_a, step_b, name="Parallel Phase"), final_step],
     )
 
@@ -141,43 +141,43 @@ def test_parallel_streaming(workflow_storage):
     assert completed_events[0].content is not None
 
 
-def test_parallel_with_agent(workflow_storage, test_agent):
+def test_parallel_with_agent(shared_db, test_agent):
     """Test parallel execution with agent step."""
     agent_step = Step(name="agent_step", agent=test_agent)
 
     workflow = Workflow(
         name="Agent Parallel",
-        db=workflow_storage,
+        db=shared_db,
         steps=[Parallel(step_a, agent_step, name="Mixed Parallel"), final_step],
     )
 
     response = workflow.run(message="test")
     assert isinstance(response, WorkflowRunResponse)
-    parallel_output = response.step_responses[0]
+    parallel_output = response.step_results[0]
     assert isinstance(parallel_output, StepOutput)
     assert "Output A" in parallel_output.content
 
 
 @pytest.mark.asyncio
-async def test_async_parallel(workflow_storage):
+async def test_async_parallel(shared_db):
     """Test async parallel execution."""
     workflow = Workflow(
         name="Async Parallel",
-        db=workflow_storage,
+        db=shared_db,
         steps=[Parallel(step_a, step_b, name="Parallel Phase"), final_step],
     )
 
     response = await workflow.arun(message="test")
     assert isinstance(response, WorkflowRunResponse)
-    assert len(response.step_responses) == 2
+    assert len(response.step_results) == 2
 
 
 @pytest.mark.asyncio
-async def test_async_parallel_streaming(workflow_storage):
+async def test_async_parallel_streaming(shared_db):
     """Test async parallel execution with streaming."""
     workflow = Workflow(
         name="Async Streaming Parallel",
-        db=workflow_storage,
+        db=shared_db,
         steps=[Parallel(step_a, step_b, name="Parallel Phase"), final_step],
     )
 

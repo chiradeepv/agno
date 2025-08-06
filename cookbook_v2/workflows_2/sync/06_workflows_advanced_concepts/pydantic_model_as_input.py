@@ -8,6 +8,7 @@ from agno.tools.duckduckgo import DuckDuckGoTools
 from agno.tools.hackernews import HackerNewsTools
 from agno.workflow.v2.step import Step
 from agno.workflow.v2.workflow import Workflow
+from lancedb import db
 from pydantic import BaseModel, Field
 
 
@@ -67,7 +68,7 @@ if __name__ == "__main__":
     content_creation_workflow = Workflow(
         name="Content Creation Workflow",
         description="Automated content creation from blog posts to social media",
-        storage=SqliteDb(
+        db=SqliteDb(
             session_table="workflow_session",
             db_file="tmp/workflow_v2.db",
         ),

@@ -6,21 +6,21 @@ from agno.models.openai.chat import OpenAIChat
 
 
 @pytest.fixture
-def chat_agent(agent_storage, memory):
+def chat_agent(shared_db, memory):
     """Create an agent with storage and memory for testing."""
     return Agent(
         model=OpenAIChat(id="gpt-4o-mini"),
-        storage=agent_storage,
+        storage=shared_db,
         memory=memory,
     )
 
 
 @pytest.fixture
-def memory_agent(agent_storage, memory):
+def memory_agent(shared_db, memory):
     """Create an agent that creates memories."""
     return Agent(
         model=OpenAIChat(id="gpt-4o-mini"),
-        storage=agent_storage,
+        storage=shared_db,
         memory=memory,
         enable_user_memories=True,
     )
@@ -43,7 +43,7 @@ def test_agent_runs_in_memory(chat_agent):
 
 
 @pytest.mark.asyncio
-async def test_multi_user_multi_session_chat(memory_agent, agent_storage, memory):
+async def test_multi_user_multi_session_chat(memory_agent, shared_db, memory):
     """Test multi-user multi-session chat with storage and memory."""
     # Define user and session IDs
     user_1_id = "user_1@example.com"
@@ -83,20 +83,20 @@ async def test_multi_user_multi_session_chat(memory_agent, agent_storage, memory
     await memory_agent.arun("What do you suggest I do this weekend?", user_id=user_1_id, session_id=user_1_session_1_id)
 
     # Verify storage DB has the right sessions
-    all_session_ids = agent_storage.get_all_session_ids()
+    all_session_ids = shared_db.get_all_session_ids()
     assert len(all_session_ids) == 4  # 4 sessions total
 
     # Check that each user has the expected sessions
-    user_1_sessions = agent_storage.get_all_sessions(user_id=user_1_id)
+    user_1_sessions = shared_db.get_all_sessions(user_id=user_1_id)
     assert len(user_1_sessions) == 2
     assert user_1_session_1_id in [session.session_id for session in user_1_sessions]
     assert user_1_session_2_id in [session.session_id for session in user_1_sessions]
 
-    user_2_sessions = agent_storage.get_all_sessions(user_id=user_2_id)
+    user_2_sessions = shared_db.get_all_sessions(user_id=user_2_id)
     assert len(user_2_sessions) == 1
     assert user_2_session_1_id in [session.session_id for session in user_2_sessions]
 
-    user_3_sessions = agent_storage.get_all_sessions(user_id=user_3_id)
+    user_3_sessions = shared_db.get_all_sessions(user_id=user_3_id)
     assert len(user_3_sessions) == 1
     assert user_3_session_1_id in [session.session_id for session in user_3_sessions]
 
