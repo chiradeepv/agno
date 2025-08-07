@@ -4722,6 +4722,7 @@ class Agent:
         for m in messages:
             if m.role == assistant_message_role and m.metrics is not None and m.from_history is False:
                 metrics += m.metrics
+
         return metrics
 
     def rename(self, name: str, session_id: Optional[str] = None) -> None:
