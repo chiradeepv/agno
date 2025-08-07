@@ -8,6 +8,7 @@ from agno.knowledge.embedder.base import Embedder
 from agno.utils.log import logger
 
 try:
+    from openai import AsyncAzureOpenAI as AsyncAzureOpenAIClient
     from openai import AzureOpenAI as AzureOpenAIClient
     from openai.types.create_embedding_response import CreateEmbeddingResponse
 except ImportError:
@@ -32,6 +33,7 @@ class AzureOpenAIEmbedder(Embedder):
     request_params: Optional[Dict[str, Any]] = None
     client_params: Optional[Dict[str, Any]] = None
     openai_client: Optional[AzureOpenAIClient] = None
+    async_client: Optional[AsyncAzureOpenAIClient] = None
 
     @property
     def client(self) -> AzureOpenAIClient:
@@ -60,6 +62,35 @@ class AzureOpenAIEmbedder(Embedder):
             _client_params.update(self.client_params)
 
         return AzureOpenAIClient(**_client_params)
+
+    @property
+    def aclient(self) -> AsyncAzureOpenAIClient:
+        if self.async_client:
+            return self.async_client
+
+        _client_params: Dict[str, Any] = {}
+        if self.api_key:
+            _client_params["api_key"] = self.api_key
+        if self.api_version:
+            _client_params["api_version"] = self.api_version
+        if self.organization:
+            _client_params["organization"] = self.organization
+        if self.azure_endpoint:
+            _client_params["azure_endpoint"] = self.azure_endpoint
+        if self.azure_deployment:
+            _client_params["azure_deployment"] = self.azure_deployment
+        if self.base_url:
+            _client_params["base_url"] = self.base_url
+        if self.azure_ad_token:
+            _client_params["azure_ad_token"] = self.azure_ad_token
+        if self.azure_ad_token_provider:
+            _client_params["azure_ad_token_provider"] = self.azure_ad_token_provider
+
+        if self.client_params:
+            _client_params.update(self.client_params)
+
+        self.async_client = AsyncAzureOpenAIClient(**_client_params)
+        return self.async_client
 
     def _response(self, text: str) -> CreateEmbeddingResponse:
         _request_params: Dict[str, Any] = {

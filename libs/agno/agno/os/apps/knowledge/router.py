@@ -269,14 +269,14 @@ def attach_routes(router: APIRouter, knowledge: Knowledge) -> APIRouter:
     return router
 
 
-def process_content(knowledge: Knowledge, content_id: str, content: Content, reader_id: Optional[str] = None):
+async def process_content(knowledge: Knowledge, content_id: str, content: Content, reader_id: Optional[str] = None):
     """Background task to process the content"""
     log_info(f"Processing content {content_id}")
     try:
         content.id = content_id
         if reader_id:
             content.reader = knowledge.readers[reader_id]
-        knowledge.process_content(content)
+        await knowledge.process_content(content)
         log_info(f"Content {content_id} processed successfully")
     except Exception as e:
         log_info(f"Error processing content {content_id}: {e}")

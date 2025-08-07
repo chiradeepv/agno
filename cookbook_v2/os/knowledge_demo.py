@@ -18,9 +18,9 @@ vector_db = PgVector(
     db_url=db_url,
 )
 
-vector_db = LightRag(
-    api_key=os.getenv("LIGHTRAG_API_KEY"),
-)
+# vector_db = LightRag(
+#     api_key=os.getenv("LIGHTRAG_API_KEY"),
+# )
 
 # contents_db = JsonDb(db_path="./agno_json_data")
 contents_db = PostgresDb(db_url=db_url)

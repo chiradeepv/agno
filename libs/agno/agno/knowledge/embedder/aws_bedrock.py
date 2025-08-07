@@ -1,3 +1,4 @@
+import asyncio
 import json
 from dataclasses import dataclass
 from os import getenv
@@ -210,3 +211,19 @@ class AwsBedrockEmbedder(Embedder):
             usage = response["usage"]
 
         return embedding, usage
+
+    async def async_get_embedding(self, text: str) -> List[float]:
+        """
+        Async version of get_embedding().
+        Offloads the blocking boto3 call to a thread.
+        """
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, self.get_embedding, text)
+
+    async def async_get_embedding_and_usage(self, text: str) -> Tuple[List[float], Optional[Dict[str, Any]]]:
+        """
+        Async version of get_embedding_and_usage().
+        Offloads the blocking boto3 call to a thread.
+        """
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, self.get_embedding_and_usage, text)

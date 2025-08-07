@@ -765,6 +765,16 @@ class Weaviate(VectorDb):
             logger.error(f"Error deleting documents by content_id '{content_id}': {e}")
             return False
 
+    def delete_by_content_hash(self, content_hash: str) -> bool:
+        """Delete content by content hash using direct filter deletion."""
+        try:
+            collection = self.get_client().collections.get(self.collection)
+            collection.data.delete_many(where=Filter.by_property("content_hash").equal(content_hash))
+            return True
+        except Exception as e:
+            logger.error(f"Error deleting documents by content_hash '{content_hash}': {e}")
+            return False
+
     def get_vector_index_config(self, index_type: VectorIndex, distance_metric: Distance):
         """
         Returns the appropriate vector index configuration with the specified distance metric.

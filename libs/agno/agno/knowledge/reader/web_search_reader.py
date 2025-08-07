@@ -105,6 +105,7 @@ class WebSearchReader(Reader):
                 else:
                     logger.error(f"All DuckDuckGo search attempts failed: {e}")
                     return []
+        return []
 
     def _perform_google_search(self, query: str) -> List[Dict[str, str]]:
         """Perform web search using Google (requires googlesearch-python)"""
