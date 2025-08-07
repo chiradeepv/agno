@@ -119,6 +119,7 @@ def test_agent_with_state_on_run():
         markdown=True,
     )
     agent.run("Add oranges to my shopping list", session_id="session_1", session_state={"shopping_list": []})
+    
     response = agent.run(
         'Current shopping list: {shopping_list}. Other random json ```json { "properties": { "title": { "title": "a" } } }```', session_id="session_1"
     )

@@ -241,6 +241,7 @@ class Agent:
     # Use these for few-shot learning or to provide additional context to the Model.
     # Note: these are not retained in memory, they are added directly to the messages sent to the model.
     additional_messages: Optional[List[Union[Dict, Message]]] = None
+    
     # --- User message settings ---
     # Provide the user message as a string, list, dict, or function
     # Note: this will ignore the message sent to the run function
@@ -1068,6 +1069,10 @@ class Agent:
         7. Save session to storage
         8. Optional: Save output to file if save_response_to_file is set
         """
+        # Resolving here for async requirement
+        if self.dependencies is not None:
+            await self.aresolve_run_dependencies()
+            
         log_debug(f"Agent Run Start: {run_response.run_id}", center=True)
 
         self.model = cast(Model, self.model)
@@ -1150,6 +1155,11 @@ class Agent:
         6. Save session to storage
         7. Optional: Save output to file if save_response_to_file is set
         """
+        # Resolving here for async requirement
+        if self.dependencies is not None:
+            await self.aresolve_run_dependencies()
+
+
         log_debug(f"Agent Run Start: {run_response.run_id}", center=True)
         # Start the Run by yielding a RunStarted event
         if stream_intermediate_steps:
@@ -1289,10 +1299,6 @@ class Agent:
 
         # Update session state from DB
         session_state = self.update_session_state(session=agent_session, session_state=session_state)
-
-        # Resolve dependencies
-        if self.dependencies is not None:
-            self.resolve_run_dependencies()
 
         # Extract workflow context from kwargs if present
         workflow_context = kwargs.pop("workflow_context", None)
@@ -1886,10 +1892,6 @@ class Agent:
         # Update session state from DB
         session_state = self.update_session_state(session=agent_session, session_state=session_state)
 
-        # Resolve dependencies
-        if self.dependencies is not None:
-            self.resolve_run_dependencies()
-
         effective_filters = knowledge_filters
 
         # When filters are passed manually
@@ -2056,6 +2058,11 @@ class Agent:
         6. Save session to storage
         7. Save output to file if save_response_to_file is set
         """
+        
+        # Resolving here for async requirement
+        if self.dependencies is not None:
+            await self.aresolve_run_dependencies()
+
 
         self.model = cast(Model, self.model)
 
@@ -2132,6 +2139,10 @@ class Agent:
         6. Save output to file if save_response_to_file is set
         7. Save session to storage
         """
+        # Resolving here for async requirement
+        if self.dependencies is not None:
+            await self.aresolve_run_dependencies()
+
         # Start the Run by yielding a RunContinued event
         if stream_intermediate_steps:
             yield self._handle_event(create_run_response_continued_event(run_response), run_response)
@@ -3600,8 +3611,11 @@ class Agent:
         # Get the session_metrics from the database
         if "session_metrics" in session.session_data:
             session_metrics_from_db = session.session_data.get("session_metrics")
-            if session_metrics_from_db is not None and isinstance(session_metrics_from_db, dict):
-                return Metrics(**session_metrics_from_db)
+            if session_metrics_from_db is not None:
+                if isinstance(session_metrics_from_db, dict):
+                    return Metrics(**session_metrics_from_db)
+                elif isinstance(session_metrics_from_db, Metrics):
+                    return session_metrics_from_db
         else:
             return Metrics()
 
@@ -3990,36 +4004,7 @@ class Agent:
         # Get references from the knowledge base to use in the user message
         references = None
         self.run_response = cast(RunResponse, self.run_response)
-        if self.add_references and message:
-            message_str: str
-            if isinstance(message, str):
-                message_str = message
-            elif callable(message):
-                message_str = message(agent=self)
-            else:
-                raise Exception("message must be a string or a callable when add_references is True")
-
-            try:
-                retrieval_timer = Timer()
-                retrieval_timer.start()
-                docs_from_knowledge = self.get_relevant_docs_from_knowledge(
-                    query=message_str, filters=knowledge_filters, **kwargs
-                )
-                if docs_from_knowledge is not None:
-                    references = MessageReferences(
-                        query=message_str, references=docs_from_knowledge, time=round(retrieval_timer.elapsed, 4)
-                    )
-                    # Add the references to the run_response
-                    if self.run_response.metadata is None:
-                        self.run_response.metadata = RunResponseMetaData()
-                    if self.run_response.metadata.references is None:
-                        self.run_response.metadata.references = []
-                    self.run_response.metadata.references.append(references)
-                retrieval_timer.stop()
-                log_debug(f"Time to get references: {retrieval_timer.elapsed:.4f}s")
-            except Exception as e:
-                log_warning(f"Failed to get references: {e}")
-
+        
         # 1. If the user_message is provided, use that.
         if self.user_message is not None:
             if isinstance(self.user_message, Message):
@@ -4033,6 +4018,7 @@ class Agent:
                     raise Exception("user_message must return a string")
 
             if self.add_state_in_messages:
+                print("HERE", session.session_data.get("session_state"))
                 user_message_content = self.format_message_with_state_variables(user_message_content, user_id=user_id, session_state=session.session_data.get("session_state"))
 
             return Message(
@@ -4044,9 +4030,9 @@ class Agent:
                 files=files,
                 **kwargs,
             )
-
+            
         # 2. If build_user_context is False or message is a list, return the message as is.
-        if not self.build_user_context or isinstance(message, list):
+        elif not self.build_user_context:
             return Message(
                 role=self.user_message_role,
                 content=message,
@@ -4056,27 +4042,8 @@ class Agent:
                 files=files,
                 **kwargs,
             )
-
-        # Handle list messages by converting to string
-        if isinstance(message, list):
-            # Convert list to string (join with newlines if all elements are strings)
-            if all(isinstance(item, str) for item in message):
-                message_content = "\n".join(message)
-            else:
-                message_content = str(message)
-
-            return Message(
-                role=self.user_message_role,
-                content=message_content,
-                images=images,
-                audio=audio,
-                videos=videos,
-                files=files,
-                **kwargs,
-            )
-
         # 3. Build the default user message for the Agent
-        if message is None:
+        elif message is None:
             # If we have any media, return a message with empty content
             if images is not None or audio is not None or videos is not None or files is not None:
                 return Message(
@@ -4091,45 +4058,93 @@ class Agent:
             else:
                 # If the message is None, return None
                 return None
+        
+        # 3. If message is provided, format it with the session state variables
+        else:
+            # Handle list messages by converting to string
+            if isinstance(message, list):
+                # Convert list to string (join with newlines if all elements are strings)
+                if all(isinstance(item, str) for item in message):
+                    message_content = "\n".join(message)
+                else:
+                    message_content = str(message)
 
-        user_msg_content = message
-        # Format the message with the session state variables
-        if self.add_state_in_messages:
-            user_msg_content = self.format_message_with_state_variables(message, user_id=user_id, session_state=session.session_data.get("session_state"))
+                return Message(
+                    role=self.user_message_role,
+                    content=message_content,
+                    images=images,
+                    audio=audio,
+                    videos=videos,
+                    files=files,
+                    **kwargs,
+                )
 
-        # Convert to string for concatenation operations
-        user_msg_content_str = get_text_from_message(user_msg_content) if user_msg_content is not None else ""
+            user_msg_content = message
+            if self.add_references:
+                if isinstance(message, str):
+                    user_msg_content = message
+                elif callable(message):
+                    user_msg_content = message(agent=self)
+                else:
+                    raise Exception("message must be a string or a callable when add_references is True")
 
-        # 4.1 Add references to user message
-        if (
-            self.add_references
-            and references is not None
-            and references.references is not None
-            and len(references.references) > 0
-        ):
-            user_msg_content_str += "\n\nUse the following references from the knowledge base if it helps:\n"
-            user_msg_content_str += "<references>\n"
-            user_msg_content_str += self.convert_documents_to_string(references.references) + "\n"
-            user_msg_content_str += "</references>"
-        # 4.2 Add context to user message
-        if self.add_dependencies_to_context and self.dependencies is not None:
-            user_msg_content_str += "\n\n<additional context>\n"
-            user_msg_content_str += self.convert_context_to_string(self.dependencies) + "\n"
-            user_msg_content_str += "</additional context>"
+                try:
+                    retrieval_timer = Timer()
+                    retrieval_timer.start()
+                    docs_from_knowledge = self.get_relevant_docs_from_knowledge(
+                        query=user_msg_content, filters=knowledge_filters, **kwargs
+                    )
+                    if docs_from_knowledge is not None:
+                        references = MessageReferences(
+                            query=user_msg_content, references=docs_from_knowledge, time=round(retrieval_timer.elapsed, 4)
+                        )
+                        # Add the references to the run_response
+                        if self.run_response.metadata is None:
+                            self.run_response.metadata = RunResponseMetaData()
+                        if self.run_response.metadata.references is None:
+                            self.run_response.metadata.references = []
+                        self.run_response.metadata.references.append(references)
+                    retrieval_timer.stop()
+                    log_debug(f"Time to get references: {retrieval_timer.elapsed:.4f}s")
+                except Exception as e:
+                    log_warning(f"Failed to get references: {e}")
+                    
+            if self.add_state_in_messages:
+                user_msg_content = self.format_message_with_state_variables(user_msg_content, user_id=user_id, session_state=session.session_data.get("session_state"))
 
-        # Use the string version for the final content
-        user_msg_content = user_msg_content_str
+            # Convert to string for concatenation operations
+            user_msg_content_str = get_text_from_message(user_msg_content) if user_msg_content is not None else ""
 
-        # Return the user message
-        return Message(
-            role=self.user_message_role,
-            content=user_msg_content,
-            audio=audio,
-            images=images,
-            videos=videos,
-            files=files,
-            **kwargs,
-        )
+            # 4.1 Add references to user message
+            if (
+                self.add_references
+                and references is not None
+                and references.references is not None
+                and len(references.references) > 0
+            ):
+                user_msg_content_str += "\n\nUse the following references from the knowledge base if it helps:\n"
+                user_msg_content_str += "<references>\n"
+                user_msg_content_str += self.convert_documents_to_string(references.references) + "\n"
+                user_msg_content_str += "</references>"
+            # 4.2 Add context to user message
+            if self.add_dependencies_to_context and self.dependencies is not None:
+                user_msg_content_str += "\n\n<additional context>\n"
+                user_msg_content_str += self.convert_context_to_string(self.dependencies) + "\n"
+                user_msg_content_str += "</additional context>"
+
+            # Use the string version for the final content
+            user_msg_content = user_msg_content_str
+
+            # Return the user message
+            return Message(
+                role=self.user_message_role,
+                content=user_msg_content,
+                audio=audio,
+                images=images,
+                videos=videos,
+                files=files,
+                **kwargs,
+            )
 
     def get_run_messages(
         self,
