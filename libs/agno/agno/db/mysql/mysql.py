@@ -723,7 +723,7 @@ class MySQLDb(BaseDb):
             List[str]: List of memory topics.
         """
         try:
-            table = self._get_table(table_type="user_memories")
+            table = self._get_table(table_type="memories")
 
             with self.Session() as sess, sess.begin():
                 # MySQL approach: extract JSON array elements differently

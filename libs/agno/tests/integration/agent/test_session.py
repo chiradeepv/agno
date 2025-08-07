@@ -3,7 +3,7 @@ from typing import Any, Dict, Optional
 import uuid
 
 from agno.agent.agent import Agent
-from agno.db.sqlite.sqlite import SessionType
+from agno.db.base import SessionType
 from agno.models.openai.chat import OpenAIChat
 
 
@@ -77,7 +77,7 @@ def test_agent_session_state_switch_session_id(shared_db):
     assert session_from_storage.session_data["session_state"] == {"test_key": "test_value"}
 
 
-def test_agent_with_state_on_agent():
+def test_agent_with_state_on_agent(shared_db):
     # Define a tool that increments our counter and returns the new value
     def add_item(session_state: Dict[str, Any], item: str) -> str:
         """Add an item to the shopping list."""
@@ -86,6 +86,7 @@ def test_agent_with_state_on_agent():
 
     # Create an Agent that maintains state
     agent = Agent(
+        db=shared_db,
         session_state={"shopping_list": []},
         tools=[add_item],
         instructions="Current state (shopping list) is: {shopping_list}",
@@ -103,7 +104,7 @@ def test_agent_with_state_on_agent():
     )
 
 
-def test_agent_with_state_on_run():
+def test_agent_with_state_on_agent_stream(shared_db):
     # Define a tool that increments our counter and returns the new value
     def add_item(session_state: Dict[str, Any], item: str) -> str:
         """Add an item to the shopping list."""
@@ -112,6 +113,41 @@ def test_agent_with_state_on_run():
 
     # Create an Agent that maintains state
     agent = Agent(
+        db=shared_db,
+        session_state={"shopping_list": []},
+        session_id=str(uuid.uuid4()),
+        tools=[add_item],
+        instructions="Current state (shopping list) is: {shopping_list}",
+        # Add the state to the messages
+        add_state_in_messages=True,
+        markdown=True,
+    )
+    for response in agent.run("Add oranges to my shopping list", stream=True):
+        pass
+    
+    session_from_storage = shared_db.get_session(session_id=agent.session_id, session_type=SessionType.AGENT)
+    assert session_from_storage.session_data["session_state"] == {"shopping_list": ["oranges"]}
+    
+    for response in agent.run(
+        'Current shopping list: {shopping_list}. Other random json ```json { "properties": { "title": { "title": "a" } } }```', stream=True
+    ):
+        pass
+    assert (
+        agent.run_response.messages[1].content
+        == 'Current shopping list: [\'oranges\']. Other random json ```json { "properties": { "title": { "title": "a" } } }```'
+    )
+
+
+def test_agent_with_state_on_run(shared_db):
+    # Define a tool that increments our counter and returns the new value
+    def add_item(session_state: Dict[str, Any], item: str) -> str:
+        """Add an item to the shopping list."""
+        session_state["shopping_list"].append(item)
+        return f"The shopping list is now {session_state['shopping_list']}"
+
+    # Create an Agent that maintains state
+    agent = Agent(
+        db=shared_db,
         tools=[add_item],
         instructions="Current state (shopping list) is: {shopping_list}",
         # Add the state to the messages
@@ -120,10 +156,109 @@ def test_agent_with_state_on_run():
     )
     agent.run("Add oranges to my shopping list", session_id="session_1", session_state={"shopping_list": []})
     
+    session_from_storage = shared_db.get_session(session_id="session_1", session_type=SessionType.AGENT)
+    assert session_from_storage.session_data["session_state"] == {"shopping_list": ["oranges"]}
+    
     response = agent.run(
         'Current shopping list: {shopping_list}. Other random json ```json { "properties": { "title": { "title": "a" } } }```', session_id="session_1"
     )
+    
     assert (
         response.messages[1].content
+        == 'Current shopping list: [\'oranges\']. Other random json ```json { "properties": { "title": { "title": "a" } } }```'
+    )
+
+
+def test_agent_with_state_on_run_stream(shared_db):
+    # Define a tool that increments our counter and returns the new value
+    def add_item(session_state: Dict[str, Any], item: str) -> str:
+        """Add an item to the shopping list."""
+        session_state["shopping_list"].append(item)
+        return f"The shopping list is now {session_state['shopping_list']}"
+
+    # Create an Agent that maintains state
+    agent = Agent(
+        db=shared_db,
+        tools=[add_item],
+        instructions="Current state (shopping list) is: {shopping_list}",
+        # Add the state to the messages
+        add_state_in_messages=True,
+        markdown=True,
+    )
+    for response in agent.run("Add oranges to my shopping list", session_id="session_1", session_state={"shopping_list": []}, stream=True):
+        pass
+    
+    session_from_storage = shared_db.get_session(session_id="session_1", session_type=SessionType.AGENT)
+    assert session_from_storage.session_data["session_state"] == {"shopping_list": ["oranges"]}
+    
+    for response in agent.run(
+        'Current shopping list: {shopping_list}. Other random json ```json { "properties": { "title": { "title": "a" } } }```', session_id="session_1", stream=True
+    ):
+        pass
+    assert (
+        agent.run_response.messages[1].content
+        == 'Current shopping list: [\'oranges\']. Other random json ```json { "properties": { "title": { "title": "a" } } }```'
+    )
+
+
+async def test_agent_with_state_on_run_async(shared_db):
+    # Define a tool that increments our counter and returns the new value
+    async def add_item(session_state: Dict[str, Any], item: str) -> str:
+        """Add an item to the shopping list."""
+        session_state["shopping_list"].append(item)
+        return f"The shopping list is now {session_state['shopping_list']}"
+
+    # Create an Agent that maintains state
+    agent = Agent(
+        db=shared_db,
+        tools=[add_item],
+        instructions="Current state (shopping list) is: {shopping_list}",
+        # Add the state to the messages
+        add_state_in_messages=True,
+        markdown=True,
+    )
+    await agent.arun("Add oranges to my shopping list", session_id="session_1", session_state={"shopping_list": []})
+    
+    session_from_storage = shared_db.get_session(session_id="session_1", session_type=SessionType.AGENT)
+    assert session_from_storage.session_data["session_state"] == {"shopping_list": ["oranges"]}
+    
+    response = await agent.arun(
+        'Current shopping list: {shopping_list}. Other random json ```json { "properties": { "title": { "title": "a" } } }```', session_id="session_1"
+    )
+    
+    assert (
+        response.messages[1].content
+        == 'Current shopping list: [\'oranges\']. Other random json ```json { "properties": { "title": { "title": "a" } } }```'
+    )
+
+
+async def test_agent_with_state_on_run_stream_async(shared_db):
+    # Define a tool that increments our counter and returns the new value
+    async def add_item(session_state: Dict[str, Any], item: str) -> str:
+        """Add an item to the shopping list."""
+        session_state["shopping_list"].append(item)
+        return f"The shopping list is now {session_state['shopping_list']}"
+
+    # Create an Agent that maintains state
+    agent = Agent(
+        db=shared_db,
+        tools=[add_item],
+        instructions="Current state (shopping list) is: {shopping_list}",
+        # Add the state to the messages
+        add_state_in_messages=True,
+        markdown=True,
+    )
+    async for response in agent.arun("Add oranges to my shopping list", session_id="session_1", session_state={"shopping_list": []}, stream=True):
+        pass
+    
+    session_from_storage = shared_db.get_session(session_id="session_1", session_type=SessionType.AGENT)
+    assert session_from_storage.session_data["session_state"] == {"shopping_list": ["oranges"]}
+    
+    async for response in agent.arun(
+        'Current shopping list: {shopping_list}. Other random json ```json { "properties": { "title": { "title": "a" } } }```', session_id="session_1", stream=True
+    ):
+        pass
+    assert (
+        agent.run_response.messages[1].content
         == 'Current shopping list: [\'oranges\']. Other random json ```json { "properties": { "title": { "title": "a" } } }```'
     )

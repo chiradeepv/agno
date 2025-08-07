@@ -418,6 +418,8 @@ class FunctionExecutionResult(BaseModel):
     status: Literal["success", "failure"]
     result: Optional[Any] = None
     error: Optional[str] = None
+    
+    updated_session_state: Optional[Dict[str, Any]] = None
 
 
 class FunctionCall(BaseModel):
@@ -647,10 +649,11 @@ class FunctionCall(BaseModel):
                 execution_chain = self._build_nested_execution_chain(entrypoint_args=entrypoint_args)
                 result = execution_chain(self.function.name, self.function.entrypoint, self.arguments or {})
             else:
-                arguments = entrypoint_args
-                if self.arguments is not None:
-                    arguments.update(self.arguments)
-                result = self.function.entrypoint(**arguments)
+                result = self.function.entrypoint(**entrypoint_args, **self.arguments)
+                
+            updated_session_state = None
+            if entrypoint_args.get("session_state") is not None:
+                updated_session_state = entrypoint_args.get("session_state")
 
             # Handle generator case
             if isgenerator(result):
@@ -676,7 +679,7 @@ class FunctionCall(BaseModel):
         # Execute post-hook if it exists
         self._handle_post_hook()
 
-        return FunctionExecutionResult(status="success", result=self.result)
+        return FunctionExecutionResult(status="success", result=self.result, updated_session_state=updated_session_state)
 
     async def _handle_pre_hook_async(self):
         """Handles the async pre-hook for the function call."""
@@ -853,6 +856,12 @@ class FunctionCall(BaseModel):
                 cache_key = self.function._get_cache_key(entrypoint_args, self.arguments)
                 cache_file = self.function._get_cache_file_path(cache_key)
                 self.function._save_to_cache(cache_file, self.result)
+                
+            
+            updated_session_state = None
+            if entrypoint_args.get("session_state") is not None:
+                updated_session_state = entrypoint_args.get("session_state")
+
 
         except AgentRunException as e:
             log_debug(f"{e.__class__.__name__}: {e}")
@@ -870,4 +879,4 @@ class FunctionCall(BaseModel):
         else:
             self._handle_post_hook()
 
-        return FunctionExecutionResult(status="success", result=self.result)
+        return FunctionExecutionResult(status="success", result=self.result, updated_session_state=updated_session_state)

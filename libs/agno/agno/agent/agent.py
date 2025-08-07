@@ -322,7 +322,7 @@ class Agent:
         session_state: Optional[Dict[str, Any]] = None,
         search_session_history: Optional[bool] = False,
         num_history_sessions: Optional[int] = None,
-        cache_session: bool = True,
+        cache_session: bool = False,
         dependencies: Optional[Dict[str, Any]] = None,
         add_dependencies_to_context: bool = False,
         db: Optional[BaseDb] = None,
@@ -632,6 +632,8 @@ class Agent:
                 session_id = self.session_id
             else:
                 session_id = str(uuid4())
+                # We make the session_id sticky to the agent instance if no session_id is provided
+                self.session_id = session_id
 
         log_debug(f"Session ID: {session_id}", center=True)
 
@@ -685,13 +687,13 @@ class Agent:
             tool_call_limit=self.tool_call_limit,
             response_format=response_format,
         )
-
+        
         # If a parser model is provided, structure the response separately
         self._parse_response_with_parser_model(model_response, run_messages)
 
         # 3. Update the RunResponse with the model response
         self._update_run_response(model_response=model_response, run_response=run_response, run_messages=run_messages)
-
+        
         # 4. Add the RunResponse to Agent Session
         session.add_run(run=run_response)
 
@@ -762,17 +764,20 @@ class Agent:
         # 1. Reason about the task if reasoning is enabled
         yield from self._handle_reasoning_stream(run_messages=run_messages)
 
+        
         # 2. Process model response
         for event in self._handle_model_response_stream(
+            session=session,
             run_response=run_response,
             run_messages=run_messages,
             response_format=response_format,
             stream_intermediate_steps=stream_intermediate_steps,
         ):
             yield event
-
+        
         # If a parser model is provided, structure the response separately
         yield from self._parse_response_with_parser_model_stream(
+            session=session,
             run_response=run_response, stream_intermediate_steps=stream_intermediate_steps
         )
 
@@ -888,12 +893,12 @@ class Agent:
         self.initialize_agent(debug_mode=debug_mode)
 
         # Read existing session from database
-        agent_session = self.get_agent_session(session_id=session_id, user_id=user_id)
+        agent_session = self.read_or_create_session(session_id=session_id, user_id=user_id)
         self.update_metadata(session=agent_session)
 
         # Update session state from DB
         session_state = self.update_session_state(session=agent_session, session_state=session_state)
-
+        
         # Resolve dependencies
         if self.dependencies is not None:
             self.resolve_run_dependencies()
@@ -1171,6 +1176,7 @@ class Agent:
 
         # 2. Generate a response from the Model
         async for event in self._ahandle_model_response_stream(
+            session=session,
             run_response=run_response,
             run_messages=run_messages,
             response_format=response_format,
@@ -1180,6 +1186,7 @@ class Agent:
 
         # If a parser model is provided, structure the response separately
         async for event in self._aparse_response_with_parser_model_stream(
+            session=session,
             run_response=run_response, stream_intermediate_steps=stream_intermediate_steps
         ):
             yield event
@@ -1294,7 +1301,7 @@ class Agent:
         self.initialize_agent(debug_mode=debug_mode)
 
         # Read existing session from storage
-        agent_session = self.get_agent_session(session_id=session_id, user_id=user_id)
+        agent_session = self.read_or_create_session(session_id=session_id, user_id=user_id)
         self.update_metadata(session=agent_session)
 
         # Update session state from DB
@@ -1519,7 +1526,7 @@ class Agent:
         self.initialize_agent(debug_mode=debug_mode)
 
         # Read existing session from storage
-        agent_session = self.get_agent_session(session_id=session_id, user_id=user_id)
+        agent_session = self.read_or_create_session(session_id=session_id, user_id=user_id)
         self.update_metadata(session=agent_session)
 
         # Update session state from DB
@@ -1775,6 +1782,7 @@ class Agent:
 
         # 2. Process model response
         for event in self._handle_model_response_stream(
+            session=session,
             run_response=run_response,
             run_messages=run_messages,
             response_format=response_format,
@@ -1886,7 +1894,7 @@ class Agent:
         self.initialize_agent(debug_mode=debug_mode)
 
         # Read existing session from storage
-        agent_session = self.get_agent_session(session_id=session_id, user_id=user_id)
+        agent_session = self.read_or_create_session(session_id=session_id, user_id=user_id)
         self.update_metadata(session=agent_session)
 
         # Update session state from DB
@@ -2153,6 +2161,7 @@ class Agent:
 
         # 2. Process model response
         async for event in self._ahandle_model_response_stream(
+            session=session,
             run_response=run_response,
             run_messages=run_messages,
             response_format=response_format,
@@ -2612,7 +2621,7 @@ class Agent:
 
     def update_session_metrics(self, session: AgentSession, run_messages: RunMessages):
         """Calculate session metrics"""
-        session_metrics = self.get_session_metrics(session=session)
+        session_metrics = self._get_session_metrics(session=session)
         session_metrics += self.calculate_metrics(run_messages.messages)
         session.session_data["session_metrics"] = session_metrics
 
@@ -2641,6 +2650,7 @@ class Agent:
 
     def _handle_model_response_stream(
         self,
+        session: AgentSession,
         run_response: RunResponse,
         run_messages: RunMessages,
         response_format: Optional[Union[Dict, Type[BaseModel]]] = None,
@@ -2669,6 +2679,7 @@ class Agent:
             stream_model_response=stream_model_response,
         ):
             yield from self._handle_model_response_chunk(
+                session=session,
                 run_response=run_response,
                 model_response=model_response,
                 model_response_event=model_response_event,
@@ -2708,6 +2719,7 @@ class Agent:
 
     async def _ahandle_model_response_stream(
         self,
+        session: AgentSession,
         run_response: RunResponse,
         run_messages: RunMessages,
         response_format: Optional[Union[Dict, Type[BaseModel]]] = None,
@@ -2738,6 +2750,7 @@ class Agent:
 
         async for model_response_event in model_response_stream:  # type: ignore
             for event in self._handle_model_response_chunk(
+                session=session,
                 run_response=run_response,
                 model_response=model_response,
                 model_response_event=model_response_event,
@@ -2777,6 +2790,7 @@ class Agent:
 
     def _handle_model_response_chunk(
         self,
+        session: AgentSession,
         run_response: RunResponse,
         model_response: ModelResponse,
         model_response_event: Union[ModelResponse, RunResponseEvent, TeamRunResponseEvent],
@@ -2935,6 +2949,10 @@ class Agent:
 
             # If the model response is a tool_call_completed, update the existing tool call in the run_response
             elif model_response_event.event == ModelResponseEvent.tool_call_completed.value:
+                if model_response_event.updated_session_state is not None:
+                    from agno.utils.merge_dict import merge_dictionaries
+                    merge_dictionaries(session.session_data["session_state"], model_response_event.updated_session_state)
+                
                 reasoning_step: Optional[ReasoningStep] = None
 
                 tool_executions_list = model_response_event.tool_executions
@@ -3524,7 +3542,7 @@ class Agent:
             agent_data["model"] = self.model.to_dict()
         return agent_data
 
-    # def get_agent_session_data(self) -> Dict[str, Any]:
+    # def get_session_data(self) -> Dict[str, Any]:
     #     session_data: Dict[str, Any] = {}
     #     if self.session_name is not None:
     #         session_data["session_name"] = self.session_name
@@ -3576,6 +3594,7 @@ class Agent:
         # Get the session_state from the database and update the current session_state
         if "session_state" in session.session_data:
             session_state_from_db = session.session_data.get("session_state")
+            
             if (
                 session_state_from_db is not None
                 and isinstance(session_state_from_db, dict)
@@ -3584,12 +3603,10 @@ class Agent:
                 # This updates session_state_from_db
                 # If there are conflicting keys, values from provided session_state will take precedence
                 merge_dictionaries(session_state_from_db, session_state)
-
+                session_state = session_state_from_db
+                
         # Update the session_state in the session
-        session_state_for_storage = deepcopy(session_state)
-        session_state_for_storage.pop("current_session_id", None)
-        session_state_for_storage.pop("current_user_id", None)
-        session.session_data["session_state"] = session_state_for_storage
+        session.session_data["session_state"] = session_state
 
         return session_state
 
@@ -3607,7 +3624,7 @@ class Agent:
             self.metadata = session.metadata
 
 
-    def get_session_metrics(self, session: AgentSession):
+    def _get_session_metrics(self, session: AgentSession):
         # Get the session_metrics from the database
         if "session_metrics" in session.session_data:
             session_metrics_from_db = session.session_data.get("session_metrics")
@@ -3640,20 +3657,11 @@ class Agent:
         #         self.audio.extend([AudioArtifact.model_validate(aud) for aud in audio_from_db])
 
 
-    def get_agent_session(
+    def read_or_create_session(
         self,
         session_id: str,
         user_id: Optional[str] = None,
     ) -> AgentSession:
-        """Load an AgentSession from database or create a new one if it does not exist.
-
-        Args:
-            session_id: The session_id to load from storage.
-            user_id: The user_id of the user.
-
-        Returns:
-            AgentSession: The AgentSession loaded from the database or created if it does not exist.
-        """
         from time import time
 
         from agno.db.base import SessionType
@@ -3664,12 +3672,12 @@ class Agent:
 
         # Try to load from database
         agent_session = None
-        if self.db is not None and self.team_id is None:
+        if self.db is not None and self.team_id is None and self.workflow_id is None:
             log_debug(f"Reading AgentSession: {session_id}")
             agent_session = cast(
                 AgentSession, self.read_session(session_id=session_id, session_type=SessionType.AGENT)
             )
-
+            
         if agent_session is None:
             # Creating new session if none found
             log_debug(f"Creating new AgentSession: {session_id}")
@@ -3687,6 +3695,31 @@ class Agent:
             self._agent_session = agent_session
 
         return agent_session
+    
+
+    def get_session(
+        self,
+        session_id: str,
+    ) -> AgentSession:
+        """Load an AgentSession from database.
+
+        Args:
+            session_id: The session_id to load from storage.
+            user_id: The user_id of the user.
+
+        Returns:
+            AgentSession: The AgentSession loaded from the database or created if it does not exist.
+        """
+        from agno.db.base import SessionType
+
+        # Try to load from database
+        if self.db is not None:
+            agent_session = cast(
+                AgentSession, self.read_session(session_id=session_id, session_type=SessionType.AGENT)
+            )
+            return agent_session
+        
+        return None
 
     def save_session(self, session: AgentSession) -> None:
         """Save the AgentSession to storage
@@ -3697,13 +3730,16 @@ class Agent:
 
         # If the agent is a member of a team, do not save the session to the database
         if self.db is not None and self.team_id is None and self.workflow_id is None:
+            session.session_data["session_state"].pop("current_session_id", None)
+            session.session_data["session_state"].pop("current_user_id", None)
+            
             self.upsert_session(session=session)
             log_debug(f"Created or updated AgentSession record: {session.session_id}")
 
 
     def get_chat_history(self, session_id: str) -> List[Message]:
         """Read the chat history from the session"""
-        session = self.get_agent_session(session_id=session_id)
+        session = self.get_session(session_id=session_id)
 
         return session.get_chat_history()
 
@@ -4018,7 +4054,6 @@ class Agent:
                     raise Exception("user_message must return a string")
 
             if self.add_state_in_messages:
-                print("HERE", session.session_data.get("session_state"))
                 user_message_content = self.format_message_with_state_variables(user_message_content, user_id=user_id, session_state=session.session_data.get("session_state"))
 
             return Message(
@@ -4059,7 +4094,7 @@ class Agent:
                 # If the message is None, return None
                 return None
         
-        # 3. If message is provided, format it with the session state variables
+        
         else:
             # Handle list messages by converting to string
             if isinstance(message, list):
@@ -4078,73 +4113,75 @@ class Agent:
                     files=files,
                     **kwargs,
                 )
+            else:
 
-            user_msg_content = message
-            if self.add_references:
-                if isinstance(message, str):
-                    user_msg_content = message
-                elif callable(message):
-                    user_msg_content = message(agent=self)
-                else:
-                    raise Exception("message must be a string or a callable when add_references is True")
+                user_msg_content = message
+                if self.add_references:
+                    if isinstance(message, str):
+                        user_msg_content = message
+                    elif callable(message):
+                        user_msg_content = message(agent=self)
+                    else:
+                        raise Exception("message must be a string or a callable when add_references is True")
 
-                try:
-                    retrieval_timer = Timer()
-                    retrieval_timer.start()
-                    docs_from_knowledge = self.get_relevant_docs_from_knowledge(
-                        query=user_msg_content, filters=knowledge_filters, **kwargs
-                    )
-                    if docs_from_knowledge is not None:
-                        references = MessageReferences(
-                            query=user_msg_content, references=docs_from_knowledge, time=round(retrieval_timer.elapsed, 4)
+                    try:
+                        retrieval_timer = Timer()
+                        retrieval_timer.start()
+                        docs_from_knowledge = self.get_relevant_docs_from_knowledge(
+                            query=user_msg_content, filters=knowledge_filters, **kwargs
                         )
-                        # Add the references to the run_response
-                        if self.run_response.metadata is None:
-                            self.run_response.metadata = RunResponseMetaData()
-                        if self.run_response.metadata.references is None:
-                            self.run_response.metadata.references = []
-                        self.run_response.metadata.references.append(references)
-                    retrieval_timer.stop()
-                    log_debug(f"Time to get references: {retrieval_timer.elapsed:.4f}s")
-                except Exception as e:
-                    log_warning(f"Failed to get references: {e}")
-                    
-            if self.add_state_in_messages:
-                user_msg_content = self.format_message_with_state_variables(user_msg_content, user_id=user_id, session_state=session.session_data.get("session_state"))
+                        if docs_from_knowledge is not None:
+                            references = MessageReferences(
+                                query=user_msg_content, references=docs_from_knowledge, time=round(retrieval_timer.elapsed, 4)
+                            )
+                            # Add the references to the run_response
+                            if self.run_response.metadata is None:
+                                self.run_response.metadata = RunResponseMetaData()
+                            if self.run_response.metadata.references is None:
+                                self.run_response.metadata.references = []
+                            self.run_response.metadata.references.append(references)
+                        retrieval_timer.stop()
+                        log_debug(f"Time to get references: {retrieval_timer.elapsed:.4f}s")
+                    except Exception as e:
+                        log_warning(f"Failed to get references: {e}")
+                        
+                if self.add_state_in_messages:
+                    user_msg_content = self.format_message_with_state_variables(user_msg_content, user_id=user_id, session_state=session.session_data.get("session_state"))
 
-            # Convert to string for concatenation operations
-            user_msg_content_str = get_text_from_message(user_msg_content) if user_msg_content is not None else ""
 
-            # 4.1 Add references to user message
-            if (
-                self.add_references
-                and references is not None
-                and references.references is not None
-                and len(references.references) > 0
-            ):
-                user_msg_content_str += "\n\nUse the following references from the knowledge base if it helps:\n"
-                user_msg_content_str += "<references>\n"
-                user_msg_content_str += self.convert_documents_to_string(references.references) + "\n"
-                user_msg_content_str += "</references>"
-            # 4.2 Add context to user message
-            if self.add_dependencies_to_context and self.dependencies is not None:
-                user_msg_content_str += "\n\n<additional context>\n"
-                user_msg_content_str += self.convert_context_to_string(self.dependencies) + "\n"
-                user_msg_content_str += "</additional context>"
+                # Convert to string for concatenation operations
+                user_msg_content_str = get_text_from_message(user_msg_content) if user_msg_content is not None else ""
 
-            # Use the string version for the final content
-            user_msg_content = user_msg_content_str
+                # 4.1 Add references to user message
+                if (
+                    self.add_references
+                    and references is not None
+                    and references.references is not None
+                    and len(references.references) > 0
+                ):
+                    user_msg_content_str += "\n\nUse the following references from the knowledge base if it helps:\n"
+                    user_msg_content_str += "<references>\n"
+                    user_msg_content_str += self.convert_documents_to_string(references.references) + "\n"
+                    user_msg_content_str += "</references>"
+                # 4.2 Add context to user message
+                if self.add_dependencies_to_context and self.dependencies is not None:
+                    user_msg_content_str += "\n\n<additional context>\n"
+                    user_msg_content_str += self.convert_context_to_string(self.dependencies) + "\n"
+                    user_msg_content_str += "</additional context>"
 
-            # Return the user message
-            return Message(
-                role=self.user_message_role,
-                content=user_msg_content,
-                audio=audio,
-                images=images,
-                videos=videos,
-                files=files,
-                **kwargs,
-            )
+                # Use the string version for the final content
+                user_msg_content = user_msg_content_str
+
+                # Return the user message
+                return Message(
+                    role=self.user_message_role,
+                    content=user_msg_content,
+                    audio=audio,
+                    images=images,
+                    videos=videos,
+                    files=files,
+                    **kwargs,
+                )
 
     def get_run_messages(
         self,
@@ -4380,7 +4417,7 @@ class Agent:
         if session_id is None:
             raise ValueError("Session ID is required")
 
-        session = self.get_agent_session(session_id=session_id)
+        session = self.get_session(session_id=session_id)
 
         return session.get_session_summary()
 
@@ -4748,7 +4785,10 @@ class Agent:
         if session_id is None:
             raise Exception("Session ID is not set")
 
-        session = self.get_agent_session(session_id=session_id)  # type: ignore
+        session = self.get_session(session_id=session_id)  # type: ignore
+        
+        if session is None:
+            raise Exception("Session not found")
 
         # -*- Rename Agent
         self.name = name
@@ -4767,7 +4807,10 @@ class Agent:
             raise Exception("Session ID is not set")
 
         # -*- Read from storage
-        session = self.get_agent_session(session_id=session_id)  # type: ignore
+        session = self.get_session(session_id=session_id)  # type: ignore
+        
+        if session is None:
+            raise Exception("Session not found")
 
         # -*- Generate name for session
         if autogenerate:
@@ -4831,7 +4874,10 @@ class Agent:
             log_warning("Session ID is not set, cannot get messages for session")
             return []
 
-        session = self.get_agent_session(session_id=session_id)  # type: ignore
+        session = self.get_session(session_id=session_id)  # type: ignore
+        
+        if session is None:
+            raise Exception("Session not found")
 
         # Only filter by agent_id if this is part of a team
         return session.get_messages_from_last_n_runs(
@@ -5426,7 +5472,7 @@ class Agent:
             log_warning("A response model is required to parse the response with a parser model")
 
     def _parse_response_with_parser_model_stream(
-        self, run_response: RunResponse, stream_intermediate_steps: bool = True
+        self, session: AgentSession, run_response: RunResponse, stream_intermediate_steps: bool = True
     ):
         """Parse the model response using the parser model"""
         if self.parser_model is not None:
@@ -5445,6 +5491,7 @@ class Agent:
                     stream_model_response=False,
                 ):
                     yield from self._handle_model_response_chunk(
+                        session=session,
                         run_response=run_response,
                         model_response=parser_model_response,
                         model_response_event=model_response_event,
@@ -5470,7 +5517,7 @@ class Agent:
                 log_warning("A response model is required to parse the response with a parser model")
 
     async def _aparse_response_with_parser_model_stream(
-        self, run_response: RunResponse, stream_intermediate_steps: bool = True
+        self, session: AgentSession, run_response: RunResponse, stream_intermediate_steps: bool = True
     ):
         """Parse the model response using the parser model stream."""
         if self.parser_model is not None:
@@ -5490,6 +5537,7 @@ class Agent:
                 )
                 async for model_response_event in model_response_stream:  # type: ignore
                     for event in self._handle_model_response_chunk(
+                        session=session,
                         run_response=run_response,
                         model_response=parser_model_response,
                         model_response_event=model_response_event,
@@ -7053,7 +7101,7 @@ class Agent:
         # # from agno.api.agent import AgentRunCreate, create_agent_run
 
         # try:
-        #     # agent_session: Optional[AgentSession] = self.agent_session or self.get_agent_session(
+        #     # agent_session: Optional[AgentSession] = self.agent_session or self.read_or_create_session(
         #     #     session_id=session_id, user_id=user_id
         #     # )
 
@@ -7075,7 +7123,7 @@ class Agent:
         # from agno.api.agent import AgentRunCreate, acreate_agent_run
 
         # try:
-        #     agent_session: Optional[AgentSession] = self.agent_session or self.get_agent_session(
+        #     agent_session: Optional[AgentSession] = self.agent_session or self.read_or_create_session(
         #         session_id=session_id, user_id=user_id
         #     )
 
