@@ -16,8 +16,6 @@ class TeamSession:
 
     # Session UUID
     session_id: str
-    # ID of the team session this team session is associated with (so for sub-teams)
-    team_session_id: Optional[str] = None
 
     # ID of the team that this session is associated with
     team_id: Optional[str] = None
@@ -77,7 +75,6 @@ class TeamSession:
         return cls(
             session_id=data.get("session_id"),  # type: ignore
             team_id=data.get("team_id"),
-            team_session_id=data.get("team_session_id"),
             user_id=data.get("user_id"),
             workflow_id=data.get("workflow_id"),
             team_data=data.get("team_data"),

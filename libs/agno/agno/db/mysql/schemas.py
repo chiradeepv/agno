@@ -14,7 +14,6 @@ SESSION_TABLE_SCHEMA = {
     "team_id": {"type": String, "nullable": True},
     "workflow_id": {"type": String, "nullable": True},
     "user_id": {"type": String, "nullable": True},
-    "team_session_id": {"type": String, "nullable": True},  # TODO: remove this column
     "session_data": {"type": JSON, "nullable": True},
     "agent_data": {"type": JSON, "nullable": True},
     "team_data": {"type": JSON, "nullable": True},

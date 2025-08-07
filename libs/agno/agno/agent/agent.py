@@ -891,7 +891,6 @@ class Agent:
         self.update_metadata(session=agent_session)
 
         # Update session state from DB
-        # TODO: Make sure session state is available to functions
         session_state = self.update_session_state(session=agent_session, session_state=session_state)
 
         # Resolve dependencies
@@ -931,6 +930,7 @@ class Agent:
         self.determine_tools_for_model(
             model=self.model,
             session=agent_session,
+            session_state=session_state,
             user_id=user_id,
             async_mode=False,
             knowledge_filters=effective_filters,
@@ -1293,7 +1293,7 @@ class Agent:
         # Resolve dependencies
         if self.dependencies is not None:
             self.resolve_run_dependencies()
-            
+
         # Extract workflow context from kwargs if present
         workflow_context = kwargs.pop("workflow_context", None)
 
@@ -1325,6 +1325,7 @@ class Agent:
         self.determine_tools_for_model(
             model=self.model,
             session=agent_session,
+            session_state=session_state,
             user_id=user_id,
             async_mode=True,
             knowledge_filters=effective_filters,
@@ -1514,7 +1515,7 @@ class Agent:
         # Read existing session from storage
         agent_session = self.get_agent_session(session_id=session_id, user_id=user_id)
         self.update_metadata(session=agent_session)
-        
+
         # Update session state from DB
         session_state = self.update_session_state(session=agent_session, session_state=session_state)
 
@@ -1578,6 +1579,7 @@ class Agent:
         self.determine_tools_for_model(
             model=self.model,
             session=agent_session,
+            session_state=session_state,
             user_id=user_id,
             async_mode=False,
             knowledge_filters=effective_filters,
@@ -3325,6 +3327,7 @@ class Agent:
         self,
         model: Model,
         session: AgentSession,
+        session_state: Optional[Dict[str, Any]] = None,
         user_id: Optional[str] = None,
         async_mode: bool = False,
         knowledge_filters: Optional[Dict[str, Any]] = None,
@@ -3366,6 +3369,7 @@ class Agent:
                             # If the function does not exist in self.functions
                             if name not in self._functions_for_model:
                                 func._agent = self
+                                func._session_state = session_state
                                 func.process_entrypoint(strict=strict)
                                 if strict and func.strict is None:
                                     func.strict = True
@@ -3382,6 +3386,7 @@ class Agent:
                     elif isinstance(tool, Function):
                         if tool.name not in self._functions_for_model:
                             tool._agent = self
+                            tool._session_state = session_state
                             tool.process_entrypoint(strict=strict)
                             if strict and tool.strict is None:
                                 tool.strict = True
@@ -3401,6 +3406,7 @@ class Agent:
                             if function_name not in self._functions_for_model:
                                 func = Function.from_callable(tool, strict=strict)
                                 func._agent = self
+                                func._session_state = session_state
                                 if strict:
                                     func.strict = True
                                 if self.tool_hooks is not None:
@@ -3553,6 +3559,7 @@ class Agent:
     def update_session_state(self, session: AgentSession, session_state: Dict[str, Any]):
         """Load the existing Agent from an AgentSession (from the database)"""
 
+        from copy import deepcopy
         from agno.utils.merge_dict import merge_dictionaries
 
         # Get the session_state from the database and update the current session_state
@@ -3568,13 +3575,17 @@ class Agent:
                 merge_dictionaries(session_state_from_db, session_state)
 
         # Update the session_state in the session
-        session.session_data["session_state"] = session_state
+        session_state_for_storage = deepcopy(session_state)
+        session_state_for_storage.pop("current_session_id", None)
+        session_state_for_storage.pop("current_user_id", None)
+        session.session_data["session_state"] = session_state_for_storage
 
         return session_state
 
     def update_metadata(self, session: AgentSession):
         """Update the extra_data in the session"""
-        
+        from agno.utils.merge_dict import merge_dictionaries
+
         # Read metadata from the database
         if session.metadata is not None:
             # If metadata is set in the agent, update the database metadata with the agent's metadata

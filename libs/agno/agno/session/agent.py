@@ -16,8 +16,6 @@ class AgentSession:
 
     # Session UUID
     session_id: str
-    # ID of the team session this agent session is associated with
-    team_session_id: Optional[str] = None
 
     # ID of the agent that this session is associated with
     agent_id: Optional[str] = None
@@ -71,7 +69,6 @@ class AgentSession:
         return cls(
             session_id=data.get("session_id"),  # type: ignore
             agent_id=data.get("agent_id"),
-            team_session_id=data.get("team_session_id"),
             user_id=data.get("user_id"),
             workflow_id=data.get("workflow_id"),
             team_id=data.get("team_id"),

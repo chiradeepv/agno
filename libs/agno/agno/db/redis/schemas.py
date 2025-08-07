@@ -9,7 +9,6 @@ SESSION_SCHEMA = {
     "team_id": {"type": "string"},
     "workflow_id": {"type": "string"},
     "user_id": {"type": "string"},
-    "team_session_id": {"type": "string"},
     "session_data": {"type": "json"},
     "agent_data": {"type": "json"},
     "team_data": {"type": "json"},

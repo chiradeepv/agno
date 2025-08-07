@@ -145,13 +145,15 @@ class Function(BaseModel):
                 del type_hints["agent"]
             if "team" in sig.parameters:
                 del type_hints["team"]
+            if "session_state" in sig.parameters:
+                del type_hints["session_state"]
             # log_info(f"Type hints for {function_name}: {type_hints}")
 
             # Filter out return type and only process parameters
             param_type_hints = {
                 name: type_hints.get(name)
                 for name in sig.parameters
-                if name != "return" and name not in ["agent", "team", "self"]
+                if name != "return" and name not in ["agent", "team", "session_state", "self"]
             }
 
             # Parse docstring for parameters
@@ -178,14 +180,14 @@ class Function(BaseModel):
             # See: https://platform.openai.com/docs/guides/structured-outputs/supported-schemas#all-fields-must-be-required
             if strict:
                 parameters["required"] = [
-                    name for name in parameters["properties"] if name not in ["agent", "team", "self"]
+                    name for name in parameters["properties"] if name not in ["agent", "team", "session_state", "self"]
                 ]
             else:
                 # Mark a field as required if it has no default value (this would include optional fields)
                 parameters["required"] = [
                     name
                     for name, param in sig.parameters.items()
-                    if param.default == param.empty and name != "self" and name not in ["agent", "team"]
+                    if param.default == param.empty and name not in ["agent", "team", "session_state", "self"]
                 ]
 
             # log_debug(f"JSON schema for {function_name}: {parameters}")
@@ -234,10 +236,12 @@ class Function(BaseModel):
                 del type_hints["agent"]
             if "team" in sig.parameters:
                 del type_hints["team"]
+            if "session_state" in sig.parameters:
+                del type_hints["session_state"]
             # log_info(f"Type hints for {self.name}: {type_hints}")
 
             # Filter out return type and only process parameters
-            excluded_params = ["return", "agent", "team", "self"]
+            excluded_params = ["return", "agent", "team", "session_state", "self"]
             if self.requires_user_input and self.user_input_fields:
                 if len(self.user_input_fields) == 0:
                     excluded_params.extend(list(type_hints.keys()))
@@ -340,7 +344,7 @@ class Function(BaseModel):
     def process_schema_for_strict(self):
         self.parameters["additionalProperties"] = False
         self.parameters["required"] = [
-            name for name in self.parameters["properties"] if name not in ["agent", "team", "self"]
+            name for name in self.parameters["properties"] if name not in ["agent", "team", "session_state", "self"]
         ]
 
     def _get_cache_key(self, entrypoint_args: Dict[str, Any], call_args: Optional[Dict[str, Any]] = None) -> str:
@@ -353,6 +357,8 @@ class Function(BaseModel):
             del copy_entrypoint_args["agent"]
         if "team" in copy_entrypoint_args:
             del copy_entrypoint_args["team"]
+        if "session_state" in copy_entrypoint_args:
+            del copy_entrypoint_args["session_state"]
         args_str = str(copy_entrypoint_args)
 
         kwargs_str = str(sorted((call_args or {}).items()))
@@ -468,6 +474,9 @@ class FunctionCall(BaseModel):
                 # Check if the pre-hook has an team argument
                 if "team" in signature(self.function.pre_hook).parameters:
                     pre_hook_args["team"] = self.function._team
+                # Check if the pre-hook has an session_state argument
+                if "session_state" in signature(self.function.pre_hook).parameters:
+                    pre_hook_args["session_state"] = self.function._session_state
                 # Check if the pre-hook has an fc argument
                 if "fc" in signature(self.function.pre_hook).parameters:
                     pre_hook_args["fc"] = self
@@ -493,6 +502,9 @@ class FunctionCall(BaseModel):
                 # Check if the post-hook has an team argument
                 if "team" in signature(self.function.post_hook).parameters:
                     post_hook_args["team"] = self.function._team
+                # Check if the post-hook has an session_state argument
+                if "session_state" in signature(self.function.post_hook).parameters:
+                    post_hook_args["session_state"] = self.function._session_state
                 # Check if the post-hook has an fc argument
                 if "fc" in signature(self.function.post_hook).parameters:
                     post_hook_args["fc"] = self
@@ -516,6 +528,9 @@ class FunctionCall(BaseModel):
         # Check if the entrypoint has an team argument
         if "team" in signature(self.function.entrypoint).parameters:  # type: ignore
             entrypoint_args["team"] = self.function._team
+        # Check if the entrypoint has an session_state argument
+        if "session_state" in signature(self.function.entrypoint).parameters:  # type: ignore
+            entrypoint_args["session_state"] = self.function._session_state
         # Check if the entrypoint has an fc argument
         if "fc" in signature(self.function.entrypoint).parameters:  # type: ignore
             entrypoint_args["fc"] = self
@@ -532,6 +547,9 @@ class FunctionCall(BaseModel):
         # Check if the hook has an team argument
         if "team" in signature(hook).parameters:
             hook_args["team"] = self.function._team
+        # Check if the hook has an session_state argument
+        if "session_state" in signature(hook).parameters:
+            hook_args["session_state"] = self.function._session_state
 
         if "name" in signature(hook).parameters:
             hook_args["name"] = name
@@ -673,6 +691,9 @@ class FunctionCall(BaseModel):
                 # Check if the pre-hook has an team argument
                 if "team" in signature(self.function.pre_hook).parameters:
                     pre_hook_args["team"] = self.function._team
+                # Check if the pre-hook has an session_state argument
+                if "session_state" in signature(self.function.pre_hook).parameters:
+                    pre_hook_args["session_state"] = self.function._session_state
                 # Check if the pre-hook has an fc argument
                 if "fc" in signature(self.function.pre_hook).parameters:
                     pre_hook_args["fc"] = self
@@ -699,6 +720,10 @@ class FunctionCall(BaseModel):
                 # Check if the post-hook has an team argument
                 if "team" in signature(self.function.post_hook).parameters:
                     post_hook_args["team"] = self.function._team
+                # Check if the post-hook has an session_state argument
+                if "session_state" in signature(self.function.post_hook).parameters:
+                    post_hook_args["session_state"] = self.function._session_state
+                
                 # Check if the post-hook has an fc argument
                 if "fc" in signature(self.function.post_hook).parameters:
                     post_hook_args["fc"] = self
