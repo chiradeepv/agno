@@ -18,19 +18,19 @@ def test_tool_call_requires_confirmation(shared_db):
         telemetry=False,
     )
 
-    agent.run("What is the weather in Tokyo?")
+    response = agent.run("What is the weather in Tokyo?")
 
-    assert agent.run_response.is_paused
-    assert agent.run_response.tools[0].requires_confirmation
-    assert agent.run_response.tools[0].tool_name == "get_the_weather"
-    assert agent.run_response.tools[0].tool_args == {"city": "Tokyo"}
+    assert response.is_paused
+    assert response.tools[0].requires_confirmation
+    assert response.tools[0].tool_name == "get_the_weather"
+    assert response.tools[0].tool_args == {"city": "Tokyo"}
 
     # Mark the tool as confirmed
-    agent.run_response.tools[0].confirmed = True
+    response.tools[0].confirmed = True
 
-    agent.continue_run()
-    assert agent.run_response.is_paused is False
-    assert agent.run_response.tools[0].result == "It is currently 70 degrees and cloudy in Tokyo"
+    response = agent.continue_run(response)
+    assert response.is_paused is False
+    assert response.tools[0].result == "It is currently 70 degrees and cloudy in Tokyo"
 
 
 def test_tool_call_requires_confirmation_continue_with_run_response(shared_db):
@@ -198,11 +198,10 @@ def test_tool_call_requires_confirmation_memory_footprint(shared_db):
 
     response = agent.run("What is the weather in Tokyo?", session_id=session_id)
 
-    assert len(agent.memory.runs[session_id]) == 1, "There should be one run in the memory"
-    assert len(agent.memory.runs[session_id][0].messages) == 3, (
-        "There should be three messages in the run (system, user, assistant)"
-    )
+    session_from_db = agent.get_session(session_id=session_id)
 
+    assert len(session_from_db.runs) == 1, "There should be one run in the memory"
+    assert len(session_from_db.runs[0].messages) == 3, [m.role for m in session_from_db.runs[0].messages]
     assert response.is_paused
 
     # Mark the tool as confirmed
@@ -212,10 +211,10 @@ def test_tool_call_requires_confirmation_memory_footprint(shared_db):
     assert response.is_paused is False
     assert response.tools[0].result == "It is currently 70 degrees and cloudy in Tokyo"
 
-    assert len(agent.memory.runs[session_id]) == 1, "There should be one run in the memory"
-    assert len(agent.memory.runs[session_id][0].messages) == 5, (
-        "There should be five messages in the run (system, user, assistant, tool call, assistant)"
-    )
+    session_from_db = agent.get_session(session_id=session_id)
+
+    assert len(session_from_db.runs) == 1, "There should be one run in the memory"
+    assert len(session_from_db.runs[0].messages) == 5, [m.role for m in session_from_db.runs[0].messages]
 
 
 def test_tool_call_requires_confirmation_stream(shared_db):

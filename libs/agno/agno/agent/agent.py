@@ -241,7 +241,7 @@ class Agent:
     # Use these for few-shot learning or to provide additional context to the Model.
     # Note: these are not retained in memory, they are added directly to the messages sent to the model.
     additional_messages: Optional[List[Union[Dict, Message]]] = None
-    
+
     # --- User message settings ---
     # Provide the user message as a string, list, dict, or function
     # Note: this will ignore the message sent to the run function
@@ -687,15 +687,15 @@ class Agent:
             tool_call_limit=self.tool_call_limit,
             response_format=response_format,
         )
-        
+
         # If a parser model is provided, structure the response separately
         self._parse_response_with_parser_model(model_response, run_messages)
 
         # 3. Update the RunResponse with the model response
         self._update_run_response(model_response=model_response, run_response=run_response, run_messages=run_messages)
-        
+
         # 4. Add the RunResponse to Agent Session
-        session.add_run(run=run_response)
+        session.upsert_run(run=run_response)
 
         # We should break out of the run function
         if any(tool_call.is_paused for tool_call in run_response.tools or []):
@@ -764,7 +764,7 @@ class Agent:
         # 1. Reason about the task if reasoning is enabled
         yield from self._handle_reasoning_stream(run_messages=run_messages)
 
-        
+
         # 2. Process model response
         for event in self._handle_model_response_stream(
             session=session,
@@ -774,7 +774,7 @@ class Agent:
             stream_intermediate_steps=stream_intermediate_steps,
         ):
             yield event
-        
+
         # If a parser model is provided, structure the response separately
         yield from self._parse_response_with_parser_model_stream(
             session=session,
@@ -782,7 +782,7 @@ class Agent:
         )
 
         # 3. Add RunResponse to Agent Session
-        session.add_run(run=run_response)
+        session.upsert_run(run=run_response)
 
         # We should break out of the run function
         if any(tool_call.is_paused for tool_call in run_response.tools or []):
@@ -898,7 +898,7 @@ class Agent:
 
         # Update session state from DB
         session_state = self.update_session_state(session=agent_session, session_state=session_state)
-        
+
         # Resolve dependencies
         if self.dependencies is not None:
             self.resolve_run_dependencies()
@@ -1077,7 +1077,7 @@ class Agent:
         # Resolving here for async requirement
         if self.dependencies is not None:
             await self.aresolve_run_dependencies()
-            
+
         log_debug(f"Agent Run Start: {run_response.run_id}", center=True)
 
         self.model = cast(Model, self.model)
@@ -1101,7 +1101,7 @@ class Agent:
         self._update_run_response(model_response=model_response, run_response=run_response, run_messages=run_messages)
 
         # 4. Add RunResponse to Agent Session
-        session.add_run(run=run_response)
+        session.upsert_run(run=run_response)
 
         # We should break out of the run function
         if any(tool_call.is_paused for tool_call in run_response.tools or []):
@@ -1192,7 +1192,7 @@ class Agent:
             yield event
 
         # 3. Add RunResponse to Agent Session
-        session.add_run(run=run_response)
+        session.upsert_run(run=run_response)
 
         # We should break out of the run function
         if any(tool_call.is_paused for tool_call in run_response.tools or []):
@@ -1517,6 +1517,12 @@ class Agent:
         """
         if not run_response and not run_id:
             raise ValueError("Either run_response or run_id must be provided.")
+        
+        
+        if not run_response and (run_id is not None and (session_id is None and self.session_id is None)):
+            raise ValueError("Session ID is required to continue a run from a run_id.")
+        
+        session_id = run_response.session_id if run_response else session_id
 
         session_id, user_id, session_state = self._initialize_session(
             session_id=session_id, user_id=user_id
@@ -1572,6 +1578,8 @@ class Agent:
             # The run is continued from a run_id. This requires the updated tools to be passed.
             if updated_tools is None:
                 raise ValueError("Updated tools are required to continue a run from a run_id.")
+            
+            print("HERE", agent_session)
 
             runs = agent_session.runs
             run_response = next((r for r in runs if r.run_id == run_id), None)  # type: ignore
@@ -1717,7 +1725,7 @@ class Agent:
         self._update_run_response(model_response=model_response, run_response=run_response, run_messages=run_messages)
 
         # 3. Add the run to memory
-        session.add_run(run=run_response)
+        session.upsert_run(run=run_response)
 
         # We should break out of the run function
         if any(tool_call.is_paused for tool_call in run_response.tools or []):
@@ -1791,7 +1799,7 @@ class Agent:
             yield event
 
         # 3. Add the run to memory
-        session.add_run(run=run_response)
+        session.upsert_run(run=run_response)
 
         # We should break out of the run function
         if any(tool_call.is_paused for tool_call in run_response.tools or []):
@@ -1885,6 +1893,9 @@ class Agent:
         """
         if not run_response and not run_id:
             raise ValueError("Either run_response or run_id must be provided.")
+        
+        if not run_response and (run_id is not None and (session_id is None and self.session_id is None)):
+            raise ValueError("Session ID is required to continue a run from a run_id.")
 
         session_id, user_id, session_state = self._initialize_session(
             session_id=session_id, user_id=user_id
@@ -2066,7 +2077,7 @@ class Agent:
         6. Save session to storage
         7. Save output to file if save_response_to_file is set
         """
-        
+
         # Resolving here for async requirement
         if self.dependencies is not None:
             await self.aresolve_run_dependencies()
@@ -2090,7 +2101,7 @@ class Agent:
         self._update_run_response(model_response=model_response, run_response=run_response, run_messages=run_messages)
 
         # 3. Add the run to memory
-        session.add_run(run=run_response)
+        session.upsert_run(run=run_response)
 
         # We should break out of the run function
         if any(tool_call.is_paused for tool_call in run_response.tools or []):
@@ -2170,7 +2181,7 @@ class Agent:
             yield event
 
         # 3. Add the run to memory
-        session.add_run(run=run_response)
+        session.upsert_run(run=run_response)
 
         # We should break out of the run function
         if any(tool_call.is_paused for tool_call in run_response.tools or []):
@@ -2952,7 +2963,7 @@ class Agent:
                 if model_response_event.updated_session_state is not None:
                     from agno.utils.merge_dict import merge_dictionaries
                     merge_dictionaries(session.session_data["session_state"], model_response_event.updated_session_state)
-                
+
                 reasoning_step: Optional[ReasoningStep] = None
 
                 tool_executions_list = model_response_event.tool_executions
@@ -3594,7 +3605,7 @@ class Agent:
         # Get the session_state from the database and update the current session_state
         if "session_state" in session.session_data:
             session_state_from_db = session.session_data.get("session_state")
-            
+
             if (
                 session_state_from_db is not None
                 and isinstance(session_state_from_db, dict)
@@ -3604,7 +3615,7 @@ class Agent:
                 # If there are conflicting keys, values from provided session_state will take precedence
                 merge_dictionaries(session_state_from_db, session_state)
                 session_state = session_state_from_db
-                
+
         # Update the session_state in the session
         session.session_data["session_state"] = session_state
 
@@ -3665,7 +3676,7 @@ class Agent:
         from time import time
 
         from agno.db.base import SessionType
-        
+
         # Returning cached session if we have one
         if self._agent_session is not None and self._agent_session.session_id == session_id:
             return self._agent_session
@@ -3677,7 +3688,7 @@ class Agent:
             agent_session = cast(
                 AgentSession, self.read_session(session_id=session_id, session_type=SessionType.AGENT)
             )
-            
+
         if agent_session is None:
             # Creating new session if none found
             log_debug(f"Creating new AgentSession: {session_id}")
@@ -3695,7 +3706,7 @@ class Agent:
             self._agent_session = agent_session
 
         return agent_session
-    
+
 
     def get_session(
         self,
@@ -3718,7 +3729,7 @@ class Agent:
                 AgentSession, self.read_session(session_id=session_id, session_type=SessionType.AGENT)
             )
             return agent_session
-        
+
         return None
 
     def save_session(self, session: AgentSession) -> None:
@@ -3731,7 +3742,7 @@ class Agent:
         if self.db is not None and self.team_id is None and self.workflow_id is None:
             session.session_data["session_state"].pop("current_session_id", None)
             session.session_data["session_state"].pop("current_user_id", None)
-            
+
             self.upsert_session(session=session)
             log_debug(f"Created or updated AgentSession record: {session.session_id}")
 
@@ -4039,7 +4050,7 @@ class Agent:
         # Get references from the knowledge base to use in the user message
         references = None
         self.run_response = cast(RunResponse, self.run_response)
-        
+
         # 1. If the user_message is provided, use that.
         if self.user_message is not None:
             if isinstance(self.user_message, Message):
@@ -4064,7 +4075,7 @@ class Agent:
                 files=files,
                 **kwargs,
             )
-            
+
         # 2. If build_user_context is False or message is a list, return the message as is.
         elif not self.build_user_context:
             return Message(
@@ -4092,8 +4103,8 @@ class Agent:
             else:
                 # If the message is None, return None
                 return None
-        
-        
+
+
         else:
             # Handle list messages by converting to string
             if isinstance(message, list):
@@ -4143,7 +4154,7 @@ class Agent:
                         log_debug(f"Time to get references: {retrieval_timer.elapsed:.4f}s")
                     except Exception as e:
                         log_warning(f"Failed to get references: {e}")
-                        
+
                 if self.add_state_in_messages:
                     user_msg_content = self.format_message_with_state_variables(user_msg_content, user_id=user_id, session_state=session.session_data.get("session_state"))
 
@@ -4785,7 +4796,7 @@ class Agent:
             raise Exception("Session ID is not set")
 
         session = self.get_session(session_id=session_id)  # type: ignore
-        
+
         if session is None:
             raise Exception("Session not found")
 
@@ -4807,7 +4818,7 @@ class Agent:
 
         # -*- Read from storage
         session = self.get_session(session_id=session_id)  # type: ignore
-        
+
         if session is None:
             raise Exception("Session not found")
 
@@ -4874,7 +4885,7 @@ class Agent:
             return []
 
         session = self.get_session(session_id=session_id)  # type: ignore
-        
+
         if session is None:
             raise Exception("Session not found")
 

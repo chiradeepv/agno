@@ -1563,7 +1563,7 @@ class Team:
         run_response: TeamRunResponse,
     ):
         # Add TeamRun to memory
-        self.team_session.add_run(run=run_response)
+        self.team_session.upsert_run(run=run_response)
 
     def _handle_model_response_stream(
         self,
@@ -5889,7 +5889,7 @@ class Team:
                 # Add the member run to the team run response
                 self.run_response = cast(TeamRunResponse, self.run_response)
                 # Add the member run to the team session
-                self.team_session.add_run(member_agent.run_response)
+                self.team_session.upsert_run(member_agent.run_response)
 
                 # Update team session state
                 self._update_team_session_state(member_agent)
@@ -5973,7 +5973,7 @@ class Team:
                     # Add the member run to the team run response
                     self.run_response = cast(TeamRunResponse, self.run_response)
                     # Add the member run to the team session
-                    self.team_session.add_run(agent.run_response)
+                    self.team_session.upsert_run(agent.run_response)
 
                     # Update team session state
                     self._update_team_session_state(current_agent)
@@ -6202,7 +6202,7 @@ class Team:
             # Add the member run to the team run response
             self.run_response = cast(TeamRunResponse, self.run_response)
             # Add the member run to the team session
-            self.team_session.add_run(member_agent.run_response)
+            self.team_session.upsert_run(member_agent.run_response)
 
             # Update team session state
             self._update_team_session_state(member_agent)
@@ -6342,7 +6342,7 @@ class Team:
             # Add the member run to the team run response
             self.run_response = cast(TeamRunResponse, self.run_response)
             # Add the member run to the team session
-            self.team_session.add_run(member_agent.run_response)
+            self.team_session.upsert_run(member_agent.run_response)
 
             # Update team session state
             self._update_team_session_state(member_agent)
@@ -6589,7 +6589,7 @@ class Team:
             # Add the member run to the team run response
             self.run_response = cast(TeamRunResponse, self.run_response)
             # Add the member run to the team session
-            self.team_session.add_run(member_agent.run_response)
+            self.team_session.upsert_run(member_agent.run_response)
 
             # Update team session state
             self._update_team_session_state(member_agent)
@@ -6726,7 +6726,7 @@ class Team:
             # Add the member run to the team run response
             self.run_response = cast(TeamRunResponse, self.run_response)
             # Add the member run to the team session
-            self.team_session.add_run(member_agent.run_response)
+            self.team_session.upsert_run(member_agent.run_response)
 
             # Update team session state
             self._update_team_session_state(member_agent)

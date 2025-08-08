@@ -86,7 +86,7 @@ class TeamSession:
             summary=data.get("summary"),
         )
 
-    def add_run(self, run: Union[TeamRunResponse, RunResponse]):
+    def upsert_run(self, run: Union[TeamRunResponse, RunResponse]):
         """Adds a RunResponse, together with some calculated data, to the runs list."""
 
         messages = run.messages
@@ -96,8 +96,13 @@ class TeamSession:
 
         if not self.runs:
             self.runs = []
-
-        self.runs.append(run)
+            
+        for i, existing_run in enumerate(self.runs):
+            if existing_run.run_id == run.run_id:
+                self.runs[i] = run
+                break
+        else:
+            self.runs.append(run)
 
         log_debug("Added RunResponse to Team Session")
 

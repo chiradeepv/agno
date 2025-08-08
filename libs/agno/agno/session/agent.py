@@ -88,7 +88,7 @@ class AgentSession:
             "updated_at": self.updated_at,
         }
 
-    def add_run(self, run: RunResponse):
+    def upsert_run(self, run: RunResponse):
         """Adds a RunResponse, together with some calculated data, to the runs list."""
         messages = run.messages
         for m in messages:
@@ -97,8 +97,13 @@ class AgentSession:
 
         if not self.runs:
             self.runs = []
-
-        self.runs.append(run)
+            
+        for i, existing_run in enumerate(self.runs):
+            if existing_run.run_id == run.run_id:
+                self.runs[i] = run
+                break
+        else:
+            self.runs.append(run)
 
         log_debug("Added RunResponse to Agent Session")
 
