@@ -158,13 +158,13 @@ class Agent:
     knowledge_filters: Optional[Dict[str, Any]] = None
     # Let the agent choose the knowledge filters
     enable_agentic_knowledge_filters: Optional[bool] = False
-    add_references: bool = False
+    add_knowledge_to_context: bool = False
     # Retrieval function to get references
     # This function, if provided, is used instead of the default search_knowledge function
     # Signature:
-    # def retriever(agent: Agent, query: str, num_documents: Optional[int], **kwargs) -> Optional[list[dict]]:
+    # def knowledge_retriever(agent: Agent, query: str, num_documents: Optional[int], **kwargs) -> Optional[list[dict]]:
     #     ...
-    retriever: Optional[Callable[..., Optional[List[Union[Dict, str]]]]] = None
+    knowledge_retriever: Optional[Callable[..., Optional[List[Union[Dict, str]]]]] = None
     references_format: Literal["json", "yaml"] = "json"
 
     # --- Agent Tools ---
@@ -338,8 +338,8 @@ class Agent:
         knowledge: Optional[Knowledge] = None,
         knowledge_filters: Optional[Dict[str, Any]] = None,
         enable_agentic_knowledge_filters: Optional[bool] = None,
-        add_references: bool = False,
-        retriever: Optional[Callable[..., Optional[List[Union[Dict, str]]]]] = None,
+        add_knowledge_to_context: bool = False,
+        knowledge_retriever: Optional[Callable[..., Optional[List[Union[Dict, str]]]]] = None,
         references_format: Literal["json", "yaml"] = "json",
         metadata: Optional[Dict[str, Any]] = None,
         tools: Optional[List[Union[Toolkit, Callable, Function, Dict]]] = None,
@@ -424,8 +424,8 @@ class Agent:
         self.knowledge = knowledge
         self.knowledge_filters = knowledge_filters
         self.enable_agentic_knowledge_filters = enable_agentic_knowledge_filters
-        self.add_references = add_references
-        self.retriever = retriever
+        self.add_knowledge_to_context = add_knowledge_to_context
+        self.knowledge_retriever = knowledge_retriever
         self.references_format = references_format
 
         self.metadata = metadata
@@ -772,6 +772,7 @@ class Agent:
             run_messages=run_messages,
             response_format=response_format,
             stream_intermediate_steps=stream_intermediate_steps,
+            workflow_context=workflow_context,
         ):
             yield event
 
@@ -968,15 +969,14 @@ class Agent:
         for attempt in range(num_attempts):
             try:
                 # Set run_input
-                if message is not None:
-                    if isinstance(message, str):
-                        self.run_input = message
-                    elif isinstance(message, Message):
-                        self.run_input = message.to_dict()
-                    else:
-                        self.run_input = message
-                elif messages is not None:
+                if messages is not None:
                     self.run_input = [m.to_dict() if isinstance(m, Message) else m for m in messages]
+                if message is not None:
+                    formatted_message = message.to_dict() if isinstance(message, Message) else message
+                    if self.run_input is not None:
+                        self.run_input.append(formatted_message)
+                    else:
+                        self.run_input = formatted_message
 
                 # Prepare run messages
                 run_messages: RunMessages = self.get_run_messages(
@@ -1181,6 +1181,7 @@ class Agent:
             run_messages=run_messages,
             response_format=response_format,
             stream_intermediate_steps=stream_intermediate_steps,
+            workflow_context=workflow_context,
         ):
             yield event
 
@@ -1370,15 +1371,14 @@ class Agent:
         for attempt in range(num_attempts):
             try:
                 # Set run_input
-                if message is not None:
-                    if isinstance(message, str):
-                        self.run_input = message
-                    elif isinstance(message, Message):
-                        self.run_input = message.to_dict()
-                    else:
-                        self.run_input = message
-                elif messages is not None:
+                if messages is not None:
                     self.run_input = [m.to_dict() if isinstance(m, Message) else m for m in messages]
+                if message is not None:
+                    formatted_message = message.to_dict() if isinstance(message, Message) else message
+                    if self.run_input is not None:
+                        self.run_input.append(formatted_message)
+                    else:
+                        self.run_input = formatted_message
 
                 # Prepare run messages
                 run_messages: RunMessages = self.get_run_messages(
@@ -2663,6 +2663,7 @@ class Agent:
         run_messages: RunMessages,
         response_format: Optional[Union[Dict, Type[BaseModel]]] = None,
         stream_intermediate_steps: bool = False,
+        workflow_context: Optional[Dict] = None,
     ) -> Iterator[RunResponseEvent]:
         self.model = cast(Model, self.model)
 
@@ -2694,6 +2695,7 @@ class Agent:
                 reasoning_state=reasoning_state,
                 parse_structured_output=self.should_parse_structured_output,
                 stream_intermediate_steps=stream_intermediate_steps,
+                workflow_context=workflow_context,
             )
 
         # Determine reasoning completed
@@ -2732,6 +2734,7 @@ class Agent:
         run_messages: RunMessages,
         response_format: Optional[Union[Dict, Type[BaseModel]]] = None,
         stream_intermediate_steps: bool = False,
+        workflow_context: Optional[Dict] = None,
     ) -> AsyncIterator[RunResponseEvent]:
         self.model = cast(Model, self.model)
 
@@ -2765,6 +2768,7 @@ class Agent:
                 reasoning_state=reasoning_state,
                 parse_structured_output=self.should_parse_structured_output,
                 stream_intermediate_steps=stream_intermediate_steps,
+                workflow_context=workflow_context,
             ):
                 yield event
 
@@ -2805,6 +2809,7 @@ class Agent:
         reasoning_state: Optional[Dict[str, Any]] = None,
         parse_structured_output: bool = False,
         stream_intermediate_steps: bool = False,
+        workflow_context: Optional[Dict] = None,
     ) -> Iterator[RunResponseEvent]:
         if isinstance(model_response_event, tuple(get_args(RunResponseEvent))) or isinstance(
             model_response_event, tuple(get_args(TeamRunResponseEvent))
@@ -2856,6 +2861,7 @@ class Agent:
                             content_type=content_type,
                         ),
                         run_response,
+                        workflow_context=workflow_context,
                     )
                 elif (
                     model_response_event.content is not None
@@ -2872,6 +2878,7 @@ class Agent:
                             citations=model_response_event.citations,
                         ),
                         run_response,
+                        workflow_context=workflow_context,
                     )
 
                 # Process audio
@@ -2908,6 +2915,7 @@ class Agent:
                             response_audio=run_response.response_audio,
                         ),
                         run_response,
+                        workflow_context=workflow_context,
                     )
 
                 if model_response_event.image is not None:
@@ -2919,6 +2927,7 @@ class Agent:
                             image=model_response_event.image,
                         ),
                         run_response,
+                        workflow_context=workflow_context,
                     )
 
             # Handle tool interruption events
@@ -3331,13 +3340,13 @@ class Agent:
             self._rebuild_tools = True
 
         # Add tools for accessing knowledge
-        if self.knowledge is not None or self.retriever is not None:
-            # Check if retriever is an async function but used in sync mode
+        if self.knowledge is not None or self.knowledge_retriever is not None:
+            # Check if knowledge retriever is an async function but used in sync mode
             from inspect import iscoroutinefunction
 
-            if not async_mode and self.retriever and iscoroutinefunction(self.retriever):
+            if not async_mode and self.knowledge_retriever and iscoroutinefunction(self.knowledge_retriever):
                 log_warning(
-                    "Async retriever function is being used with synchronous agent.run() or agent.print_response(). "
+                    "Async knowledge retriever function is being used with synchronous agent.run() or agent.print_response(). "
                     "It is recommended to use agent.arun() or agent.aprint_response() instead."
                 )
 
@@ -4101,7 +4110,6 @@ class Agent:
                 # If the message is None, return None
                 return None
 
-
         else:
             # Handle list messages by converting to string
             if isinstance(message, list):
@@ -4123,7 +4131,7 @@ class Agent:
             else:
 
                 user_msg_content = message
-                if self.add_references:
+                if self.add_knowledge_to_context:
                     if isinstance(message, str):
                         user_msg_content = message
                     elif callable(message):
@@ -4135,11 +4143,11 @@ class Agent:
                         retrieval_timer = Timer()
                         retrieval_timer.start()
                         docs_from_knowledge = self.get_relevant_docs_from_knowledge(
-                            query=user_msg_content, filters=knowledge_filters, **kwargs
+                            query=message_str, filters=knowledge_filters, **kwargs
                         )
                         if docs_from_knowledge is not None:
                             references = MessageReferences(
-                                query=user_msg_content, references=docs_from_knowledge, time=round(retrieval_timer.elapsed, 4)
+                                query=message_str, references=docs_from_knowledge, time=round(retrieval_timer.elapsed, 4)
                             )
                             # Add the references to the run_response
                             if self.run_response.metadata is None:
@@ -4159,9 +4167,9 @@ class Agent:
                 # Convert to string for concatenation operations
                 user_msg_content_str = get_text_from_message(user_msg_content) if user_msg_content is not None else ""
 
-                # 4.1 Add references to user message
+                # 4.1 Add knowledge references to user message
                 if (
-                    self.add_references
+                    self.add_knowledge_to_context
                     and references is not None
                     and references.references is not None
                     and len(references.references) > 0
@@ -4546,27 +4554,27 @@ class Agent:
                 if not filters:
                     log_warning("No valid filters remain after validation. Search will proceed without filters.")
 
-        if self.retriever is not None and callable(self.retriever):
+        if self.knowledge_retriever is not None and callable(self.knowledge_retriever):
             from inspect import signature
 
             try:
-                sig = signature(self.retriever)
-                retriever_kwargs: Dict[str, Any] = {}
+                sig = signature(self.knowledge_retriever)
+                knowledge_retriever_kwargs: Dict[str, Any] = {}
                 if "agent" in sig.parameters:
-                    retriever_kwargs = {"agent": self}
+                    knowledge_retriever_kwargs = {"agent": self}
                 if "filters" in sig.parameters:
-                    retriever_kwargs["filters"] = filters
-                retriever_kwargs.update({"query": query, "num_documents": num_documents, **kwargs})
-                return self.retriever(**retriever_kwargs)
+                    knowledge_retriever_kwargs["filters"] = filters
+                knowledge_retriever_kwargs.update({"query": query, "num_documents": num_documents, **kwargs})
+                return self.knowledge_retriever(**knowledge_retriever_kwargs)
             except Exception as e:
-                log_warning(f"Retriever failed: {e}")
+                log_warning(f"Knowledge retriever failed: {e}")
                 raise e
 
         # Use knowledge base search
         try:
             if self.knowledge is None or (
                 (getattr(self.knowledge, "vector_db", None)) is None
-                and getattr(self.knowledge, "retriever", None) is None
+                and getattr(self.knowledge, "knowledge_retriever", None) is None
             ):
                 return None
 
@@ -4609,32 +4617,32 @@ class Agent:
                 if not filters:
                     log_warning("No valid filters remain after validation. Search will proceed without filters.")
 
-        if self.retriever is not None and callable(self.retriever):
+        if self.knowledge_retriever is not None and callable(self.knowledge_retriever):
             from inspect import isawaitable, signature
 
             try:
-                sig = signature(self.retriever)
-                retriever_kwargs: Dict[str, Any] = {}
+                sig = signature(self.knowledge_retriever)
+                knowledge_retriever_kwargs: Dict[str, Any] = {}
                 if "agent" in sig.parameters:
-                    retriever_kwargs = {"agent": self}
+                    knowledge_retriever_kwargs = {"agent": self}
                 if "filters" in sig.parameters:
-                    retriever_kwargs["filters"] = filters
-                retriever_kwargs.update({"query": query, "num_documents": num_documents, **kwargs})
-                result = self.retriever(**retriever_kwargs)
+                    knowledge_retriever_kwargs["filters"] = filters
+                knowledge_retriever_kwargs.update({"query": query, "num_documents": num_documents, **kwargs})
+                result = self.knowledge_retriever(**knowledge_retriever_kwargs)
 
                 if isawaitable(result):
                     result = await result
 
                 return result
             except Exception as e:
-                log_warning(f"Retriever failed: {e}")
+                log_warning(f"Knowledge retriever failed: {e}")
                 raise e
 
         # Use knowledge base search
         try:
             if self.knowledge is None or (
                 getattr(self.knowledge, "vector_db", None) is None
-                and getattr(self.knowledge, "retriever", None) is None
+                and getattr(self.knowledge, "knowledge_retriever", None) is None
             ):
                 return None
 

@@ -1,4 +1,5 @@
 from typing import Any, Callable, Dict, List, Optional, Union
+from uuid import uuid4
 
 from fastapi import HTTPException, UploadFile
 
@@ -11,7 +12,7 @@ from agno.team.team import Team
 from agno.tools.function import Function
 from agno.tools.toolkit import Toolkit
 from agno.utils.log import logger
-from agno.workflow.v2.workflow import Workflow
+from agno.workflow.workflow import Workflow
 
 
 def get_run_input(run_dict: Dict[str, Any], is_workflow_run: bool = False) -> str:
@@ -239,3 +240,9 @@ def _generate_schema_from_params(self, params: Dict[str, Any]) -> Dict[str, Any]
         schema["required"] = required
 
     return schema
+
+def generate_id(name: Optional[str] = None) -> str:
+    if name:
+        return name.lower().replace(" ", "-").replace("_", "-")
+    else:
+        return str(uuid4())

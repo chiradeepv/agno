@@ -151,8 +151,8 @@ class Team:
     add_location_to_context: bool = False
     # If True, add the team name to the instructions
     add_name_to_context: bool = False
-    # If True, add the tools available to team members to the system message
-    add_member_tools_to_system_message: bool = True
+    # If True, add the tools available to team members to the context
+    add_member_tools_to_context: bool = True
 
     # Provide the system message as a string or function
     system_message: Optional[Union[str, Callable, Message]] = None
@@ -186,13 +186,13 @@ class Team:
     enable_agentic_knowledge_filters: Optional[bool] = False
 
     # If True, add references to the user prompt
-    add_references: bool = False
+    add_knowledge_to_context: bool = False
     # Retrieval function to get references
     # This function, if provided, is used instead of the default search_knowledge function
     # Signature:
-    # def retriever(team: Team, query: str, num_documents: Optional[int], **kwargs) -> Optional[list[dict]]:
+    # def knowledge_retriever(team: Team, query: str, num_documents: Optional[int], **kwargs) -> Optional[list[dict]]:
     #     ...
-    retriever: Optional[Callable[..., Optional[List[Union[Dict, str]]]]] = None
+    knowledge_retriever: Optional[Callable[..., Optional[List[Union[Dict, str]]]]] = None
     references_format: Literal["json", "yaml"] = "json"
 
     # --- Tools ---
@@ -324,7 +324,7 @@ class Team:
         add_datetime_to_context: bool = False,
         add_location_to_context: bool = False,
         add_name_to_context: bool = False,
-        add_member_tools_to_system_message: bool = True,
+        add_member_tools_to_context: bool = True,
         system_message: Optional[Union[str, Callable, Message]] = None,
         system_message_role: str = "system",
         additional_messages: Optional[List[Union[Dict, Message]]] = None,
@@ -332,9 +332,9 @@ class Team:
         add_dependencies_to_context: bool = False,
         knowledge: Optional[Knowledge] = None,
         knowledge_filters: Optional[Dict[str, Any]] = None,
-        add_references: bool = False,
+        add_knowledge_to_context: bool = False,
         enable_agentic_knowledge_filters: Optional[bool] = False,
-        retriever: Optional[Callable[..., Optional[List[Union[Dict, str]]]]] = None,
+        knowledge_retriever: Optional[Callable[..., Optional[List[Union[Dict, str]]]]] = None,
         references_format: Literal["json", "yaml"] = "json",
         enable_agentic_context: bool = False,
         share_member_interactions: bool = False,
@@ -402,7 +402,7 @@ class Team:
         self.add_datetime_to_context = add_datetime_to_context
         self.add_location_to_context = add_location_to_context
         self.add_name_to_context = add_name_to_context
-        self.add_member_tools_to_system_message = add_member_tools_to_system_message
+        self.add_member_tools_to_context = add_member_tools_to_context
         self.system_message = system_message
         self.system_message_role = system_message_role
         self.additional_messages = additional_messages
@@ -413,8 +413,8 @@ class Team:
         self.knowledge = knowledge
         self.knowledge_filters = knowledge_filters
         self.enable_agentic_knowledge_filters = enable_agentic_knowledge_filters
-        self.add_references = add_references
-        self.retriever = retriever
+        self.add_knowledge_to_context = add_knowledge_to_context
+        self.knowledge_retriever = knowledge_retriever
         self.references_format = references_format
 
         self.enable_agentic_context = enable_agentic_context
@@ -821,6 +821,7 @@ class Team:
             run_messages=run_messages,
             response_format=response_format,
             stream_intermediate_steps=stream_intermediate_steps,
+            workflow_context=workflow_context,
         )
 
         # 3. Add the run to memory
@@ -852,7 +853,7 @@ class Team:
     @overload
     def run(
         self,
-        message: Union[str, List, Dict, Message, BaseModel],
+        message: Optional[Union[str, List, Dict, Message, BaseModel]] = None,
         *,
         stream: Literal[False] = False,
         stream_intermediate_steps: Optional[bool] = None,
@@ -864,6 +865,7 @@ class Team:
         images: Optional[Sequence[Image]] = None,
         videos: Optional[Sequence[Video]] = None,
         files: Optional[Sequence[File]] = None,
+        messages: Optional[Sequence[Union[Dict, Message]]] = None,
         knowledge_filters: Optional[Dict[str, Any]] = None,
         **kwargs: Any,
     ) -> TeamRunResponse: ...
@@ -871,7 +873,7 @@ class Team:
     @overload
     def run(
         self,
-        message: Union[str, List, Dict, Message, BaseModel],
+        message: Optional[Union[str, List, Dict, Message, BaseModel]] = None,
         *,
         stream: Literal[True] = True,
         stream_intermediate_steps: Optional[bool] = None,
@@ -883,13 +885,14 @@ class Team:
         images: Optional[Sequence[Image]] = None,
         videos: Optional[Sequence[Video]] = None,
         files: Optional[Sequence[File]] = None,
+        messages: Optional[Sequence[Union[Dict, Message]]] = None,
         knowledge_filters: Optional[Dict[str, Any]] = None,
         **kwargs: Any,
     ) -> Iterator[Union[RunResponseEvent, TeamRunResponseEvent]]: ...
 
     def run(
         self,
-        message: Union[str, List, Dict, Message, BaseModel],
+        message: Optional[Union[str, List, Dict, Message, BaseModel]] = None,
         *,
         stream: Optional[bool] = None,
         stream_intermediate_steps: Optional[bool] = None,
@@ -901,6 +904,7 @@ class Team:
         images: Optional[Sequence[Image]] = None,
         videos: Optional[Sequence[Video]] = None,
         files: Optional[Sequence[File]] = None,
+        messages: Optional[Sequence[Union[Dict, Message]]] = None,
         knowledge_filters: Optional[Dict[str, Any]] = None,
         **kwargs: Any,
     ) -> Union[TeamRunResponse, Iterator[Union[RunResponseEvent, TeamRunResponseEvent]]]:
@@ -1015,13 +1019,14 @@ class Team:
             log_debug(f"Mode: '{self.mode}'", center=True)
 
             # Set run_input
+            if messages is not None:
+                self.run_input = [m.to_dict() if isinstance(m, Message) else m for m in messages]
             if message is not None:
-                if isinstance(message, str):
-                    self.run_input = message
-                elif isinstance(message, Message):
-                    self.run_input = message.to_dict()
+                formatted_message = message.to_dict() if isinstance(message, Message) else message
+                if self.run_input is not None:
+                    self.run_input.append(formatted_message)
                 else:
-                    self.run_input = message
+                    self.run_input = formatted_message
 
             # Run the team
             try:
@@ -1035,6 +1040,7 @@ class Team:
                         images=images,
                         videos=videos,
                         files=files,
+                        messages=messages,
                         knowledge_filters=effective_filters,
                         **kwargs,
                     )
@@ -1047,6 +1053,7 @@ class Team:
                         images=images,
                         videos=videos,
                         files=files,
+                        messages=messages,
                         knowledge_filters=effective_filters,
                         **kwargs,
                     )
@@ -1215,6 +1222,7 @@ class Team:
             run_messages=run_messages,
             response_format=response_format,
             stream_intermediate_steps=stream_intermediate_steps,
+            workflow_context=workflow_context,
         ):
             yield event
 
@@ -1265,6 +1273,7 @@ class Team:
         images: Optional[Sequence[Image]] = None,
         videos: Optional[Sequence[Video]] = None,
         files: Optional[Sequence[File]] = None,
+        messages: Optional[Sequence[Union[Dict, Message]]] = None,
         knowledge_filters: Optional[Dict[str, Any]] = None,
         **kwargs: Any,
     ) -> TeamRunResponse: ...
@@ -1284,6 +1293,7 @@ class Team:
         images: Optional[Sequence[Image]] = None,
         videos: Optional[Sequence[Video]] = None,
         files: Optional[Sequence[File]] = None,
+        messages: Optional[Sequence[Union[Dict, Message]]] = None,
         knowledge_filters: Optional[Dict[str, Any]] = None,
         **kwargs: Any,
     ) -> AsyncIterator[Union[RunResponseEvent, TeamRunResponseEvent]]: ...
@@ -1302,6 +1312,7 @@ class Team:
         images: Optional[Sequence[Image]] = None,
         videos: Optional[Sequence[Video]] = None,
         files: Optional[Sequence[File]] = None,
+        messages: Optional[Sequence[Union[Dict, Message]]] = None,
         knowledge_filters: Optional[Dict[str, Any]] = None,
         **kwargs: Any,
     ) -> Union[TeamRunResponse, AsyncIterator[Union[RunResponseEvent, TeamRunResponseEvent]]]:
@@ -1401,14 +1412,16 @@ class Team:
             log_debug(f"Team Run Start: {self.run_id}", center=True)
             log_debug(f"Mode: '{self.mode}'", center=True)
 
-            # Set run_input
+            # Set run_input - use both message and messages if provided (using two ifs as Dirk suggested)
+            self.run_input = None
+            if messages is not None:
+                self.run_input = [m.to_dict() if isinstance(m, Message) else m for m in messages]
             if message is not None:
-                if isinstance(message, str):
-                    self.run_input = message
-                elif isinstance(message, Message):
-                    self.run_input = message.to_dict()
+                formatted_message = message.to_dict() if isinstance(message, Message) else message
+                if self.run_input is not None:
+                    self.run_input.append(formatted_message)
                 else:
-                    self.run_input = message
+                    self.run_input = formatted_message
 
             # Run the team
             try:
@@ -1423,6 +1436,7 @@ class Team:
                         images=images,
                         videos=videos,
                         files=files,
+                        messages=messages,
                         knowledge_filters=effective_filters,
                         **kwargs,
                     )
@@ -1435,6 +1449,7 @@ class Team:
                         images=images,
                         videos=videos,
                         files=files,
+                        messages=messages,
                         knowledge_filters=effective_filters,
                         **kwargs,
                     )
@@ -1571,6 +1586,7 @@ class Team:
         run_messages: RunMessages,
         response_format: Optional[Union[Dict, Type[BaseModel]]] = None,
         stream_intermediate_steps: bool = False,
+        workflow_context: Optional[Dict] = None,
     ) -> Iterator[Union[TeamRunResponseEvent, RunResponseEvent]]:
         self.model = cast(Model, self.model)
 
@@ -1601,6 +1617,7 @@ class Team:
                 reasoning_state=reasoning_state,
                 stream_intermediate_steps=stream_intermediate_steps,
                 parse_structured_output=self.should_parse_structured_output,
+                workflow_context=workflow_context,
             )
 
         # 3. Update TeamRunResponse
@@ -1651,6 +1668,7 @@ class Team:
         run_messages: RunMessages,
         response_format: Optional[Union[Dict, Type[BaseModel]]] = None,
         stream_intermediate_steps: bool = False,
+        workflow_context: Optional[Dict] = None,
     ) -> AsyncIterator[Union[TeamRunResponseEvent, RunResponseEvent]]:
         self.model = cast(Model, self.model)
 
@@ -1682,6 +1700,7 @@ class Team:
                 reasoning_state=reasoning_state,
                 stream_intermediate_steps=stream_intermediate_steps,
                 parse_structured_output=self.should_parse_structured_output,
+                workflow_context=workflow_context,
             ):
                 yield chunk
 
@@ -1736,6 +1755,7 @@ class Team:
         reasoning_state: Optional[Dict[str, Any]] = None,
         stream_intermediate_steps: bool = False,
         parse_structured_output: bool = False,
+        workflow_context: Optional[Dict] = None,
     ) -> Iterator[Union[TeamRunResponseEvent, RunResponseEvent]]:
         if isinstance(model_response_event, tuple(get_args(RunResponseEvent))) or isinstance(
             model_response_event, tuple(get_args(TeamRunResponseEvent))
@@ -1824,6 +1844,7 @@ class Team:
                                 image=model_response_event.image,
                             ),
                             run_response,
+                            workflow_context=workflow_context,
                         )
                     else:
                         yield self._handle_event(
@@ -1833,6 +1854,7 @@ class Team:
                                 content_type=content_type,
                             ),
                             run_response,
+                            workflow_context=workflow_context,
                         )
 
             # If the model response is a tool_call_started, add the tool call to the run_response
@@ -1961,7 +1983,9 @@ class Team:
                 log_warning("Something went wrong. Member run response content is not a string")
 
     def _update_memory(
-        self, run_messages: RunMessages, user_id: Optional[str] = None
+        self,
+        run_messages: RunMessages,
+        user_id: Optional[str] = None,
     ) -> Iterator[TeamRunResponseEvent]:
         from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -2014,7 +2038,9 @@ class Team:
                     )
 
     async def _aupdate_memory(
-        self, run_messages: RunMessages, user_id: Optional[str] = None
+        self,
+        run_messages: RunMessages,
+        user_id: Optional[str] = None,
     ) -> AsyncIterator[TeamRunResponseEvent]:
         self.run_response = cast(TeamRunResponse, self.run_response)
         tasks = []
@@ -2282,6 +2308,7 @@ class Team:
         images: Optional[Sequence[Image]] = None,
         videos: Optional[Sequence[Video]] = None,
         files: Optional[Sequence[File]] = None,
+        messages: Optional[Sequence[Union[Dict, Message]]] = None,
         markdown: Optional[bool] = None,
         knowledge_filters: Optional[Dict[str, Any]] = None,
         **kwargs: Any,
@@ -2309,6 +2336,7 @@ class Team:
                 images=images,
                 videos=videos,
                 files=files,
+                messages=messages,
                 markdown=markdown,
                 stream_intermediate_steps=stream_intermediate_steps,
                 knowledge_filters=knowledge_filters,
@@ -2329,6 +2357,7 @@ class Team:
                 images=images,
                 videos=videos,
                 files=files,
+                messages=messages,
                 markdown=markdown,
                 knowledge_filters=knowledge_filters,
                 **kwargs,
@@ -2349,6 +2378,7 @@ class Team:
         images: Optional[Sequence[Image]] = None,
         videos: Optional[Sequence[Video]] = None,
         files: Optional[Sequence[File]] = None,
+        messages: Optional[Sequence[Union[Dict, Message]]] = None,
         markdown: bool = False,
         knowledge_filters: Optional[Dict[str, Any]] = None,
         **kwargs: Any,
@@ -2394,6 +2424,7 @@ class Team:
                 audio=audio,
                 videos=videos,
                 files=files,
+                messages=messages,
                 stream=False,
                 session_id=session_id,
                 session_state=session_state,
@@ -2637,6 +2668,7 @@ class Team:
         images: Optional[Sequence[Image]] = None,
         videos: Optional[Sequence[Video]] = None,
         files: Optional[Sequence[File]] = None,
+        messages: Optional[Sequence[Union[Dict, Message]]] = None,
         markdown: bool = False,
         stream_intermediate_steps: bool = False,  # type: ignore
         knowledge_filters: Optional[Dict[str, Any]] = None,
@@ -2699,6 +2731,7 @@ class Team:
                 images=images,
                 videos=videos,
                 files=files,
+                messages=messages,
                 stream=True,
                 stream_intermediate_steps=stream_intermediate_steps,
                 session_id=session_id,
@@ -3158,6 +3191,7 @@ class Team:
         images: Optional[Sequence[Image]] = None,
         videos: Optional[Sequence[Video]] = None,
         files: Optional[Sequence[File]] = None,
+        messages: Optional[Sequence[Union[Dict, Message]]] = None,
         markdown: Optional[bool] = None,
         knowledge_filters: Optional[Dict[str, Any]] = None,
         **kwargs: Any,
@@ -3185,6 +3219,7 @@ class Team:
                 images=images,
                 videos=videos,
                 files=files,
+                messages=messages,
                 markdown=markdown,
                 stream_intermediate_steps=stream_intermediate_steps,
                 knowledge_filters=knowledge_filters,
@@ -3205,6 +3240,7 @@ class Team:
                 images=images,
                 videos=videos,
                 files=files,
+                messages=messages,
                 markdown=markdown,
                 knowledge_filters=knowledge_filters,
                 **kwargs,
@@ -3225,6 +3261,7 @@ class Team:
         images: Optional[Sequence[Image]] = None,
         videos: Optional[Sequence[Video]] = None,
         files: Optional[Sequence[File]] = None,
+        messages: Optional[Sequence[Union[Dict, Message]]] = None,
         markdown: bool = False,
         knowledge_filters: Optional[Dict[str, Any]] = None,
         **kwargs: Any,
@@ -3270,6 +3307,7 @@ class Team:
                 audio=audio,
                 videos=videos,
                 files=files,
+                messages=messages,
                 stream=False,
                 session_id=session_id,
                 session_state=session_state,
@@ -3511,8 +3549,10 @@ class Team:
         images: Optional[Sequence[Image]] = None,
         videos: Optional[Sequence[Video]] = None,
         files: Optional[Sequence[File]] = None,
+        messages: Optional[Sequence[Union[Dict, Message]]] = None,
         markdown: bool = False,
         stream_intermediate_steps: bool = False,  # type: ignore
+        knowledge_filters: Optional[Dict[str, Any]] = None,
         **kwargs: Any,
     ) -> None:
         import textwrap
@@ -3575,11 +3615,13 @@ class Team:
                 images=images,
                 videos=videos,
                 files=files,
+                messages=messages,
                 stream=True,
                 stream_intermediate_steps=stream_intermediate_steps,
                 session_id=session_id,
                 session_state=session_state,
                 user_id=user_id,
+                knowledge_filters=knowledge_filters,
                 **kwargs,
             )
             team_markdown = None
@@ -4721,13 +4763,13 @@ class Team:
         if self.enable_agentic_context:
             _tools.append(self.get_set_shared_context_function(session_id=session_id))
 
-        if self.knowledge is not None or self.retriever is not None:
-            # Check if retriever is an async function but used in sync mode
+        if self.knowledge is not None or self.knowledge_retriever is not None:
+            # Check if knowledge retriever is an async function but used in sync mode
             from inspect import iscoroutinefunction
 
-            if self.retriever is not None and iscoroutinefunction(self.retriever):
+            if self.knowledge_retriever is not None and iscoroutinefunction(self.knowledge_retriever):
                 log_warning(
-                    "Async retriever function is being used with synchronous agent.run() or agent.print_response(). "
+                    "Async knowledge retriever function is being used with synchronous agent.run() or agent.print_response(). "
                     "It is recommended to use agent.arun() or agent.aprint_response() instead."
                 )
 
@@ -4898,7 +4940,7 @@ class Team:
                     system_message_content += f"{indent * ' '}   - Name: {member.name}\n"
                 if member.role is not None:
                     system_message_content += f"{indent * ' '}   - Role: {member.role}\n"
-                if member.tools is not None and self.add_member_tools_to_system_message:
+                if member.tools is not None and self.add_member_tools_to_context:
                     system_message_content += f"{indent * ' '}   - Member tools:\n"
                     for _tool in member.tools:
                         if isinstance(_tool, Toolkit):
@@ -5199,6 +5241,7 @@ class Team:
         images: Optional[Sequence[Image]] = None,
         videos: Optional[Sequence[Video]] = None,
         files: Optional[Sequence[File]] = None,
+        messages: Optional[Sequence[Union[Dict, Message]]] = None,
         knowledge_filters: Optional[Dict[str, Any]] = None,
         **kwargs: Any,
     ) -> RunMessages:
@@ -5211,7 +5254,8 @@ class Team:
         1. Add system message to run_messages
         2. Add extra messages to run_messages
         3. Add history to run_messages
-        4. Add user message to run_messages
+        4. Add messages to run_messages if provided (messages parameter first)
+        5. Add user message to run_messages (message parameter second)
 
         """
         # Initialize the RunMessages object
@@ -5247,15 +5291,16 @@ class Team:
             # Add the extra messages to the run_response
             if len(messages_to_add_to_run_response) > 0:
                 log_debug(f"Adding {len(messages_to_add_to_run_response)} extra messages")
-                if self.run_response.extra_data is None:
-                    self.run_response.extra_data = RunResponseExtraData(
-                        additional_messages=messages_to_add_to_run_response
-                    )
-                else:
-                    if self.run_response.extra_data.additional_messages is None:
-                        self.run_response.extra_data.additional_messages = messages_to_add_to_run_response
+                if self.run_response is not None:
+                    if self.run_response.metadata is None:
+                        self.run_response.metadata = RunResponseMetaData(
+                            additional_messages=messages_to_add_to_run_response
+                        )
                     else:
-                        self.run_response.extra_data.additional_messages.extend(messages_to_add_to_run_response)
+                        if self.run_response.metadata.additional_messages is None:
+                            self.run_response.metadata.additional_messages = messages_to_add_to_run_response
+                        else:
+                            self.run_response.metadata.additional_messages.extend(messages_to_add_to_run_response)
 
         # 3. Add history to run_messages
         if self.add_history_to_context:
@@ -5281,18 +5326,55 @@ class Team:
                 # Extend the messages with the history
                 run_messages.messages += history_copy
 
-        # 4. Add user message to run_messages
-        user_message = self._get_user_message(
-            message,
-            user_id=user_id,
-            audio=audio,
-            images=images,
-            videos=videos,
-            files=files,
-            knowledge_filters=knowledge_filters,
-            **kwargs,
-        )
+        # 4. Add messages to run_messages
+        if messages is not None and len(messages) > 0:
+            for _m in messages:
+                if isinstance(_m, Message):
+                    run_messages.messages.append(_m)
+                    if run_messages.extra_messages is None:
+                        run_messages.extra_messages = []
+                    run_messages.extra_messages.append(_m)
+                elif isinstance(_m, dict):
+                    try:
+                        _m_parsed = Message.model_validate(_m)
+                        run_messages.messages.append(_m_parsed)
+                        if run_messages.extra_messages is None:
+                            run_messages.extra_messages = []
+                        run_messages.extra_messages.append(_m_parsed)
+                    except Exception as e:
+                        log_warning(f"Failed to validate message: {e}")
 
+        # 5. Add user message to run_messages (message second as per Dirk's requirement)
+        user_message: Optional[Message] = None
+        # 5.1 Build user message if message is None, str or list
+        if message is None or isinstance(message, str) or isinstance(message, list):
+            user_message = self._get_user_message(
+                message,
+                user_id=user_id,
+                audio=audio,
+                images=images,
+                videos=videos,
+                files=files,
+                knowledge_filters=knowledge_filters,
+                **kwargs,
+            )
+        # 5.2 If message is provided as a Message, use it directly
+        elif isinstance(message, Message):
+            user_message = message
+        # 5.3 If message is provided as a dict, try to validate it as a Message
+        elif isinstance(message, dict):
+            try:
+                user_message = Message.model_validate(message)
+            except Exception as e:
+                log_warning(f"Failed to validate message: {e}")
+        # 5.4 If message is provided as a BaseModel, convert it to a Message
+        elif isinstance(message, BaseModel):
+            try:
+                # Create a user message with the BaseModel content
+                content = message.model_dump_json(indent=2, exclude_none=True)
+                user_message = Message(role="user", content=content)
+            except Exception as e:
+                log_warning(f"Failed to convert BaseModel to message: {e}")
         # Add user message to run_messages
         if user_message is not None:
             run_messages.user_message = user_message
@@ -5314,7 +5396,7 @@ class Team:
         # Get references from the knowledge base to use in the user message
         references = None
         self.run_response = cast(TeamRunResponse, self.run_response)
-        if self.add_references and message:
+        if self.add_knowledge_to_context and message:
             message_str: str
             if isinstance(message, str):
                 message_str = message
@@ -5323,7 +5405,7 @@ class Team:
             elif isinstance(message, BaseModel):
                 message_str = message.model_dump_json(indent=2, exclude_none=True)
             else:
-                raise Exception("message must be a string or a callable when add_references is True")
+                raise Exception("message must be a string or a callable when add_knowledge_to_context is True")
 
             try:
                 retrieval_timer = Timer()
@@ -5347,24 +5429,29 @@ class Team:
                 log_warning(f"Failed to get references: {e}")
 
         # Build user message if message is None, str or list
-        user_message_content: str = ""
         if isinstance(message, str) or isinstance(message, list):
+            # For lists, pass them directly as content like the agent does
+            if isinstance(message, list):
+                return Message(
+                    role="user",
+                    content=message,
+                    audio=audio,
+                    images=images,
+                    videos=videos,
+                    files=files,
+                    **kwargs,
+                )
+
+            # For strings, build the content with state, references, and context
+            user_message_content: str = ""
             if self.add_state_in_messages:
-                if isinstance(message, str):
-                    user_message_content = self._format_message_with_state_variables(message, user_id=user_id)
-                elif isinstance(message, list):
-                    user_message_content = "\n".join(
-                        [self._format_message_with_state_variables(msg, user_id=user_id) for msg in message]
-                    )
+                user_message_content = self._format_message_with_state_variables(message, user_id=user_id)
             else:
-                if isinstance(message, str):
-                    user_message_content = message
-                else:
-                    user_message_content = "\n".join(message)
+                user_message_content = message
 
             # Add references to user message
             if (
-                self.add_references
+                self.add_knowledge_to_context
                 and references is not None
                 and references.references is not None
                 and len(references.references) > 0
@@ -7345,20 +7432,20 @@ class Team:
                 if not filters:
                     log_warning("No valid filters remain after validation. Search will proceed without filters.")
 
-        if self.retriever is not None and callable(self.retriever):
+        if self.knowledge_retriever is not None and callable(self.knowledge_retriever):
             from inspect import signature
 
             try:
-                sig = signature(self.retriever)
-                retriever_kwargs: Dict[str, Any] = {}
+                sig = signature(self.knowledge_retriever)
+                knowledge_retriever_kwargs: Dict[str, Any] = {}
                 if "team" in sig.parameters:
-                    retriever_kwargs = {"team": self}
+                    knowledge_retriever_kwargs = {"team": self}
                 if "filters" in sig.parameters:
-                    retriever_kwargs["filters"] = filters
-                retriever_kwargs.update({"query": query, "num_documents": num_documents, **kwargs})
-                return self.retriever(**retriever_kwargs)
+                    knowledge_retriever_kwargs["filters"] = filters
+                knowledge_retriever_kwargs.update({"query": query, "num_documents": num_documents, **kwargs})
+                return self.knowledge_retriever(**knowledge_retriever_kwargs)
             except Exception as e:
-                log_warning(f"Retriever failed: {e}")
+                log_warning(f"Knowledge retriever failed: {e}")
                 raise e
         try:
             if self.knowledge is None or self.knowledge.vector_db is None:
@@ -7403,20 +7490,20 @@ class Team:
                 if not filters:
                     log_warning("No valid filters remain after validation. Search will proceed without filters.")
 
-        if self.retriever is not None and callable(self.retriever):
+        if self.knowledge_retriever is not None and callable(self.knowledge_retriever):
             from inspect import signature
 
             try:
-                sig = signature(self.retriever)
-                retriever_kwargs: Dict[str, Any] = {}
+                sig = signature(self.knowledge_retriever)
+                knowledge_retriever_kwargs: Dict[str, Any] = {}
                 if "team" in sig.parameters:
-                    retriever_kwargs = {"team": self}
+                    knowledge_retriever_kwargs = {"team": self}
                 if "filters" in sig.parameters:
-                    retriever_kwargs["filters"] = filters
-                retriever_kwargs.update({"query": query, "num_documents": num_documents, **kwargs})
-                return self.retriever(**retriever_kwargs)
+                    knowledge_retriever_kwargs["filters"] = filters
+                knowledge_retriever_kwargs.update({"query": query, "num_documents": num_documents, **kwargs})
+                return self.knowledge_retriever(**knowledge_retriever_kwargs)
             except Exception as e:
-                log_warning(f"Retriever failed: {e}")
+                log_warning(f"Knowledge retriever failed: {e}")
                 raise e
 
         try:
