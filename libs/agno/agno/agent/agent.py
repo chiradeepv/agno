@@ -496,12 +496,6 @@ class Agent:
         self.debug_level = debug_level
         self.telemetry = telemetry
 
-        # --- Params not to be set by user ---
-        self.run_id: Optional[str] = None
-        self.run_input: Optional[Union[str, List, Dict, Message, BaseModel]] = None
-        self.run_messages: Optional[RunMessages] = None
-        self.run_response: Optional[RunResponse] = None
-
         # Images generated during this session
         self.images: Optional[List[ImageArtifact]] = None
         # Audio generated during this session
@@ -957,9 +951,6 @@ class Agent:
         run_response.model = self.model.id if self.model is not None else None
         run_response.model_provider = self.model.provider if self.model is not None else None
 
-        self.run_response = run_response
-        self.run_id = run_id
-
         # If no retries are set, use the agent's default retries
         retries = retries if retries is not None else self.retries
 
@@ -968,15 +959,6 @@ class Agent:
 
         for attempt in range(num_attempts):
             try:
-                # Set run_input
-                if messages is not None:
-                    self.run_input = [m.to_dict() if isinstance(m, Message) else m for m in messages]
-                if message is not None:
-                    formatted_message = message.to_dict() if isinstance(message, Message) else message
-                    if self.run_input is not None:
-                        self.run_input.append(formatted_message)
-                    else:
-                        self.run_input = formatted_message
 
                 # Prepare run messages
                 run_messages: RunMessages = self.get_run_messages(
@@ -993,8 +975,6 @@ class Agent:
                 )
                 if len(run_messages.messages) == 0:
                     log_error("No messages to be sent to the model.")
-
-                self.run_messages = run_messages
 
                 if stream:
                     response_iterator = self._run_stream(
@@ -1030,15 +1010,15 @@ class Agent:
 
                     time.sleep(delay)
             except KeyboardInterrupt:
-                self.run_response = self.create_run_response(
-                    run_state=RunStatus.cancelled, content="Operation cancelled by user", run_response=run_response
-                )
+                run_response.content = "Operation cancelled by user"
+                run_response.status = RunStatus.cancelled
+
                 if stream:
                     return generator_wrapper(  # type: ignore
                         create_run_response_cancelled_event(run_response, "Operation cancelled by user")
                     )
                 else:
-                    return self.run_response
+                    return run_response
 
         # If we get here, all retries failed
         if last_exception is not None:
@@ -1359,9 +1339,6 @@ class Agent:
         run_response.model = self.model.id if self.model is not None else None
         run_response.model_provider = self.model.provider if self.model is not None else None
 
-        self.run_response = run_response
-        self.run_id = run_id
-
         # If no retries are set, use the agent's default retries
         retries = retries if retries is not None else self.retries
 
@@ -1370,15 +1347,6 @@ class Agent:
 
         for attempt in range(num_attempts):
             try:
-                # Set run_input
-                if messages is not None:
-                    self.run_input = [m.to_dict() if isinstance(m, Message) else m for m in messages]
-                if message is not None:
-                    formatted_message = message.to_dict() if isinstance(message, Message) else message
-                    if self.run_input is not None:
-                        self.run_input.append(formatted_message)
-                    else:
-                        self.run_input = formatted_message
 
                 # Prepare run messages
                 run_messages: RunMessages = self.get_run_messages(
@@ -1431,15 +1399,15 @@ class Agent:
 
                     time.sleep(delay)
             except KeyboardInterrupt:
-                self.run_response = self.create_run_response(
-                    run_state=RunStatus.cancelled, content="Operation cancelled by user", run_response=run_response
-                )
+                run_response.content = "Operation cancelled by user"
+                run_response.status = RunStatus.cancelled
+
                 if stream:
                     return async_generator_wrapper(
                         create_run_response_cancelled_event(run_response, "Operation cancelled by user")
                     )
                 else:
-                    return self.run_response
+                    return run_response
 
         # If we get here, all retries failed
         if last_exception is not None:
@@ -1569,8 +1537,6 @@ class Agent:
         if run_response is not None:
             # The run is continued from a provided run_response. This contains the updated tools.
             messages = run_response.messages or []
-            self.run_response = run_response
-            self.run_id = run_response.run_id
         elif run_id is not None:
 
             # The run is continued from a run_id. This requires the updated tools to be passed.
@@ -1583,8 +1549,6 @@ class Agent:
                 raise RuntimeError(f"No runs found for run ID {run_id}")
             run_response.tools = updated_tools
             messages = run_response.messages or []
-            self.run_response = run_response
-            self.run_id = run_id
         else:
             raise ValueError("Either run_response or run_id must be provided.")
 
@@ -1613,15 +1577,6 @@ class Agent:
             self.run_messages = self.get_continue_run_messages(
                 messages=messages,
             )
-
-            # Set run_input
-            if self.run_messages.user_message is not None:
-                if isinstance(self.run_messages.user_message, str):
-                    self.run_input = self.run_messages.user_message
-                elif isinstance(self.run_messages.user_message, Message):
-                    self.run_input = self.run_messages.user_message.to_dict()
-                else:
-                    self.run_input = self.run_messages.user_message
 
             # Reset the run state
             run_response.status = RunStatus.running
@@ -1665,9 +1620,9 @@ class Agent:
                         create_run_response_cancelled_event(run_response, "Operation cancelled by user")
                     )
                 else:
-                    return self.create_run_response(
-                        run_state=RunStatus.cancelled, content="Operation cancelled by user", run_response=run_response
-                    )
+                    run_response.content = "Operation cancelled by user"
+                    run_response.status = RunStatus.cancelled
+                    return run_response
 
         # If we get here, all retries failed
         if last_exception is not None:
@@ -1936,8 +1891,6 @@ class Agent:
         if run_response is not None:
             # The run is continued from a provided run_response. This contains the updated tools.
             messages = run_response.messages or []
-            self.run_response = run_response
-            self.run_id = run_response.run_id
         elif run_id is not None:
             # The run is continued from a run_id. This requires the updated tools to be passed.
             if updated_tools is None:
@@ -1949,8 +1902,6 @@ class Agent:
                 raise RuntimeError(f"No runs found for run ID {run_id}")
             run_response.tools = updated_tools
             messages = run_response.messages or []
-            self.run_response = run_response
-            self.run_id = run_id
         else:
             raise ValueError("Either run_response or run_id must be provided.")
 
@@ -1974,17 +1925,6 @@ class Agent:
                 user_message = m
                 messages.remove(m)
                 break
-
-        # Set run_input
-        if user_message is not None:
-            if isinstance(user_message, str):
-                self.run_input = user_message
-            elif isinstance(user_message, Message):
-                self.run_input = user_message.to_dict()
-            else:
-                self.run_input = user_message
-        elif messages is not None:
-            self.run_input = [m.to_dict() if isinstance(m, Message) else m for m in messages]
 
         last_exception = None
         num_attempts = retries + 1
@@ -2038,9 +1978,10 @@ class Agent:
                         create_run_response_cancelled_event(run_response, "Operation cancelled by user")
                     )
                 else:
-                    return self.create_run_response(
-                        run_state=RunStatus.cancelled, content="Operation cancelled by user", run_response=run_response
-                    )
+                    run_response.content = "Operation cancelled by user"
+                    run_response.status = RunStatus.cancelled
+                    return run_response
+
         # If we get here, all retries failed
         if last_exception is not None:
             log_error(
@@ -3025,74 +2966,6 @@ class Agent:
                             ),
                             run_response,
                         )
-
-    def create_run_response(
-        self,
-        content: Optional[Any] = None,
-        *,
-        session_id: Optional[str] = None,
-        thinking: Optional[str] = None,
-        redacted_thinking: Optional[str] = None,
-        reasoning_content: Optional[str] = None,
-        run_state: RunStatus = RunStatus.running,
-        content_type: Optional[str] = None,
-        created_at: Optional[int] = None,
-        citations: Optional[Citations] = None,
-        run_response: Optional[RunResponse] = None,
-    ) -> RunResponse:
-        thinking_combined = (thinking or "") + (redacted_thinking or "")
-
-        tools = None
-        response_audio = None
-        audio = None
-        images = None
-        videos = None
-        model = None
-        messages = None
-        metadata = None
-
-        if run_response:
-            model = run_response.model
-            messages = run_response.messages
-            metadata = run_response.metadata
-            if not content:
-                content = run_response.content
-                content_type = run_response.content_type
-            audio = run_response.audio
-            images = run_response.images
-            videos = run_response.videos
-            response_audio = run_response.response_audio
-            citations = run_response.citations
-            tools = run_response.tools
-            reasoning_content = run_response.reasoning_content
-
-        rr = RunResponse(
-            run_id=self.run_id,
-            status=run_state,
-            session_id=session_id,
-            agent_id=self.agent_id,
-            agent_name=self.name,
-            content=content,
-            thinking=thinking_combined if thinking_combined else None,
-            reasoning_content=reasoning_content,
-            tools=tools,
-            audio=audio,
-            images=images,
-            videos=videos,
-            citations=citations,
-            response_audio=response_audio,
-        )
-        if content_type is not None:
-            rr.content_type = content_type
-        if created_at is not None:
-            rr.created_at = created_at
-        if messages is not None:
-            rr.messages = messages
-        if metadata is not None:
-            rr.metadata = metadata
-        if model is not None:
-            rr.model = model
-        return rr
 
     def _make_memories_and_summaries(
         self,
@@ -4712,9 +4585,9 @@ class Agent:
                 return str(context)
 
     def save_run_response_to_file(
-        self, message: Optional[Union[str, List, Dict, Message]] = None, session_id: Optional[str] = None, user_id: Optional[str] = None
+        self, run_response: RunResponse, message: Optional[Union[str, List, Dict, Message]] = None, session_id: Optional[str] = None, user_id: Optional[str] = None
     ) -> None:
-        if self.save_response_to_file is not None and self.run_response is not None:
+        if self.save_response_to_file is not None and run_response is not None:
             message_str = None
             if message is not None:
                 if isinstance(message, str):
@@ -4729,17 +4602,17 @@ class Agent:
                     session_id=session_id,
                     user_id=user_id,
                     message=message_str,
-                    run_id=self.run_id,
+                    run_id=run_response.run_id,
                 )
                 fn_path = Path(fn)
                 if not fn_path.parent.exists():
                     fn_path.parent.mkdir(parents=True, exist_ok=True)
-                if isinstance(self.run_response.content, str):
-                    fn_path.write_text(self.run_response.content)
+                if isinstance(run_response.content, str):
+                    fn_path.write_text(run_response.content)
                 else:
                     import json
 
-                    fn_path.write_text(json.dumps(self.run_response.content, indent=2))
+                    fn_path.write_text(json.dumps(run_response.content, indent=2))
             except Exception as e:
                 log_warning(f"Failed to save output to file: {e}")
 
