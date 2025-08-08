@@ -5,7 +5,7 @@ from agno.models.openai import OpenAIChat
 from agno.tools.decorator import tool
 
 
-def test_tool_call_requires_confirmation():
+def test_tool_call_requires_confirmation(shared_db):
     @tool(requires_confirmation=True)
     def get_the_weather(city: str):
         return f"It is currently 70 degrees and cloudy in {city}"
@@ -13,6 +13,7 @@ def test_tool_call_requires_confirmation():
     agent = Agent(
         model=OpenAIChat(id="gpt-4o-mini"),
         tools=[get_the_weather],
+        db=shared_db,
         markdown=True,
         telemetry=False,
     )
@@ -32,7 +33,7 @@ def test_tool_call_requires_confirmation():
     assert agent.run_response.tools[0].result == "It is currently 70 degrees and cloudy in Tokyo"
 
 
-def test_tool_call_requires_confirmation_continue_with_run_response():
+def test_tool_call_requires_confirmation_continue_with_run_response(shared_db):
     @tool(requires_confirmation=True)
     def get_the_weather(city: str):
         return f"It is currently 70 degrees and cloudy in {city}"
@@ -40,6 +41,7 @@ def test_tool_call_requires_confirmation_continue_with_run_response():
     agent = Agent(
         model=OpenAIChat(id="gpt-4o-mini"),
         tools=[get_the_weather],
+        db=shared_db,
         markdown=True,
         telemetry=False,
     )
@@ -59,7 +61,7 @@ def test_tool_call_requires_confirmation_continue_with_run_response():
     assert response.tools[0].result == "It is currently 70 degrees and cloudy in Tokyo"
 
 
-def test_tool_call_requires_confirmation_continue_with_run_id(shared_db, memory):
+def test_tool_call_requires_confirmation_continue_with_run_id(shared_db):
     @tool(requires_confirmation=True)
     def get_the_weather(city: str):
         return f"It is currently 70 degrees and cloudy in {city}"
@@ -68,8 +70,7 @@ def test_tool_call_requires_confirmation_continue_with_run_id(shared_db, memory)
     agent = Agent(
         model=OpenAIChat(id="gpt-4o-mini"),
         tools=[get_the_weather],
-        storage=shared_db,
-        memory=memory,
+        db=shared_db,
         telemetry=False,
     )
 
@@ -87,8 +88,7 @@ def test_tool_call_requires_confirmation_continue_with_run_id(shared_db, memory)
     agent = Agent(
         model=OpenAIChat(id="gpt-4o-mini"),
         tools=[get_the_weather],
-        storage=shared_db,
-        memory=memory,
+        db=shared_db,
         telemetry=False,
     )
 
@@ -97,7 +97,7 @@ def test_tool_call_requires_confirmation_continue_with_run_id(shared_db, memory)
     assert response.tools[0].result == "It is currently 70 degrees and cloudy in Tokyo"
 
 
-def test_tool_call_requires_confirmation_continue_with_run_id_stream(shared_db, memory):
+def test_tool_call_requires_confirmation_continue_with_run_id_stream(shared_db):
     @tool(requires_confirmation=True)
     def get_the_weather(city: str):
         return f"It is currently 70 degrees and cloudy in {city}"
@@ -106,8 +106,7 @@ def test_tool_call_requires_confirmation_continue_with_run_id_stream(shared_db, 
     agent = Agent(
         model=OpenAIChat(id="gpt-4o-mini"),
         tools=[get_the_weather],
-        storage=shared_db,
-        memory=memory,
+        db=shared_db,
         telemetry=False,
     )
 
@@ -128,8 +127,7 @@ def test_tool_call_requires_confirmation_continue_with_run_id_stream(shared_db, 
     agent = Agent(
         model=OpenAIChat(id="gpt-4o-mini"),
         tools=[get_the_weather],
-        storage=shared_db,
-        memory=memory,
+        db=shared_db,
         telemetry=False,
     )
 
@@ -145,7 +143,7 @@ def test_tool_call_requires_confirmation_continue_with_run_id_stream(shared_db, 
 
 @pytest.mark.asyncio
 @pytest.mark.skip(reason="Async makes this test flaky")
-async def test_tool_call_requires_confirmation_continue_with_run_id_async(shared_db, memory):
+async def test_tool_call_requires_confirmation_continue_with_run_id_async(shared_db):
     @tool(requires_confirmation=True)
     def get_the_weather(city: str):
         return f"It is currently 70 degrees and cloudy in {city}"
@@ -154,8 +152,7 @@ async def test_tool_call_requires_confirmation_continue_with_run_id_async(shared
     agent = Agent(
         model=OpenAIChat(id="gpt-4o-mini"),
         tools=[get_the_weather],
-        storage=shared_db,
-        memory=memory,
+        db=shared_db,
         instructions="When you have confirmation, then just use the tool",
         telemetry=False,
     )
@@ -175,8 +172,7 @@ async def test_tool_call_requires_confirmation_continue_with_run_id_async(shared
     agent = Agent(
         model=OpenAIChat(id="gpt-4o-mini"),
         tools=[get_the_weather],
-        storage=shared_db,
-        memory=memory,
+        db=shared_db,
         telemetry=False,
     )
 
@@ -185,7 +181,7 @@ async def test_tool_call_requires_confirmation_continue_with_run_id_async(shared
     assert response.tools[0].result == "It is currently 70 degrees and cloudy in Tokyo"
 
 
-def test_tool_call_requires_confirmation_memory_footprint():
+def test_tool_call_requires_confirmation_memory_footprint(shared_db):
     @tool(requires_confirmation=True)
     def get_the_weather(city: str):
         return f"It is currently 70 degrees and cloudy in {city}"
@@ -193,6 +189,7 @@ def test_tool_call_requires_confirmation_memory_footprint():
     agent = Agent(
         model=OpenAIChat(id="gpt-4o-mini"),
         tools=[get_the_weather],
+        db=shared_db,
         markdown=True,
         telemetry=False,
     )
@@ -221,7 +218,7 @@ def test_tool_call_requires_confirmation_memory_footprint():
     )
 
 
-def test_tool_call_requires_confirmation_stream():
+def test_tool_call_requires_confirmation_stream(shared_db):
     @tool(requires_confirmation=True)
     def get_the_weather(city: str):
         return f"It is currently 70 degrees and cloudy in {city}"
@@ -229,6 +226,7 @@ def test_tool_call_requires_confirmation_stream():
     agent = Agent(
         model=OpenAIChat(id="gpt-4o-mini"),
         tools=[get_the_weather],
+        db=shared_db,
         markdown=True,
         telemetry=False,
     )
@@ -253,7 +251,7 @@ def test_tool_call_requires_confirmation_stream():
 
 
 @pytest.mark.asyncio
-async def test_tool_call_requires_confirmation_async():
+async def test_tool_call_requires_confirmation_async(shared_db):
     @tool(requires_confirmation=True)
     async def get_the_weather(city: str):
         return f"It is currently 70 degrees and cloudy in {city}"
@@ -261,6 +259,7 @@ async def test_tool_call_requires_confirmation_async():
     agent = Agent(
         model=OpenAIChat(id="gpt-4o-mini"),
         tools=[get_the_weather],
+        db=shared_db,
         markdown=True,
         telemetry=False,
     )
@@ -281,7 +280,7 @@ async def test_tool_call_requires_confirmation_async():
 
 @pytest.mark.asyncio
 @pytest.mark.skip(reason="Async makes this test flaky")
-async def test_tool_call_requires_confirmation_stream_async():
+async def test_tool_call_requires_confirmation_stream_async(shared_db):
     @tool(requires_confirmation=True)
     async def get_the_weather(city: str):
         return f"It is currently 70 degrees and cloudy in {city}"
@@ -289,6 +288,7 @@ async def test_tool_call_requires_confirmation_stream_async():
     agent = Agent(
         model=OpenAIChat(id="gpt-4o-mini"),
         tools=[get_the_weather],
+        db=shared_db,
         markdown=True,
         telemetry=False,
     )
@@ -314,7 +314,7 @@ async def test_tool_call_requires_confirmation_stream_async():
     assert found_confirmation is False, "Some tools still require confirmation"
 
 
-def test_tool_call_multiple_requires_confirmation():
+def test_tool_call_multiple_requires_confirmation(shared_db):
     @tool(requires_confirmation=True)
     def get_the_weather(city: str):
         return f"It is currently 70 degrees and cloudy in {city}"
@@ -325,6 +325,7 @@ def test_tool_call_multiple_requires_confirmation():
     agent = Agent(
         model=OpenAIChat(id="gpt-4o-mini"),
         tools=[get_the_weather, get_activities],
+        db=shared_db,
         markdown=True,
         telemetry=False,
     )

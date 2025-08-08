@@ -3665,7 +3665,7 @@ class Agent:
         from time import time
 
         from agno.db.base import SessionType
-
+        
         # Returning cached session if we have one
         if self._agent_session is not None and self._agent_session.session_id == session_id:
             return self._agent_session
@@ -3727,7 +3727,6 @@ class Agent:
         Returns:
             Optional[AgentSession]: The saved AgentSession or None if not saved.
         """
-
         # If the agent is a member of a team, do not save the session to the database
         if self.db is not None and self.team_id is None and self.workflow_id is None:
             session.session_data["session_state"].pop("current_session_id", None)
