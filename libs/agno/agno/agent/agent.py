@@ -1518,16 +1518,14 @@ class Agent:
         if not run_response and not run_id:
             raise ValueError("Either run_response or run_id must be provided.")
         
-        
         if not run_response and (run_id is not None and (session_id is None and self.session_id is None)):
             raise ValueError("Session ID is required to continue a run from a run_id.")
         
         session_id = run_response.session_id if run_response else session_id
-
+        
         session_id, user_id, session_state = self._initialize_session(
             session_id=session_id, user_id=user_id
         )
-
         # Initialize the Agent
         self.initialize_agent(debug_mode=debug_mode)
 
@@ -1579,8 +1577,6 @@ class Agent:
             if updated_tools is None:
                 raise ValueError("Updated tools are required to continue a run from a run_id.")
             
-            print("HERE", agent_session)
-
             runs = agent_session.runs
             run_response = next((r for r in runs if r.run_id == run_id), None)  # type: ignore
             if run_response is None:
@@ -2261,6 +2257,7 @@ class Agent:
             ),
             run_response,
         )
+        
 
         # Save session to storage
         self.save_session(session=session)
@@ -3685,10 +3682,10 @@ class Agent:
         agent_session = None
         if self.db is not None and self.team_id is None and self.workflow_id is None:
             log_debug(f"Reading AgentSession: {session_id}")
+
             agent_session = cast(
                 AgentSession, self.read_session(session_id=session_id, session_type=SessionType.AGENT)
             )
-
         if agent_session is None:
             # Creating new session if none found
             log_debug(f"Creating new AgentSession: {session_id}")
