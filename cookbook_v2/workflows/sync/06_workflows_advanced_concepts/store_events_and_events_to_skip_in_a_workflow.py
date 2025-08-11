@@ -6,7 +6,7 @@ from agno.run.response import (
     ToolCallCompletedEvent,
     ToolCallStartedEvent,
 )
-from agno.run.workflow import WorkflowRunEvent
+from agno.run.workflow import WorkflowRunEvent, WorkflowRunResponse
 from agno.tools.googlesearch import GoogleSearchTools
 from agno.tools.hackernews import HackerNewsTools
 from agno.workflow.parallel import Parallel
@@ -51,12 +51,12 @@ search_step = Step(
 )
 
 
-def print_stored_events(workflow, example_name):
+def print_stored_events(run_response: WorkflowRunResponse, example_name):
     """Helper function to print stored events in a nice format"""
     print(f"\n--- {example_name} - Stored Events ---")
-    if workflow.run_response and workflow.run_response.events:
-        print(f"Total stored events: {len(workflow.run_response.events)}")
-        for i, event in enumerate(workflow.run_response.events, 1):
+    if run_response.events:
+        print(f"Total stored events: {len(run_response.events)}")
+        for i, event in enumerate(run_response.events, 1):
             print(f"  {i}. {event.event}")
     else:
         print("No events stored")
@@ -92,14 +92,15 @@ for event in step_workflow.run(
         print(
             f"Event: {event.event if hasattr(event, 'event') else type(event).__name__}"
         )
+run_response = step_workflow.get_last_run_response()
 
 print("\nStep workflow completed!")
 print(
-    f"Total events stored: {len(step_workflow.run_response.events) if step_workflow.run_response and step_workflow.run_response.events else 0}"
+    f"Total events stored: {len(run_response.events) if run_response and run_response.events else 0}"
 )
 
 # Print stored events in a nice format
-print_stored_events(step_workflow, "Simple Step Workflow")
+print_stored_events(run_response, "Simple Step Workflow")
 
 # ------------------------------------------------------------------------------------------------ #
 # ------------------------------------------------------------------------------------------------ #
@@ -139,6 +140,7 @@ for event in parallel_workflow.run(
             f"Event: {event.event if hasattr(event, 'event') else type(event).__name__}"
         )
 
-print(f"Parallel workflow stored {len(parallel_workflow.run_response.events)} events")
-print_stored_events(parallel_workflow, "Parallel Workflow")
+run_response = parallel_workflow.get_last_run_response()
+print(f"Parallel workflow stored {len(run_response.events)} events")
+print_stored_events(run_response, "Parallel Workflow")
 print()

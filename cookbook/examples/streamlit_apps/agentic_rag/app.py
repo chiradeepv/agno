@@ -297,8 +297,8 @@ def main():
                 response = ""
                 try:
                     # Run the agent and stream the response
-                    run_response = agentic_rag_agent.run(question, stream=True)
-                    for _resp_chunk in run_response:
+                    run_response_iterator = agentic_rag_agent.run(question, stream=True)
+                    for _resp_chunk in run_response_iterator:
                         # Display tool calls if available
                         if hasattr(_resp_chunk, "tool") and _resp_chunk.tool:
                             display_tool_calls(tool_calls_container, [_resp_chunk.tool])
@@ -307,9 +307,9 @@ def main():
                         if _resp_chunk.content is not None:
                             response += _resp_chunk.content
                             resp_container.markdown(response)
-
+                    run_response = agentic_rag_agent.get_last_run_response()
                     add_message(
-                        "assistant", response, agentic_rag_agent.run_response.tools
+                        "assistant", response, run_response.tools
                     )
                 except Exception as e:
                     error_message = f"Sorry, I encountered an error: {str(e)}"

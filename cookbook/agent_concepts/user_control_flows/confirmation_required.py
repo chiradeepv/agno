@@ -60,9 +60,8 @@ agent = Agent(
     markdown=True,
 )
 
-agent.run("Fetch the top 2 hackernews stories.")
-run_response = agent.run_response
-if agent.is_paused:  # Or agent.run_response.is_paused
+run_response = agent.run("Fetch the top 2 hackernews stories.")
+if run_response.is_paused:
     for tool in run_response.tools_requiring_confirmation:
         # Ask for confirmation
         console.print(

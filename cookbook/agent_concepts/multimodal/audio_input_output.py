@@ -21,12 +21,12 @@ agent = Agent(
     markdown=True,
 )
 
-agent.run(
+run_response = agent.run(
     "What's in these recording?",
     audio=[Audio(content=wav_data, format="wav")],
 )
 
-if agent.run_response.response_audio is not None:
+if run_response.response_audio is not None:
     write_audio_to_file(
-        audio=agent.run_response.response_audio.content, filename="tmp/result.wav"
+        audio=run_response.response_audio.content, filename="tmp/result.wav"
     )

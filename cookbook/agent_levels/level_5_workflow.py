@@ -25,9 +25,10 @@ class CacheWorkflow(Workflow):
         logger.info(f"Cache miss for '{message}'")
         # Run the agent and yield the response
         yield from self.agent.run(message, stream=True)
+        run_response = self.agent.get_last_run_response()
 
         # Cache the output after response is yielded
-        self.session_state[message] = self.agent.run_response.content
+        self.session_state[message] = run_response.content
 
 
 if __name__ == "__main__":

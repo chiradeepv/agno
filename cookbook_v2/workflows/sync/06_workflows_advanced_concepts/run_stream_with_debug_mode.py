@@ -112,17 +112,13 @@ if __name__ == "__main__":
     print("=" * 60)
 
     if all_chunks:
-        # Use the workflow's run_response which should be the complete response
-        if hasattr(workflow, "run_response") and workflow.run_response:
-            pprint_run_response(workflow.run_response, markdown=True, show_time=True)
+        # Fallback: just print the last chunk content if it exists
+        final_chunk = all_chunks[-1]
+        if hasattr(final_chunk, "content") and final_chunk.content:
+            print("📝 Final Content:")
+            print(final_chunk.content)
         else:
-            # Fallback: just print the last chunk content if it exists
-            final_chunk = all_chunks[-1]
-            if hasattr(final_chunk, "content") and final_chunk.content:
-                print("📝 Final Content:")
-                print(final_chunk.content)
-            else:
-                print("❌ No final content found")
-                print(f"Last chunk type: {type(final_chunk).__name__}")
+            print("❌ No final content found")
+            print(f"Last chunk type: {type(final_chunk).__name__}")
     else:
         print("❌ No chunks received")

@@ -4,6 +4,7 @@ import requests
 from agno.agent import Agent
 from agno.media import Audio
 from agno.models.openai import OpenAIChat
+from agno.utils.pprint import pprint_run_response
 
 # Fetch the audio file and convert it to a base64 encoded string
 url = "https://openaiassets.blob.core.windows.net/$web/API/docs/audio/alloy.wav"
@@ -20,14 +21,15 @@ agent = Agent(
     markdown=True,
     debug_mode=True,
 )
-agent.print_response(
+run_response = agent.run(
     "What's in these recording?",
     audio=[Audio(content=wav_data, format="wav")],
 )
+pprint_run_response(run_response)
 # Showing input audio, output audio and total audio tokens metrics
-print(f"Input audio tokens: {agent.run_response.metrics['input_audio_tokens']}")
-print(f"Output audio tokens: {agent.run_response.metrics['output_audio_tokens']}")
-print(f"Audio tokens: {agent.run_response.metrics['audio_tokens']}")
+print(f"Input audio tokens: {run_response.metrics.input_audio_tokens}")
+print(f"Output audio tokens: {run_response.metrics.output_audio_tokens}")
+print(f"Audio tokens: {run_response.metrics.audio_tokens}")
 
 agent = Agent(
     model=OpenAIChat(id="o3-mini"),
@@ -35,16 +37,17 @@ agent = Agent(
     telemetry=False,
     debug_mode=True,
 )
-agent.print_response(
+run_response = agent.run(
     "Solve the trolley problem. Evaluate multiple ethical frameworks. Include an ASCII diagram of your solution.",
     stream=False,
 )
+pprint_run_response(run_response)
 # Showing reasoning tokens metrics
-print(f"Reasoning tokens: {agent.run_response.metrics['reasoning_tokens']}")
+print(f"Reasoning tokens: {run_response.metrics['reasoning_tokens']}")
 
 
 agent = Agent(model=OpenAIChat(id="gpt-4o-mini"), markdown=True, telemetry=False)
 agent.run("Share a 2 sentence horror story" * 150)
-agent.print_response("Share a 2 sentence horror story" * 150)
+run_response = agent.run("Share a 2 sentence horror story" * 150)
 # Showing cached tokens metrics
-print(f"Cached tokens: {agent.run_response.metrics['cached_tokens']}")
+print(f"Cached tokens: {run_response.metrics.cached_tokens}")

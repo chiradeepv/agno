@@ -407,10 +407,6 @@ class RunResponse:
         response_audio = data.pop("response_audio", None)
         response_audio = AudioResponse.model_validate(response_audio) if response_audio else None
 
-        # To make it backwards compatible
-        if "event" in data:
-            data.pop("event")
-
         return cls(
             messages=messages,
             tools=tools,

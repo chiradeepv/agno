@@ -56,6 +56,12 @@ class WorkflowSession:
         if self.updated_at is None:
             self.updated_at = current_time
 
+    def get_run(self, run_id: str) -> Optional[WorkflowRunResponse]:
+        for run in self.runs:
+            if run.run_id == run_id:
+                return run
+        return None
+
     def upsert_run(self, run: WorkflowRunResponse) -> None:
         """Add or update a workflow run (upsert behavior)"""
         if self.runs is None:

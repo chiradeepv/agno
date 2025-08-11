@@ -68,11 +68,11 @@ agent = Agent(
 run_response = agent.run(
     "Fetch 2 articles about the topic 'python'. You can choose which source to use, but only use one source."
 )
-while run_response.is_paused:  # Or agent.run_response.is_paused
-    for tool in agent.run_response.tools_requiring_confirmation:
+while run_response.is_paused:
+    for tool_exc in run_response.tools_requiring_confirmation:
         # Ask for confirmation
         console.print(
-            f"Tool name [bold blue]{tool.tool_name}({tool.tool_args})[/] requires confirmation."
+            f"Tool name [bold blue]{tool_exc.tool_name}({tool_exc.tool_args})[/] requires confirmation."
         )
         message = (
             Prompt.ask("Do you want to continue?", choices=["y", "n"], default="y")

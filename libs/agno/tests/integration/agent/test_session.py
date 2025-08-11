@@ -23,12 +23,12 @@ def test_agent_default_state(shared_db):
     chat_agent = chat_agent_factory(shared_db, session_id, session_state)
 
     response = chat_agent.run("Hello, how are you?")
-    
+
     assert response.run_id is not None
-    
+
     assert chat_agent.session_id == session_id
     assert chat_agent.session_state == session_state
-    
+
     session_from_storage = shared_db.get_session(session_id=session_id, session_type=SessionType.AGENT)
     assert session_from_storage is not None
     assert session_from_storage.session_id == session_id
@@ -41,9 +41,9 @@ def test_agent_set_session_name(shared_db):
     chat_agent = chat_agent_factory(shared_db, session_id)
 
     response = chat_agent.run("Hello, how are you?")
-    
+
     chat_agent.set_session_name(session_id=session_id, session_name="my_test_session")
-    
+
     session_from_storage = shared_db.get_session(session_id=session_id, session_type=SessionType.AGENT)
     assert session_from_storage is not None
     assert session_from_storage.session_id == session_id
@@ -52,7 +52,7 @@ def test_agent_set_session_name(shared_db):
 def test_agent_session_state_switch_session_id(shared_db):
     session_id_1 = "session_1"
     session_id_2 = "session_2"
-    
+
     chat_agent = chat_agent_factory(shared_db, session_id_1, session_state={"test_key": "test_value"})
 
     # First run with a session ID (reset should not happen)
@@ -122,18 +122,20 @@ def test_agent_with_state_on_agent_stream(shared_db):
         add_state_in_messages=True,
         markdown=True,
     )
-    for response in agent.run("Add oranges to my shopping list", stream=True):
+    for _ in agent.run("Add oranges to my shopping list", stream=True):
         pass
-    
+
     session_from_storage = shared_db.get_session(session_id=agent.session_id, session_type=SessionType.AGENT)
     assert session_from_storage.session_data["session_state"] == {"shopping_list": ["oranges"]}
-    
-    for response in agent.run(
+
+    for _ in agent.run(
         'Current shopping list: {shopping_list}. Other random json ```json { "properties": { "title": { "title": "a" } } }```', stream=True
     ):
         pass
+
+    run_response = agent.get_last_run_response()
     assert (
-        agent.run_response.messages[1].content
+        run_response.messages[1].content
         == 'Current shopping list: [\'oranges\']. Other random json ```json { "properties": { "title": { "title": "a" } } }```'
     )
 
@@ -155,14 +157,14 @@ def test_agent_with_state_on_run(shared_db):
         markdown=True,
     )
     agent.run("Add oranges to my shopping list", session_id="session_1", session_state={"shopping_list": []})
-    
+
     session_from_storage = shared_db.get_session(session_id="session_1", session_type=SessionType.AGENT)
     assert session_from_storage.session_data["session_state"] == {"shopping_list": ["oranges"]}
-    
+
     response = agent.run(
         'Current shopping list: {shopping_list}. Other random json ```json { "properties": { "title": { "title": "a" } } }```', session_id="session_1"
     )
-    
+
     assert (
         response.messages[1].content
         == 'Current shopping list: [\'oranges\']. Other random json ```json { "properties": { "title": { "title": "a" } } }```'
@@ -187,16 +189,18 @@ def test_agent_with_state_on_run_stream(shared_db):
     )
     for response in agent.run("Add oranges to my shopping list", session_id="session_1", session_state={"shopping_list": []}, stream=True):
         pass
-    
+
     session_from_storage = shared_db.get_session(session_id="session_1", session_type=SessionType.AGENT)
     assert session_from_storage.session_data["session_state"] == {"shopping_list": ["oranges"]}
-    
+
     for response in agent.run(
         'Current shopping list: {shopping_list}. Other random json ```json { "properties": { "title": { "title": "a" } } }```', session_id="session_1", stream=True
     ):
         pass
+    
+    run_response = agent.get_last_run_response(session_id="session_1")
     assert (
-        agent.run_response.messages[1].content
+        run_response.messages[1].content
         == 'Current shopping list: [\'oranges\']. Other random json ```json { "properties": { "title": { "title": "a" } } }```'
     )
 
@@ -218,14 +222,14 @@ async def test_agent_with_state_on_run_async(shared_db):
         markdown=True,
     )
     await agent.arun("Add oranges to my shopping list", session_id="session_1", session_state={"shopping_list": []})
-    
+
     session_from_storage = shared_db.get_session(session_id="session_1", session_type=SessionType.AGENT)
     assert session_from_storage.session_data["session_state"] == {"shopping_list": ["oranges"]}
-    
+
     response = await agent.arun(
         'Current shopping list: {shopping_list}. Other random json ```json { "properties": { "title": { "title": "a" } } }```', session_id="session_1"
     )
-    
+
     assert (
         response.messages[1].content
         == 'Current shopping list: [\'oranges\']. Other random json ```json { "properties": { "title": { "title": "a" } } }```'
@@ -250,15 +254,17 @@ async def test_agent_with_state_on_run_stream_async(shared_db):
     )
     async for response in agent.arun("Add oranges to my shopping list", session_id="session_1", session_state={"shopping_list": []}, stream=True):
         pass
-    
+
     session_from_storage = shared_db.get_session(session_id="session_1", session_type=SessionType.AGENT)
     assert session_from_storage.session_data["session_state"] == {"shopping_list": ["oranges"]}
-    
+
     async for response in agent.arun(
         'Current shopping list: {shopping_list}. Other random json ```json { "properties": { "title": { "title": "a" } } }```', session_id="session_1", stream=True
     ):
         pass
+    
+    run_response = agent.get_last_run_response(session_id="session_1")
     assert (
-        agent.run_response.messages[1].content
+        run_response.messages[1].content
         == 'Current shopping list: [\'oranges\']. Other random json ```json { "properties": { "title": { "title": "a" } } }```'
     )

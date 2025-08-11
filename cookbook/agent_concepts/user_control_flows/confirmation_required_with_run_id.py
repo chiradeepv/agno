@@ -60,9 +60,9 @@ agent = Agent(
     markdown=True,
 )
 
-agent.run("Fetch the top 2 hackernews stories.")
-if agent.is_paused:  # Or agent.run_response.is_paused
-    for tool in agent.run_response.tools_requiring_confirmation:
+run_response = agent.run("Fetch the top 2 hackernews stories.")
+if run_response.is_paused:
+    for tool in run_response.tools_requiring_confirmation:
         # Ask for confirmation
         console.print(
             f"Tool name [bold blue]{tool.tool_name}({tool.tool_args})[/] requires confirmation."
@@ -79,10 +79,10 @@ if agent.is_paused:  # Or agent.run_response.is_paused
             # We update the tools in place
             tool.confirmed = True
 
-updated_tools = agent.run_response.tools
+updated_tools = run_response.tools
 
 run_response = agent.continue_run(
-    run_id=agent.run_response.run_id, updated_tools=updated_tools
+    run_id=run_response.run_id, updated_tools=updated_tools
 )
 
 pprint.pprint_run_response(run_response)

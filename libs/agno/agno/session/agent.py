@@ -106,6 +106,12 @@ class AgentSession:
             self.runs.append(run)
 
         log_debug("Added RunResponse to Agent Session")
+        
+    def get_run(self, run_id: str) -> Optional[RunResponse]:
+        for run in self.runs:
+            if run.run_id == run_id:
+                return run
+        return None
 
     def get_messages_from_last_n_runs(
         self,

@@ -55,18 +55,18 @@ def custom_content_planning_function(
     # Create intelligent planning prompt
     planning_prompt = f"""
         STRATEGIC CONTENT PLANNING REQUEST:
-        
+
         Core Topic: {message}
-        
+
         Research Results: {previous_step_content[:500] if previous_step_content else "No research results"}
-        
+
         Planning Requirements:
         1. Create a comprehensive content strategy based on the research
         2. Leverage the research findings effectively
         3. Identify content formats and channels
         4. Provide timeline and priority recommendations
         5. Include engagement and distribution strategies
-        
+
         Please create a detailed, actionable content plan.
     """
 
@@ -77,7 +77,7 @@ def custom_content_planning_function(
         for event in response_iterator:
             yield event
 
-        response = content_planner.run_response
+        response = content_planner.get_last_run_response()
 
         enhanced_content = f"""
             ## Strategic Content Plan

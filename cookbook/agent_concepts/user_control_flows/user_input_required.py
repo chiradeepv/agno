@@ -32,9 +32,9 @@ agent = Agent(
     markdown=True,
 )
 
-agent.run("Send an email with the subject 'Hello' and the body 'Hello, world!'")
-if agent.is_paused:  # Or agent.run_response.is_paused
-    for tool in agent.run_response.tools_requiring_user_input:
+run_response = agent.run("Send an email with the subject 'Hello' and the body 'Hello, world!'")
+if run_response.is_paused:
+    for tool in run_response.tools_requiring_user_input:
         input_schema: List[UserInputField] = tool.user_input_schema
 
         for field in input_schema:
@@ -59,7 +59,7 @@ if agent.is_paused:  # Or agent.run_response.is_paused
 
     run_response = (
         agent.continue_run()
-    )  # or agent.continue_run(run_response=agent.run_response)
+    )  # or agent.continue_run(run_response=run_response)
     pprint.pprint_run_response(run_response)
 
 # Or for simple debug flow

@@ -3,6 +3,8 @@ from agno.memory import Memory, SessionSummarizer
 from agno.models.openai import OpenAIChat
 from rich.pretty import pprint
 
+from agno.utils.pprint import pprint_run_response
+
 # You can also override the entire `system_message` for the session summarizer if you wanted
 session_summarizer = SessionSummarizer(
     model=OpenAIChat(id="gpt-4o-mini"),
@@ -47,10 +49,8 @@ pprint(
     ]
 )
 
-agent.print_response("What have we been talking about?", stream=True)
-
-# -*- Print the messages used for the last response (only the last 3 is kept in history)
-pprint([m.model_dump(include={"role", "content"}) for m in agent.run_response.messages])
+run_response = agent.run("What have we been talking about?", stream=True)
+pprint_run_response(run_response)
 
 # We can get the session summary from memory as well
 session_summary = agent.get_session_summary()

@@ -121,7 +121,8 @@ def test_tool_call_requires_confirmation_continue_with_run_id_stream(shared_db):
             response.tools[0].confirmed = True
             updated_tools = response.tools
 
-    assert agent.run_response.is_paused
+    run_response = agent.get_last_run_response(session_id=session_id)
+    assert run_response.is_paused
 
     # Create a completely new agent instance
     agent = Agent(
@@ -132,13 +133,13 @@ def test_tool_call_requires_confirmation_continue_with_run_id_stream(shared_db):
     )
 
     response = agent.continue_run(
-        run_id=response.run_id, updated_tools=updated_tools, session_id=session_id, stream=True
+        run_id=run_response.run_id, updated_tools=updated_tools, session_id=session_id, stream=True
     )
     for response in response:
         if response.is_paused:
             assert False, "The run should not be paused"
-
-    assert agent.run_response.tools[0].result == "It is currently 70 degrees and cloudy in Tokyo"
+    run_response = agent.get_last_run_response(session_id=session_id)
+    assert run_response.tools[0].result == "It is currently 70 degrees and cloudy in Tokyo"
 
 
 @pytest.mark.asyncio
@@ -241,9 +242,10 @@ def test_tool_call_requires_confirmation_stream(shared_db):
             response.tools[0].confirmed = True
             found_confirmation = True
     assert found_confirmation, "No tools were found to require confirmation"
+    run_response = agent.get_last_run_response()
 
     found_confirmation = False
-    for response in agent.continue_run(agent.run_response, stream=True):
+    for response in agent.continue_run(run_response, stream=True):
         if response.is_paused:
             found_confirmation = True
     assert found_confirmation is False, "Some tools still require confirmation"
@@ -306,8 +308,10 @@ async def test_tool_call_requires_confirmation_stream_async(shared_db):
             found_confirmation = True
     assert found_confirmation, "No tools were found to require confirmation"
 
+    run_response = agent.get_last_run_response()
+
     found_confirmation = False
-    async for response in agent.acontinue_run(agent.run_response, stream=True):
+    async for response in agent.acontinue_run(run_response, stream=True):
         if response.is_paused:
             found_confirmation = True
     assert found_confirmation is False, "Some tools still require confirmation"

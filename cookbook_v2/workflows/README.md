@@ -92,7 +92,7 @@ workflow = Workflow(
 workflow.print_response("Analyze the competitive landscape for fintech startups", markdown=True)
 ```
 
-**See Examples**: 
+**See Examples**:
 - [`sequence_of_functions_and_agents.py`](/cookbook/workflows_2/sync/01_basic_workflows/sequence_of_functions_and_agents.py)
 - [`sequence_of_functions_and_agents_stream.py`](/cookbook/workflows_2/sync/01_basic_workflows/sequence_of_functions_and_agents_stream.py)
 
@@ -141,7 +141,7 @@ workflow = Workflow(
     name="Content Creation Pipeline",
     steps=[
         Step(name="Research Phase", team=researcher),
-        Step(name="Analysis Phase", executor=custom_function), 
+        Step(name="Analysis Phase", executor=custom_function),
         Step(name="Writing Phase", agent=writer),
     ]
 )
@@ -152,7 +152,7 @@ workflow.print_response(
 )
 ```
 
-**See Examples**: 
+**See Examples**:
 - [`sequence_of_steps.py`](cookbook/workflows_2/sync/01_basic_workflows/sequence_of_steps.py)
 - [`sequence_of_steps_stream.py`](cookbook/workflows_2/sync/01_basic_workflows/sequence_of_steps_stream.py)
 - [`step_with_function.py`](/cookbook/workflows_2/sync/01_basic_workflows/step_with_function.py)
@@ -185,7 +185,7 @@ workflow = Workflow(
 workflow.print_response("Write about the latest AI developments", markdown=True)
 ```
 
-**See Examples**: 
+**See Examples**:
 - [`parallel_steps_workflow.py`](/cookbook/workflows_2/sync/04_workflows_parallel_execution/parallel_steps_workflow.py)
 - [`parallel_steps_workflow_stream.py`](/cookbook/workflows_2/sync/04_workflows_parallel_execution/parallel_steps_workflow_stream.py)
 
@@ -219,7 +219,7 @@ workflow = Workflow(
 workflow.print_response("Comprehensive analysis of AI and machine learning trends", markdown=True)
 ```
 
-**See Examples**: 
+**See Examples**:
 - [`condition_with_list_of_steps.py`](/cookbook/workflows_2/sync/02_workflows_conditional_execution/condition_with_list_of_steps.py)
 - [`condition_steps_workflow_stream.py`](/cookbook/workflows_2/sync/02_workflows_conditional_execution/condition_steps_workflow_stream.py)
 
@@ -254,7 +254,7 @@ workflow = Workflow(
 workflow.print_response("Research the impact of renewable energy on global markets", markdown=True)
 ```
 
-**See Examples**: 
+**See Examples**:
 - [`loop_steps_workflow.py`](/cookbook/workflows_2/sync/03_workflows_loop_execution/loop_steps_workflow.py)
 - [`loop_steps_workflow_stream.py`](/cookbook/workflows_2/sync/03_workflows_loop_execution/loop_steps_workflow_stream.py)
 
@@ -271,7 +271,7 @@ from agno.workflow import Router, Step, Workflow
 
 def route_by_topic(step_input) -> List[Step]:
     topic = step_input.message.lower()
-    
+
     if "tech" in topic:
         return [Step(name="Tech Research", agent=tech_expert)]
     elif "business" in topic:
@@ -294,7 +294,7 @@ workflow = Workflow(
 workflow.print_response("Latest developments in artificial intelligence and machine learning", markdown=True)
 ```
 
-**See Examples**: 
+**See Examples**:
 - [`router_steps_workflow.py`](/cookbook/workflows_2/sync/05_workflows_conditional_branching/router_steps_workflow.py)
 - [`router_steps_workflow_stream.py`](/cookbook/workflows_2/sync/05_workflows_conditional_branching/router_steps_workflow_stream.py)
 
@@ -313,7 +313,7 @@ article_creation_sequence = Steps(
     description="Complete article creation workflow from research to final edit",
     steps=[
         Step(name="research", agent=researcher),
-        Step(name="writing", agent=writer), 
+        Step(name="writing", agent=writer),
         Step(name="editing", agent=editor),
     ],
 )
@@ -344,7 +344,7 @@ image_sequence = Steps(
 )
 
 video_sequence = Steps(
-    name="video_generation", 
+    name="video_generation",
     description="Complete video production and analysis workflow",
     steps=[
         Step(name="generate_video", agent=video_generator),
@@ -356,9 +356,9 @@ def media_sequence_selector(step_input) -> List[Step]:
     """Route to appropriate media generation pipeline"""
     if not step_input.message:
         return [image_sequence]
-        
+
     message_lower = step_input.message.lower()
-    
+
     if "video" in message_lower:
         return [video_sequence]
     elif "image" in message_lower:
@@ -402,34 +402,34 @@ from agno.workflow import Condition, Loop, Parallel, Router, Step, Workflow
 def research_post_processor(step_input) -> StepOutput:
     """Post-process and consolidate research data from parallel conditions"""
     research_data = step_input.previous_step_content or ""
-    
+
     try:
         # Analyze research quality and completeness
         word_count = len(research_data.split())
-        has_tech_content = any(keyword in research_data.lower() 
+        has_tech_content = any(keyword in research_data.lower()
                               for keyword in ["technology", "ai", "software", "tech"])
-        has_business_content = any(keyword in research_data.lower() 
+        has_business_content = any(keyword in research_data.lower()
                                   for keyword in ["market", "business", "revenue", "strategy"])
-        
+
         # Create enhanced research summary
         enhanced_summary = f"""
             ## Research Analysis Report
-            
+
             **Data Quality:** {"✓ High-quality" if word_count > 200 else "⚠ Limited data"}
-            
+
             **Content Coverage:**
             - Technical Analysis: {"✓ Completed" if has_tech_content else "✗ Not available"}
             - Business Analysis: {"✓ Completed" if has_business_content else "✗ Not available"}
-            
+
             **Research Findings:**
             {research_data}
         """.strip()
-        
+
         return StepOutput(
             content=enhanced_summary,
             success=True,
         )
-        
+
     except Exception as e:
         return StepOutput(
             content=f"Research post-processing failed: {str(e)}",
@@ -448,7 +448,7 @@ workflow = Workflow(
                 steps=[Step(name="Tech Research", agent=tech_researcher)]
             ),
             Condition(
-                name="Business Check", 
+                name="Business Check",
                 evaluator=is_business_topic,
                 steps=[
                     Loop(
@@ -478,11 +478,11 @@ workflow = Workflow(
 workflow.print_response("Create a comprehensive analysis of sustainable technology trends and their business impact for 2024", markdown=True)
 ```
 
-**See Examples**: 
+**See Examples**:
 - [`condition_and_parallel_steps_stream.py`](/cookbook/workflows_2/sync/02_workflows_conditional_execution/condition_and_parallel_steps_stream.py)
 - [`loop_with_parallel_steps_stream.py`](/cookbook/workflows_2/sync/03_workflows_loop_execution/loop_with_parallel_steps_stream.py)
 - [`router_with_loop_steps.py`](/cookbook/workflows_2/sync/05_workflows_conditional_branching/router_with_loop_steps.py)
- 
+
 ## Advanced Features
 
 ### Early Stopping
@@ -498,7 +498,7 @@ from agno.workflow.types import StepInput, StepOutput
 def security_gate(step_input: StepInput) -> StepOutput:
     """Security gate that stops deployment if vulnerabilities found"""
     security_result = step_input.previous_step_content or ""
-    
+
     if "VULNERABLE" in security_result.upper():
         return StepOutput(
             content="🚨 SECURITY ALERT: Critical vulnerabilities detected. Deployment blocked.",
@@ -525,7 +525,7 @@ workflow = Workflow(
 workflow.print_response("Scan this code: exec(input('Enter command: '))")
 ```
 
-**See Examples**: 
+**See Examples**:
 - [`early_stop_workflow_with_agents.py`](/cookbook/workflows_2/sync/06_workflows_advanced_concepts/early_stop_workflow_with_agents.py)
 - [`early_stop_workflow_with_loop.py`](/cookbook/workflows_2/sync/06_workflows_advanced_concepts/early_stop_workflow_with_loop.py)
 - [`early_stop_workflow_with_router.py`](/cookbook/workflows_2/sync/06_workflows_advanced_concepts/early_stop_workflow_with_router.py)
@@ -561,13 +561,13 @@ def create_comprehensive_report(step_input: StepInput) -> StepOutput:
         ## HackerNews Insights
         {hackernews_data[:500]}...
 
-        ## Web Research Findings  
+        ## Web Research Findings
         {web_data[:500]}...
     """
 
     return StepOutput(
-        step_name="comprehensive_report", 
-        content=report.strip(), 
+        step_name="comprehensive_report",
+        content=report.strip(),
         success=True
     )
 
@@ -598,7 +598,7 @@ Workflows can automatically store all events for later analysis, debugging, or a
 - **`store_events=True`**: Automatically stores all workflow events in the database
 - **`events_to_skip=[]`**: Filter out specific event types to reduce storage and noise
 - **Persistent Storage**: Events are stored in your configured storage backend (SQLite, PostgreSQL, etc.)
-- **Post-Execution Access**: Access all stored events via `workflow.run_response.events`
+- **Post-Execution Access**: Access all stored events via `run_response.events`
 
 **Available Events to Skip:**
 ```python
@@ -639,7 +639,7 @@ debug_workflow = Workflow(
 
 # store only important events
 production_workflow = Workflow(
-    name="Production Workflow", 
+    name="Production Workflow",
     store_events=True,
     events_to_skip=[
         WorkflowRunEvent.step_started,
@@ -652,7 +652,7 @@ production_workflow = Workflow(
 # No event storage
 fast_workflow = Workflow(
     name="Fast Workflow",
-    store_events=False,  
+    store_events=False,
     steps=[...]
 )
 ```
@@ -676,46 +676,46 @@ from agno.workflow.types import StepInput, StepOutput
 
 def custom_content_planning_function(step_input: StepInput) -> StepOutput:
     """Custom function that uses additional_data for enhanced context"""
-    
+
     # Access the main workflow message
     message = step_input.message
     previous_content = step_input.previous_step_content
-    
+
     # Access additional_data that was passed with the workflow
     additional_data = step_input.additional_data or {}
     user_email = additional_data.get("user_email", "No email provided")
     priority = additional_data.get("priority", "normal")
     client_type = additional_data.get("client_type", "standard")
-    
+
     # Create enhanced planning prompt with context
     planning_prompt = f"""
         STRATEGIC CONTENT PLANNING REQUEST:
-        
+
         Core Topic: {message}
         Research Results: {previous_content[:500] if previous_content else "No research results"}
-        
+
         Additional Context:
         - Client Type: {client_type}
         - Priority Level: {priority}
         - Contact Email: {user_email}
-        
+
         {"🚨 HIGH PRIORITY - Expedited delivery required" if priority == "high" else "📝 Standard delivery timeline"}
-        
+
         Please create a detailed, actionable content plan.
     """
-    
+
     response = content_planner.run(planning_prompt)
-    
+
     enhanced_content = f"""
         ## Strategic Content Plan
-        
+
         **Planning Topic:** {message}
         **Client Details:** {client_type} | {priority.upper()} priority | {user_email}
-        
+
         **Content Strategy:**
         {response.content}
     """
-    
+
     return StepOutput(content=enhanced_content, response=response)
 
 # Define workflow with steps
@@ -752,7 +752,7 @@ This adds support for having streaming event-based information for your workflow
 from agno.workflow import Workflow
 from agno.run.workflow import (
     WorkflowStartedEvent,
-    StepStartedEvent, 
+    StepStartedEvent,
     StepCompletedEvent,
     WorkflowCompletedEvent
 )
@@ -768,18 +768,18 @@ for event in workflow.run(message="AI trends", stream=True, stream_intermediate_
     if isinstance(event, WorkflowStartedEvent):
         print(f"🚀 Workflow Started: {event.workflow_name}")
         print(f"   Run ID: {event.run_id}")
-        
+
     elif isinstance(event, StepStartedEvent):
         print(f"📍 Step Started: {event.step_name}")
         print(f"   Step Index: {event.step_index}")
-        
+
     elif isinstance(event, StepCompletedEvent):
         print(f"✅ Step Completed: {event.step_name}")
         # Show content preview instead of full content
         if hasattr(event, 'content') and event.content:
             preview = str(event.content)[:100] + "..." if len(str(event.content)) > 100 else str(event.content)
             print(f"   Preview: {preview}")
-            
+
     elif isinstance(event, WorkflowCompletedEvent):
         print(f"🎉 Workflow Completed: {event.workflow_name}")
         print(f"   Total Steps: {len(event.step_results)}")
@@ -825,7 +825,7 @@ workflow = Workflow(
 workflow.print_response("Add apples and oranges to my shopping list")
 ```
 
-**See**: 
+**See**:
 - [`shared_session_state_with_agent.py`](/cookbook/workflows_2/sync/06_workflows_advanced_concepts/shared_session_state_with_agent.py)
 - [`shared_session_state_with_team.py`](/cookbook/workflows_2/sync/06_workflows_advanced_concepts/shared_session_state_with_team.py)
 

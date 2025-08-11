@@ -16,10 +16,10 @@ run_stream: Iterator[RunResponse] = agent.run(
     "What is the stock price of NVDA", stream=True
 )
 pprint_run_response(run_stream, markdown=True)
-
+run_response = agent.get_last_run_response()
 # Print metrics per message
-if agent.run_response.messages:
-    for message in agent.run_response.messages:
+if run_response.messages:
+    for message in run_response.messages:
         if message.role == "assistant":
             if message.content:
                 print(f"Message: {message.content}")
@@ -31,7 +31,7 @@ if agent.run_response.messages:
 
 # Print the metrics
 print("---" * 5, "Aggregated Metrics", "---" * 5)
-pprint(agent.run_response.metrics)
+pprint(run_response.metrics)
 # Print the session metrics
 print("---" * 5, "Session Metrics", "---" * 5)
-pprint(agent.session_metrics)
+pprint(session_metrics)

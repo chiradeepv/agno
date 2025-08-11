@@ -64,9 +64,9 @@ agent = Agent(
 
 agent.run("What can you do?")
 
-agent.run("Fetch the top 2 hackernews stories.")
-if agent.is_paused:  # Or agent.run_response.is_paused
-    for tool in agent.run_response.tools_requiring_confirmation:
+run_response = agent.run("Fetch the top 2 hackernews stories.")
+if run_response.is_paused:
+    for tool in run_response.tools_requiring_confirmation:
         # Ask for confirmation
         console.print(
             f"Tool name [bold blue]{tool.tool_name}({tool.tool_args})[/] requires confirmation."

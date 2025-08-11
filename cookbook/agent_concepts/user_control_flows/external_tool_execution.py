@@ -39,7 +39,7 @@ agent = Agent(
 )
 
 run_response = agent.run("What files do I have in my current directory?")
-if run_response.is_paused:  # Or agent.run_response.is_paused
+if run_response.is_paused:
     for tool in run_response.tools_awaiting_external_execution:
         if tool.tool_name == execute_shell_command.name:
             print(f"Executing {tool.tool_name} with args {tool.tool_args} externally")

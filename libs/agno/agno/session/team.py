@@ -85,6 +85,12 @@ class TeamSession:
             runs=serialized_runs,
             summary=data.get("summary"),
         )
+        
+    def get_run(self, run_id: str) -> Optional[RunResponse]:
+        for run in self.runs:
+            if run.run_id == run_id:
+                return run
+        return None
 
     def upsert_run(self, run: Union[TeamRunResponse, RunResponse]):
         """Adds a RunResponse, together with some calculated data, to the runs list."""

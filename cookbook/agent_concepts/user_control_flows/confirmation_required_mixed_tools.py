@@ -69,7 +69,7 @@ agent = Agent(
 run_response = agent.run(
     "Fetch the top 2 hackernews stories and email them to john@doe.com."
 )
-if run_response.is_paused:  # Or agent.run_response.is_paused
+if run_response.is_paused:
     for tool in run_response.tools:
         if tool.requires_confirmation:
             # Ask for confirmation

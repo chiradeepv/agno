@@ -245,20 +245,20 @@ def test_intermediate_steps_with_user_confirmation(shared_db):
         if run_response_delta.event not in events:
             events[run_response_delta.event] = []
         events[run_response_delta.event].append(run_response_delta)
-
+    run_response = agent.get_last_run_response()
     assert events.keys() == {RunEvent.run_started, RunEvent.run_paused}
 
     assert len(events[RunEvent.run_started]) == 1
     assert len(events[RunEvent.run_paused]) == 1
     assert events[RunEvent.run_paused][0].tools[0].requires_confirmation is True
 
-    assert agent.is_paused
+    assert run_response.is_paused
 
-    assert agent.run_response.tools[0].requires_confirmation
+    assert run_response.tools[0].requires_confirmation
 
     # Mark the tool as confirmed
-    updated_tools = agent.run_response.tools
-    run_id = agent.run_response.run_id
+    updated_tools = run_response.tools
+    run_id = run_response.run_id
     updated_tools[0].confirmed = True
 
     # Check stored events
@@ -279,7 +279,8 @@ def test_intermediate_steps_with_user_confirmation(shared_db):
             events[run_response_delta.event] = []
         events[run_response_delta.event].append(run_response_delta)
 
-    assert agent.run_response.tools[0].result == "It is currently 70 degrees and cloudy in Tokyo"
+    run_response = agent.get_last_run_response()
+    assert run_response.tools[0].result == "It is currently 70 degrees and cloudy in Tokyo"
 
     assert events.keys() == {
         RunEvent.run_continued,
@@ -298,7 +299,7 @@ def test_intermediate_steps_with_user_confirmation(shared_db):
     assert len(events[RunEvent.run_response_content]) > 1
     assert len(events[RunEvent.run_completed]) == 1
 
-    assert agent.run_response.is_paused is False
+    assert run_response.is_paused is False
 
     # Check stored events
     stored_session = shared_db.get_sessions(session_type=SessionType.AGENT)[0]
@@ -366,6 +367,7 @@ def test_intermediate_steps_with_structured_output(shared_db):
         if run_response_delta.event not in events:
             events[run_response_delta.event] = []
         events[run_response_delta.event].append(run_response_delta)
+    run_response = agent.get_last_run_response()
 
     assert events.keys() == {
         RunEvent.run_started,
@@ -387,9 +389,9 @@ def test_intermediate_steps_with_structured_output(shared_db):
     assert events[RunEvent.run_completed][0].content.name == "Elon Musk"
     assert len(events[RunEvent.run_completed][0].content.description) > 1
 
-    assert agent.run_response.content is not None
-    assert agent.run_response.content_type == "Person"
-    assert agent.run_response.content.name == "Elon Musk"
+    assert run_response.content is not None
+    assert run_response.content_type == "Person"
+    assert run_response.content["name"] == "Elon Musk"
 
 
 def test_intermediate_steps_with_parser_model(shared_db):
@@ -415,6 +417,7 @@ def test_intermediate_steps_with_parser_model(shared_db):
         if run_response_delta.event not in events:
             events[run_response_delta.event] = []
         events[run_response_delta.event].append(run_response_delta)
+    run_response = agent.get_last_run_response()
 
     assert events.keys() == {
         RunEvent.run_started,
@@ -442,6 +445,6 @@ def test_intermediate_steps_with_parser_model(shared_db):
     assert events[RunEvent.run_completed][0].content.name == "Elon Musk"
     assert len(events[RunEvent.run_completed][0].content.description) > 1
 
-    assert agent.run_response.content is not None
-    assert agent.run_response.content_type == "Person"
-    assert agent.run_response.content.name == "Elon Musk"
+    assert run_response.content is not None
+    assert run_response.content_type == "Person"
+    assert run_response.content["name"] == "Elon Musk"
