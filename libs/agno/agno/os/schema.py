@@ -211,7 +211,9 @@ class TeamResponse(BaseModel):
         memory_table = team.db.memory_table_name if team.db and team.enable_user_memories else None
         knowledge_table = team.db.knowledge_table_name if team.db and team.knowledge else None
 
-        team_instructions = team.instructions() if team.instructions and callable(team.instructions) else team.instructions
+        team_instructions = (
+            team.instructions() if team.instructions and callable(team.instructions) else team.instructions
+        )
 
         return TeamResponse(
             team_id=team.team_id,
@@ -283,6 +285,7 @@ class WorkflowRunRequest(BaseModel):
 class SessionSchema(BaseModel):
     session_id: str
     session_name: str
+    session_state: Optional[dict]
     created_at: Optional[datetime]
     updated_at: Optional[datetime]
 
@@ -292,6 +295,7 @@ class SessionSchema(BaseModel):
         return cls(
             session_id=session.get("session_id", ""),
             session_name=session_name,
+            session_state=session.get("session_data", {}).get("session_state", None),
             created_at=datetime.fromtimestamp(session.get("created_at", 0), tz=timezone.utc)
             if session.get("created_at")
             else None,
@@ -312,6 +316,7 @@ class AgentSessionDetailSchema(BaseModel):
     session_id: str
     session_name: str
     session_summary: Optional[dict]
+    session_state: Optional[dict]
     agent_id: Optional[str]
     agent_data: Optional[dict]
     total_tokens: Optional[int]
@@ -329,6 +334,7 @@ class AgentSessionDetailSchema(BaseModel):
             session_id=session.session_id,
             session_name=session_name,
             session_summary=session.summary.to_dict() if session.summary else None,
+            session_state=session.session_data.get("session_state", None) if session.session_data else None,
             agent_id=session.agent_id if session.agent_id else None,
             agent_data=session.agent_data,
             total_tokens=session.session_data.get("session_metrics", {}).get("total_tokens")
@@ -347,6 +353,7 @@ class TeamSessionDetailSchema(BaseModel):
     user_id: Optional[str]
     team_id: Optional[str]
     session_summary: Optional[dict]
+    session_state: Optional[dict]
     metrics: Optional[dict]
     team_data: Optional[dict]
     total_tokens: Optional[int]
@@ -365,6 +372,7 @@ class TeamSessionDetailSchema(BaseModel):
             session_summary=session_dict.get("summary") if session_dict.get("summary") else None,
             user_id=session.user_id,
             team_data=session.team_data,
+            session_state=session.session_data.get("session_state", None) if session.session_data else None,
             total_tokens=session.session_data.get("session_metrics", {}).get("total_tokens")
             if session.session_data
             else None,
@@ -383,6 +391,7 @@ class WorkflowSessionDetailSchema(BaseModel):
     session_name: str
 
     session_data: Optional[dict]
+    session_state: Optional[dict]
     workflow_data: Optional[dict]
     metadata: Optional[dict]
 
@@ -401,6 +410,7 @@ class WorkflowSessionDetailSchema(BaseModel):
             workflow_name=session.workflow_name,
             session_name=session_name,
             session_data=session.session_data,
+            session_state=session.session_data.get("session_state", None) if session.session_data else None,
             workflow_data=session.workflow_data,
             metadata=session.metadata,
             created_at=datetime.fromtimestamp(session.created_at, tz=timezone.utc) if session.created_at else None,
