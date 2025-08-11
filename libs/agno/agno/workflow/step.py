@@ -792,7 +792,7 @@ class Step:
                 # Add the primary executor run
                 workflow_run_response.step_executor_runs.append(raw_response)
 
-                # Add direct member agent runs (flat list, opt-in via Team.store_member_responses)
+                # Add direct member agent runs (in case of a team we force store_member_responses=True here)
                 if isinstance(raw_response, TeamRunResponse) and getattr(
                     self.active_executor, "store_member_responses", False
                 ):
