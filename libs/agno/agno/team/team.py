@@ -288,6 +288,8 @@ class Team:
     store_events: bool = False
     # List of events to skip from the Team
     events_to_skip: Optional[List[Union[RunEvent, TeamRunEvent]]] = None
+    # Store member agent runs inside the team's RunResponse
+    store_member_responses: bool = False
 
     # Optional app ID. Indicates this team is part of an app.
     os_id: Optional[str] = None
@@ -373,6 +375,7 @@ class Team:
         stream_intermediate_steps: bool = False,
         store_events: bool = False,
         events_to_skip: Optional[List[Union[RunEvent, TeamRunEvent]]] = None,
+        store_member_responses: bool = False,
         stream_member_events: bool = True,
         debug_mode: bool = False,
         debug_level: Literal[1, 2] = 1,
@@ -459,6 +462,7 @@ class Team:
         self.stream = stream
         self.stream_intermediate_steps = stream_intermediate_steps
         self.store_events = store_events
+        self.store_member_responses = store_member_responses
 
         self.events_to_skip = events_to_skip
         if self.events_to_skip is None:
@@ -874,6 +878,7 @@ class Team:
         files: Optional[Sequence[File]] = None,
         messages: Optional[Sequence[Union[Dict, Message]]] = None,
         knowledge_filters: Optional[Dict[str, Any]] = None,
+        store_member_responses: bool = False,
         **kwargs: Any,
     ) -> TeamRunResponse: ...
 
@@ -894,6 +899,7 @@ class Team:
         files: Optional[Sequence[File]] = None,
         messages: Optional[Sequence[Union[Dict, Message]]] = None,
         knowledge_filters: Optional[Dict[str, Any]] = None,
+        store_member_responses: bool = False,
         **kwargs: Any,
     ) -> Iterator[Union[RunResponseEvent, TeamRunResponseEvent]]: ...
 
@@ -912,10 +918,14 @@ class Team:
         videos: Optional[Sequence[Video]] = None,
         files: Optional[Sequence[File]] = None,
         messages: Optional[Sequence[Union[Dict, Message]]] = None,
+        store_member_responses: bool = False,
         knowledge_filters: Optional[Dict[str, Any]] = None,
         **kwargs: Any,
     ) -> Union[TeamRunResponse, Iterator[Union[RunResponseEvent, TeamRunResponseEvent]]]:
         """Run the Team and return the response."""
+
+        if store_member_responses is not None:
+            self.store_member_responses = store_member_responses
 
         session_id, user_id = self._initialize_session(
             session_id=session_id, user_id=user_id, session_state=session_state
@@ -1283,6 +1293,7 @@ class Team:
         files: Optional[Sequence[File]] = None,
         messages: Optional[Sequence[Union[Dict, Message]]] = None,
         knowledge_filters: Optional[Dict[str, Any]] = None,
+        store_member_responses: bool = False,
         **kwargs: Any,
     ) -> TeamRunResponse: ...
 
@@ -1302,6 +1313,7 @@ class Team:
         videos: Optional[Sequence[Video]] = None,
         files: Optional[Sequence[File]] = None,
         messages: Optional[Sequence[Union[Dict, Message]]] = None,
+        store_member_responses: bool = False,
         knowledge_filters: Optional[Dict[str, Any]] = None,
         **kwargs: Any,
     ) -> AsyncIterator[Union[RunResponseEvent, TeamRunResponseEvent]]: ...
@@ -1322,9 +1334,14 @@ class Team:
         files: Optional[Sequence[File]] = None,
         messages: Optional[Sequence[Union[Dict, Message]]] = None,
         knowledge_filters: Optional[Dict[str, Any]] = None,
+        store_member_responses: bool = False,
         **kwargs: Any,
     ) -> Union[TeamRunResponse, AsyncIterator[Union[RunResponseEvent, TeamRunResponseEvent]]]:
         """Run the Team asynchronously and return the response."""
+
+        if store_member_responses is not None:
+            self.store_member_responses = store_member_responses
+
         session_id, user_id = self._initialize_session(
             session_id=session_id, user_id=user_id, session_state=session_state
         )
@@ -5985,6 +6002,10 @@ class Team:
 
                 # Add the member run to the team run response
                 self.run_response = cast(TeamRunResponse, self.run_response)
+
+                if self.store_member_responses and self.run_response:
+                    self.run_response.add_member_run(member_agent.run_response)
+
                 # Add the member run to the team session
                 self.team_session.add_run(member_agent.run_response)
 
@@ -6069,6 +6090,10 @@ class Team:
 
                     # Add the member run to the team run response
                     self.run_response = cast(TeamRunResponse, self.run_response)
+
+                    if self.store_member_responses and self.run_response:
+                        self.run_response.add_member_run(agent.run_response)
+
                     # Add the member run to the team session
                     self.team_session.add_run(agent.run_response)
 
@@ -6298,6 +6323,10 @@ class Team:
 
             # Add the member run to the team run response
             self.run_response = cast(TeamRunResponse, self.run_response)
+
+            if self.store_member_responses and self.run_response:
+                self.run_response.add_member_run(member_agent.run_response)
+
             # Add the member run to the team session
             self.team_session.add_run(member_agent.run_response)
 
@@ -6438,6 +6467,10 @@ class Team:
 
             # Add the member run to the team run response
             self.run_response = cast(TeamRunResponse, self.run_response)
+
+            if self.store_member_responses and self.run_response:
+                self.run_response.add_member_run(member_agent.run_response)
+
             # Add the member run to the team session
             self.team_session.add_run(member_agent.run_response)
 
@@ -6685,6 +6718,10 @@ class Team:
 
             # Add the member run to the team run response
             self.run_response = cast(TeamRunResponse, self.run_response)
+
+            if self.store_member_responses and self.run_response:
+                self.run_response.add_member_run(member_agent.run_response)
+
             # Add the member run to the team session
             self.team_session.add_run(member_agent.run_response)
 
@@ -6822,6 +6859,10 @@ class Team:
 
             # Add the member run to the team run response
             self.run_response = cast(TeamRunResponse, self.run_response)
+
+            if self.store_member_responses and self.run_response:
+                self.run_response.add_member_run(member_agent.run_response)
+
             # Add the member run to the team session
             self.team_session.add_run(member_agent.run_response)
 

@@ -240,6 +240,11 @@ class Step:
                             self._convert_video_artifacts_to_videos(step_input.videos) if step_input.videos else None
                         )
                         audios = self._convert_audio_artifacts_to_audio(step_input.audio) if step_input.audio else None
+
+                        kwargs = {}
+                        if isinstance(self.active_executor, Team):
+                            kwargs["store_member_responses"] = True
+
                         response = self.active_executor.run(  # type: ignore[misc]
                             message=message,
                             images=images,
@@ -247,6 +252,7 @@ class Step:
                             audio=audios,
                             session_id=session_id,
                             user_id=user_id,
+                            **kwargs,
                         )
 
                         if store_executor_responses:
@@ -369,6 +375,11 @@ class Step:
                             self._convert_video_artifacts_to_videos(step_input.videos) if step_input.videos else None
                         )
                         audios = self._convert_audio_artifacts_to_audio(step_input.audio) if step_input.audio else None
+
+                        kwargs = {}
+                        if isinstance(self.active_executor, Team):
+                            kwargs["store_member_responses"] = True
+
                         response_stream = self.active_executor.run(  # type: ignore[call-overload, misc]
                             message=message,
                             images=images,
@@ -386,6 +397,7 @@ class Step:
                                 "step_name": self.name,
                                 "step_index": step_index,
                             },
+                            **kwargs,
                         )
 
                         if store_executor_responses:
@@ -536,6 +548,11 @@ class Step:
                             self._convert_video_artifacts_to_videos(step_input.videos) if step_input.videos else None
                         )
                         audios = self._convert_audio_artifacts_to_audio(step_input.audio) if step_input.audio else None
+
+                        kwargs = {}
+                        if isinstance(self.active_executor, Team):
+                            kwargs["store_member_responses"] = True
+
                         response = await self.active_executor.arun(  # type: ignore
                             message=message,
                             images=images,
@@ -543,6 +560,7 @@ class Step:
                             audio=audios,
                             session_id=session_id,
                             user_id=user_id,
+                            **kwargs,
                         )
 
                         if store_executor_responses:
@@ -683,6 +701,11 @@ class Step:
                             self._convert_video_artifacts_to_videos(step_input.videos) if step_input.videos else None
                         )
                         audios = self._convert_audio_artifacts_to_audio(step_input.audio) if step_input.audio else None
+
+                        kwargs = {}
+                        if isinstance(self.active_executor, Team):
+                            kwargs["store_member_responses"] = True
+
                         response_stream = self.active_executor.arun(  # type: ignore
                             message=message,
                             images=images,
@@ -700,6 +723,7 @@ class Step:
                                 "step_name": self.name,
                                 "step_index": step_index,
                             },
+                            **kwargs,
                         )
 
                         if store_executor_responses:
@@ -765,8 +789,16 @@ class Step:
             if raw_response and isinstance(raw_response, (RunResponse, TeamRunResponse)):
                 if workflow_run_response.step_executor_runs is None:
                     workflow_run_response.step_executor_runs = []
-                # Add to step_executor_runs
+                # Add the primary executor run
                 workflow_run_response.step_executor_runs.append(raw_response)
+
+                # Add direct member agent runs (flat list, opt-in via Team.store_member_responses)
+                if isinstance(raw_response, TeamRunResponse) and getattr(
+                    self.active_executor, "store_member_responses", False
+                ):
+                    for mr in raw_response.member_responses or []:
+                        if isinstance(mr, RunResponse):
+                            workflow_run_response.step_executor_runs.append(mr)
 
     def _prepare_message(
         self,
