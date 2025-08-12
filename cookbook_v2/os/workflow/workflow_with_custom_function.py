@@ -1,11 +1,14 @@
 from agno.agent import Agent
-from agno.db.sqlite import SqliteDb
+from agno.db.postgres import PostgresDb
 from agno.models.openai import OpenAIChat
+from agno.os import AgentOS
 from agno.team import Team
 from agno.tools.duckduckgo import DuckDuckGoTools
 from agno.tools.hackernews import HackerNewsTools
 from agno.workflow.step import Step, StepInput, StepOutput
 from agno.workflow.workflow import Workflow
+
+db_url = "postgresql+psycopg://ai:ai@localhost:5532/ai"
 
 # Define agents
 hackernews_agent = Agent(
@@ -105,24 +108,23 @@ content_planning_step = Step(
     executor=custom_content_planning_function,
 )
 
+content_creation_workflow = Workflow(
+    name="Content Creation Workflow",
+    description="Automated content creation with custom execution options",
+    db=PostgresDb(
+        session_table="workflow_session",
+        db_url=db_url,
+    ),
+    steps=[research_step, content_planning_step],
+)
 
-# Define and use examples
+# Initialize the Playground with the workflows
+agent_os = AgentOS(
+    description="Example app for basic agent with playground capabilities",
+    os_id="basic-app",
+    workflows=[content_creation_workflow],
+)
+app = agent_os.get_app()
+
 if __name__ == "__main__":
-    content_creation_workflow = Workflow(
-        name="Content Creation Workflow",
-        description="Automated content creation with custom execution options",
-        db=SqliteDb(
-            session_table="workflow_session",
-            db_file="tmp/workflow_v2.db",
-        ),
-        # Define the sequence of steps
-        # First run the research_step, then the content_planning_step
-        # You can mix and match agents, teams, and even regular python functions directly as steps
-        steps=[research_step, content_planning_step],
-    )
-    content_creation_workflow.print_response(
-        message="AI trends in 2024",
-        markdown=True,
-    )
-
-    print("\n" + "=" * 60 + "\n")
+    agent_os.serve(app="workflow_with_custom_function:app", reload=True)
