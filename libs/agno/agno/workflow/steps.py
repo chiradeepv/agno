@@ -118,7 +118,7 @@ class Steps:
         user_id: Optional[str] = None,
         workflow_run_response: Optional[WorkflowRunResponse] = None,
         store_executor_responses: bool = True,
-    ) -> List[StepOutput]:
+    ) -> StepOutput:
         """Execute all steps in sequence and return the final result"""
         log_debug(f"Steps Start: {self.name} ({len(self.steps)} steps)", center=True, symbol="-")
 
@@ -127,7 +127,7 @@ class Steps:
         self._prepare_steps()
 
         if not self.steps:
-            return [StepOutput(step_name=self.name or "Steps", content="No steps to execute")]
+            return StepOutput(step_name=self.name or "Steps", content="No steps to execute")
 
         # Track outputs and pass data between steps - following Condition/Router pattern
         all_results: List[StepOutput] = []
@@ -186,14 +186,12 @@ class Steps:
 
         except Exception as e:
             logger.error(f"Steps execution failed: {e}")
-            return [
-                StepOutput(
-                    step_name=self.name or "Steps",
-                    content=f"Steps execution failed: {str(e)}",
-                    success=False,
-                    error=str(e),
-                )
-            ]
+            return StepOutput(
+                step_name=self.name or "Steps",
+                content=f"Steps execution failed: {str(e)}",
+                success=False,
+                error=str(e),
+            )
 
     def execute_stream(
         self,
@@ -338,7 +336,7 @@ class Steps:
         user_id: Optional[str] = None,
         workflow_run_response: Optional[WorkflowRunResponse] = None,
         store_executor_responses: bool = True,
-    ) -> List[StepOutput]:
+    ) -> StepOutput:
         """Execute all steps in sequence asynchronously and return the final result"""
         log_debug(f"Steps Start: {self.name} ({len(self.steps)} steps)", center=True, symbol="-")
 
@@ -347,7 +345,7 @@ class Steps:
         self._prepare_steps()
 
         if not self.steps:
-            return [StepOutput(step_name=self.name or "Steps", content="No steps to execute")]
+            return StepOutput(step_name=self.name or "Steps", content="No steps to execute")
 
         # Track outputs and pass data between steps - following Condition/Router pattern
         all_results: List[StepOutput] = []
@@ -405,14 +403,12 @@ class Steps:
 
         except Exception as e:
             logger.error(f"Async steps execution failed: {e}")
-            return [
-                StepOutput(
-                    step_name=self.name or "Steps",
-                    content=f"Steps execution failed: {str(e)}",
-                    success=False,
-                    error=str(e),
-                )
-            ]
+            return StepOutput(
+                step_name=self.name or "Steps",
+                content=f"Steps execution failed: {str(e)}",
+                success=False,
+                error=str(e),
+            )
 
     async def aexecute_stream(
         self,

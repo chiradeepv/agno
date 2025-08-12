@@ -162,7 +162,16 @@ class Router:
         log_debug(f"Router {self.name}: Selected {len(steps_to_execute)} steps to execute")
 
         if not steps_to_execute:
-            return []
+            return StepOutput(
+                step_name=self.name,
+                step_id=router_step_id,
+                step_type="Router",
+                content=f"Router {self.name} completed with 0 results (no steps selected)",
+                success=True,
+                error=None,
+                stop=False,
+                steps=[],
+            )
 
         all_results: List[StepOutput] = []
         current_step_input = step_input
@@ -392,7 +401,16 @@ class Router:
         log_debug(f"Router {self.name} selected: {len(steps_to_execute)} steps to execute")
 
         if not steps_to_execute:
-            return []
+            return StepOutput(
+                step_name=self.name,
+                step_id=router_step_id,
+                step_type="Router",
+                content=f"Router {self.name} completed with 0 results (no steps selected)",
+                success=True,
+                error=None,
+                stop=False,
+                steps=[],
+            )
 
         # Chain steps sequentially like Loop does
         all_results: List[StepOutput] = []
