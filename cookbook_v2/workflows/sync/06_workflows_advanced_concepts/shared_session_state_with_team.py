@@ -7,14 +7,14 @@ from agno.workflow.workflow import Workflow
 
 # === TEAM TOOLS FOR STEP MANAGEMENT ===
 def add_step(
-    team: Team, step_name: str, assignee: str, priority: str = "medium"
+    session_state, step_name: str, assignee: str, priority: str = "medium"
 ) -> str:
     """Add a step to the team's workflow session state."""
-    if team.workflow_session_state is None:
-        team.workflow_session_state = {}
+    if session_state is None:
+        session_state = {}
 
-    if "steps" not in team.workflow_session_state:
-        team.workflow_session_state["steps"] = []
+    if "steps" not in session_state:
+        session_state["steps"] = []
 
     step = {
         "name": step_name,
@@ -23,21 +23,21 @@ def add_step(
         "priority": priority,
         "created_at": "now",
     }
-    team.workflow_session_state["steps"].append(step)
+    session_state["steps"].append(step)
 
     result = f"✅ Successfully added step '{step_name}' assigned to {assignee} (priority: {priority}). Total steps: {len(team.workflow_session_state['steps'])}"
     return result
 
 
-def delete_step(team: Team, step_name: str) -> str:
+def delete_step(session_state, step_name: str) -> str:
     """Delete a step from the team's workflow session state."""
     if (
-        team.workflow_session_state is None
-        or "steps" not in team.workflow_session_state
+        session_state is None
+        or "steps" not in session_state
     ):
         return "❌ No steps found to delete"
 
-    steps = team.workflow_session_state["steps"]
+    steps = session_state["steps"]
     for i, step in enumerate(steps):
         if step["name"] == step_name:
             deleted_step = steps.pop(i)
@@ -54,12 +54,12 @@ def update_step_status(
 ) -> str:
     """Update the status of a step in the workflow session state."""
     if (
-        agent.workflow_session_state is None
-        or "steps" not in agent.workflow_session_state
+        session_state is None
+        or "steps" not in session_state
     ):
         return "❌ No steps found in workflow session state"
 
-    steps = agent.workflow_session_state["steps"]
+    steps = session_state["steps"]
     for step in steps:
         if step["name"] == step_name:
             old_status = step["status"]
@@ -78,15 +78,15 @@ def update_step_status(
     return result
 
 
-def assign_step(agent: Agent, step_name: str, new_assignee: str) -> str:
+def assign_step(session_state, step_name: str, new_assignee: str) -> str:
     """Reassign a step to a different person."""
     if (
-        agent.workflow_session_state is None
-        or "steps" not in agent.workflow_session_state
+        session_state is None
+        or "steps" not in session_state
     ):
         return "❌ No steps found in workflow session state"
 
-    steps = agent.workflow_session_state["steps"]
+    steps = session_state["steps"]
     for step in steps:
         if step["name"] == step_name:
             old_assignee = step["assignee"]

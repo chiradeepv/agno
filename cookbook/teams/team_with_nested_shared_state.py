@@ -1,10 +1,15 @@
 from agno.agent.agent import Agent
+from agno.db.sqlite import SqliteDb
 from agno.models.openai.chat import OpenAIChat
 from agno.team import Team
 
+db = SqliteDb(
+        db_file="tmp/session_example.db",
+    )
+
 
 # Define tools to manage our shopping list
-def add_item(agent: Agent, item: str) -> str:
+def add_item(session_state, item: str) -> str:
     """Add an item to the shopping list and return confirmation.
 
     Args:
@@ -12,32 +17,32 @@ def add_item(agent: Agent, item: str) -> str:
     """
     # Add the item if it's not already in the list
     if item.lower() not in [
-        i.lower() for i in agent.team_session_state["shopping_list"]
+        i.lower() for i in session_state["shopping_list"]
     ]:
-        agent.team_session_state["shopping_list"].append(item)
+        session_state["shopping_list"].append(item)
         return f"Added '{item}' to the shopping list"
     else:
         return f"'{item}' is already in the shopping list"
 
 
-def remove_item(agent: Agent, item: str) -> str:
+def remove_item(session_state, item: str) -> str:
     """Remove an item from the shopping list by name.
 
     Args:
         item (str): The item to remove from the shopping list.
     """
     # Case-insensitive search
-    for i, list_item in enumerate(agent.team_session_state["shopping_list"]):
+    for i, list_item in enumerate(session_state["shopping_list"]):
         if list_item.lower() == item.lower():
-            agent.team_session_state["shopping_list"].pop(i)
+            session_state["shopping_list"].pop(i)
             return f"Removed '{list_item}' from the shopping list"
 
-    return f"'{item}' was not found in the shopping list. Current shopping list: {agent.team_session_state['shopping_list']}"
+    return f"'{item}' was not found in the shopping list. Current shopping list: {session_state['shopping_list']}"
 
 
-def remove_all_items(agent: Agent) -> str:
+def remove_all_items(session_state) -> str:
     """Remove all items from the shopping list."""
-    agent.team_session_state["shopping_list"] = []
+    session_state["shopping_list"] = []
     return "All items removed from the shopping list"
 
 
@@ -69,13 +74,10 @@ shopping_mgmt_team = Team(
 )
 
 
-def get_ingredients(agent: Agent) -> str:
+def get_ingredients(session_state) -> str:
     """Retrieve ingredients from the shopping list to use for recipe suggestions.
-
-    Args:
-        meal_type (str): Type of meal to suggest (breakfast, lunch, dinner, snack, or any)
     """
-    shopping_list = agent.team_session_state["shopping_list"]
+    shopping_list = session_state["shopping_list"]
 
     if not shopping_list:
         return "The shopping list is empty. Add some ingredients first to get recipe suggestions."
@@ -103,9 +105,9 @@ recipe_agent = Agent(
 )
 
 
-def list_items(team: Team) -> str:
+def list_items(session_state) -> str:
     """List all items in the shopping list."""
-    shopping_list = team.team_session_state["shopping_list"]
+    shopping_list = session_state["shopping_list"]
 
     if not shopping_list:
         return "The shopping list is empty."
@@ -130,7 +132,7 @@ meal_planning_team = Team(
 )
 
 
-def add_chore(team: Team, chore: str, priority: str = "medium") -> str:
+def add_chore(session_state, chore: str, priority: str = "medium") -> str:
     """Add a chore to the list with priority level.
 
     Args:
@@ -141,8 +143,8 @@ def add_chore(team: Team, chore: str, priority: str = "medium") -> str:
         str: Confirmation message
     """
     # Initialize chores list if it doesn't exist
-    if "chores" not in team.session_state:
-        team.session_state["chores"] = []
+    if "chores" not in session_state:
+        session_state["chores"] = []
 
     # Validate priority
     valid_priorities = ["low", "medium", "high"]
@@ -158,7 +160,7 @@ def add_chore(team: Team, chore: str, priority: str = "medium") -> str:
         "added_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
     }
 
-    team.session_state["chores"].append(chore_entry)
+    session_state["chores"].append(chore_entry)
 
     return f"Added chore: '{chore}' with {priority} priority"
 
@@ -167,9 +169,9 @@ shopping_team = Team(
     name="Shopping List Team",
     mode="coordinate",
     model=OpenAIChat(id="gpt-4o-mini"),
-    team_session_state={"shopping_list": []},
+    db=db,
+    session_state={"shopping_list": [], "chores": []},
     tools=[list_items, add_chore],
-    session_state={"chores": []},
     team_id="shopping_list_team",
     members=[
         shopping_mgmt_team,
@@ -192,26 +194,30 @@ shopping_team = Team(
 shopping_team.print_response(
     "Add milk, eggs, and bread to the shopping list", stream=True
 )
-print(f"Session state: {shopping_team.team_session_state}")
+session = shopping_team.get_session()
+print(f"Session state: {session.session_data["session_state"]}")
 
 shopping_team.print_response("I got bread", stream=True)
-print(f"Session state: {shopping_team.team_session_state}")
+session = shopping_team.get_session()
+print(f"Session state: {session.session_data["session_state"]}")
 
 shopping_team.print_response("I need apples and oranges", stream=True)
-print(f"Session state: {shopping_team.team_session_state}")
+session = shopping_team.get_session()
+print(f"Session state: {session.session_data["session_state"]}")
 
 shopping_team.print_response("whats on my list?", stream=True)
-print(f"Session state: {shopping_team.team_session_state}")
+session = shopping_team.get_session()
+print(f"Session state: {session.session_data["session_state"]}")
 
 # Try the meal planning feature
 shopping_team.print_response("What can I make with these ingredients?", stream=True)
-print(f"Session state: {shopping_team.team_session_state}")
+session = shopping_team.get_session()
+print(f"Session state: {session.session_data["session_state"]}")
 
 shopping_team.print_response(
     "Clear everything from my list and start over with just bananas and yogurt",
     stream=True,
 )
-print(f"Shared Session state: {shopping_team.team_session_state}")
+session = shopping_team.get_session()
+print(f"Shared Session state: {session.session_data["session_state"]}")
 
-
-print(f"Team session state: {shopping_team.session_state}")

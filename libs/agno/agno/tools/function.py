@@ -141,11 +141,11 @@ class Function(BaseModel):
             type_hints = get_type_hints(c)
 
             # If function has an the agent argument, remove the agent parameter from the type hints
-            if "agent" in sig.parameters:
+            if "agent" in sig.parameters and "agent" in type_hints:
                 del type_hints["agent"]
-            if "team" in sig.parameters:
+            if "team" in sig.parameters and "team" in type_hints:
                 del type_hints["team"]
-            if "session_state" in sig.parameters:
+            if "session_state" in sig.parameters and "session_state" in type_hints:
                 del type_hints["session_state"]
             # log_info(f"Type hints for {function_name}: {type_hints}")
 
@@ -232,11 +232,11 @@ class Function(BaseModel):
             type_hints = get_type_hints(self.entrypoint)
 
             # If function has an the agent argument, remove the agent parameter from the type hints
-            if "agent" in sig.parameters:
+            if "agent" in sig.parameters and "agent" in type_hints:
                 del type_hints["agent"]
-            if "team" in sig.parameters:
+            if "team" in sig.parameters and "team" in type_hints:
                 del type_hints["team"]
-            if "session_state" in sig.parameters:
+            if "session_state" in sig.parameters and "session_state" in type_hints:
                 del type_hints["session_state"]
             # log_info(f"Type hints for {self.name}: {type_hints}")
 

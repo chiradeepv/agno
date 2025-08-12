@@ -293,6 +293,8 @@ class Team:
     store_events: bool = False
     # List of events to skip from the Team
     events_to_skip: Optional[List[Union[RunEvent, TeamRunEvent]]] = None
+    # Store member agent runs inside the team's RunResponse
+    store_member_responses: bool = False
 
     # Optional app ID. Indicates this team is part of an app.
     os_id: Optional[str] = None
@@ -375,6 +377,7 @@ class Team:
         stream_intermediate_steps: bool = False,
         store_events: bool = False,
         events_to_skip: Optional[List[Union[RunEvent, TeamRunEvent]]] = None,
+        store_member_responses: bool = False,
         stream_member_events: bool = True,
         debug_mode: bool = False,
         debug_level: Literal[1, 2] = 1,
@@ -459,6 +462,7 @@ class Team:
         self.stream = stream
         self.stream_intermediate_steps = stream_intermediate_steps
         self.store_events = store_events
+        self.store_member_responses = store_member_responses
 
         self.events_to_skip = events_to_skip
         if self.events_to_skip is None:
@@ -726,6 +730,7 @@ class Team:
         response_format: Optional[Union[Dict, Type[BaseModel]]] = None,
         stream_intermediate_steps: bool = False,
         workflow_context: Optional[Dict] = None,
+        yield_run_response: bool = False,
     ) -> Iterator[Union[TeamRunResponseEvent, RunResponseEvent]]:
         """Run the Team and return the response iterator.
 
@@ -795,6 +800,9 @@ class Team:
 
         if stream_intermediate_steps:
             yield completed_event
+            
+        if yield_run_response:
+            yield run_response
 
         # TODO: Log team run
 
@@ -817,6 +825,7 @@ class Team:
         files: Optional[Sequence[File]] = None,
         messages: Optional[Sequence[Union[Dict, Message]]] = None,
         knowledge_filters: Optional[Dict[str, Any]] = None,
+        store_member_responses: Optional[bool] = None,
         debug_mode: Optional[bool] = None,
         **kwargs: Any,
     ) -> TeamRunResponse: ...
@@ -838,7 +847,9 @@ class Team:
         files: Optional[Sequence[File]] = None,
         messages: Optional[Sequence[Union[Dict, Message]]] = None,
         knowledge_filters: Optional[Dict[str, Any]] = None,
+        store_member_responses: Optional[bool] = None,
         debug_mode: Optional[bool] = None,
+        yield_run_response: bool = False,
         **kwargs: Any,
     ) -> Iterator[Union[RunResponseEvent, TeamRunResponseEvent]]: ...
 
@@ -858,10 +869,15 @@ class Team:
         files: Optional[Sequence[File]] = None,
         messages: Optional[Sequence[Union[Dict, Message]]] = None,
         knowledge_filters: Optional[Dict[str, Any]] = None,
+        store_member_responses: Optional[bool] = None,
         debug_mode: Optional[bool] = None,
+        yield_run_response: bool = False,
         **kwargs: Any,
     ) -> Union[TeamRunResponse, Iterator[Union[RunResponseEvent, TeamRunResponseEvent]]]:
         """Run the Team and return the response."""
+
+        if store_member_responses is not None:
+            self.store_member_responses = store_member_responses
 
         session_id, user_id, session_state = self._initialize_session(
             session_id=session_id, user_id=user_id, session_state=session_state
@@ -1001,6 +1017,7 @@ class Team:
                         response_format=response_format,
                         stream_intermediate_steps=stream_intermediate_steps,
                         workflow_context=workflow_context,
+                        yield_run_response=yield_run_response,
                     )
 
                     return response_iterator
@@ -1129,6 +1146,7 @@ class Team:
         response_format: Optional[Union[Dict, Type[BaseModel]]] = None,
         stream_intermediate_steps: bool = False,
         workflow_context: Optional[Dict] = None,
+        yield_run_response: bool = False,
     ) -> AsyncIterator[Union[TeamRunResponseEvent, RunResponseEvent]]:
         """Run the Team and return the response.
 
@@ -1198,6 +1216,9 @@ class Team:
 
         if stream_intermediate_steps:
             yield completed_event
+            
+        if yield_run_response:
+            yield run_response
 
         # 7. Log Team Run
         await self._alog_team_run(session_id=session.session_id, user_id=user_id)
@@ -1221,6 +1242,7 @@ class Team:
         files: Optional[Sequence[File]] = None,
         messages: Optional[Sequence[Union[Dict, Message]]] = None,
         knowledge_filters: Optional[Dict[str, Any]] = None,
+        store_member_responses: Optional[bool] = None,
         debug_mode: bool = False,
         **kwargs: Any,
     ) -> TeamRunResponse: ...
@@ -1241,8 +1263,10 @@ class Team:
         videos: Optional[Sequence[Video]] = None,
         files: Optional[Sequence[File]] = None,
         messages: Optional[Sequence[Union[Dict, Message]]] = None,
+        store_member_responses: Optional[bool] = None,
         knowledge_filters: Optional[Dict[str, Any]] = None,
         debug_mode: bool = False,
+        yield_run_response: bool = False,
         **kwargs: Any,
     ) -> AsyncIterator[Union[RunResponseEvent, TeamRunResponseEvent]]: ...
 
@@ -1262,10 +1286,16 @@ class Team:
         files: Optional[Sequence[File]] = None,
         messages: Optional[Sequence[Union[Dict, Message]]] = None,
         knowledge_filters: Optional[Dict[str, Any]] = None,
+        store_member_responses: Optional[bool] = None,
         debug_mode: bool = False,
+        yield_run_response: bool = False,
         **kwargs: Any,
     ) -> Union[TeamRunResponse, AsyncIterator[Union[RunResponseEvent, TeamRunResponseEvent]]]:
         """Run the Team asynchronously and return the response."""
+
+        if store_member_responses is not None:
+            self.store_member_responses = store_member_responses
+
         session_id, user_id, session_state = self._initialize_session(
             session_id=session_id, user_id=user_id, session_state=session_state
         )
@@ -1395,6 +1425,7 @@ class Team:
                         response_format=response_format,
                         stream_intermediate_steps=stream_intermediate_steps,
                         workflow_context=workflow_context,
+                        yield_run_response=yield_run_response,
                     )
                     return response_iterator
                 else:
@@ -1493,7 +1524,7 @@ class Team:
         run_response.messages = messages_for_run_response
 
         # Update the TeamRunResponse metrics
-        run_response.metrics = self.calculate_metrics(messages_for_run_response)
+        run_response.metrics = self._calculate_metrics(messages_for_run_response)
 
         for tool_call in model_response.tool_calls:
             tool_name = tool_call.get("tool_name", "")
@@ -1575,7 +1606,7 @@ class Team:
         # Update the TeamRunResponse messages
         run_response.messages = messages_for_run_response
         # Update the TeamRunResponse metrics
-        run_response.metrics = self.calculate_metrics(messages_for_run_response)
+        run_response.metrics = self._calculate_metrics(messages_for_run_response)
 
         # Update the run_response audio if streaming
         if full_model_response.audio is not None:
@@ -1646,7 +1677,7 @@ class Team:
         # Update the TeamRunResponse messages
         run_response.messages = messages_for_run_response
         # Update the TeamRunResponse metrics
-        run_response.metrics = self.calculate_metrics(messages_for_run_response)
+        run_response.metrics = self._calculate_metrics(messages_for_run_response)
 
         if stream_intermediate_steps and reasoning_state["reasoning_started"]:
             all_reasoning_steps: List[ReasoningStep] = []
@@ -4037,27 +4068,14 @@ class Team:
 
         return session_metrics
 
-    def _calculate_full_team_session_metrics(self, session: TeamSession, messages: List[Message]) -> Metrics:
-        current_session_metrics = Metrics()
-        assistant_message_role = self.model.assistant_message_role if self.model is not None else "assistant"
-
-        # Add metrics from the team members
-        for run in session.runs:  # type: ignore
-            if run.messages is not None:
-                for m in run.messages:
-                    if m.role == assistant_message_role and m.metrics is not None:
-                        current_session_metrics += m.metrics
-
-        return current_session_metrics
-
-    def calculate_metrics(self, messages: List[Message], for_session: bool = False) -> Metrics:
+    def _calculate_metrics(self, messages: List[Message], for_session: bool = False) -> Metrics:
         metrics = Metrics()
         assistant_message_role = self.model.assistant_message_role if self.model is not None else "assistant"
         for m in messages:
             if m.role == assistant_message_role and m.metrics is not None and m.from_history is False:
                 metrics += m.metrics
 
-        return metrics if for_session else metrics.to_dict()  # type: ignore
+        return metrics
 
     def update_session_metrics(self, session: TeamSession):
         """Calculate session metrics"""
@@ -4072,10 +4090,8 @@ class Team:
 
         # Calculate initial metrics
         session_metrics = self._calculate_session_metrics(session_messages)
-        full_team_session_metrics = self._calculate_full_team_session_metrics(session, session_messages)
 
         session.session_data["session_metrics"] = session_metrics
-        session.session_data["full_team_session_metrics"] = full_team_session_metrics
 
     def _aggregate_metrics_from_messages(self, messages: List[Message]) -> Dict[str, Any]:
         aggregated_metrics: Dict[str, Any] = defaultdict(list)
@@ -5883,6 +5899,10 @@ class Team:
                     run_response=member_agent_run_response,  # type: ignore
                 )
 
+                # Add the member run to the team run response
+                if self.store_member_responses and run_response:
+                    run_response.add_member_run(member_agent_run_response)
+
                 # Add the member run to the team session
                 session.upsert_run(member_agent_run_response)
 
@@ -5965,6 +5985,10 @@ class Team:
                         task=task_description,
                         run_response=member_agent_run_response,
                     )
+
+                    # Add the member run to the team run response
+                    if self.store_member_responses and run_response:
+                        run_response.add_member_run(member_agent_run_response)
 
                     # Add the member run to the team session
                     session.upsert_run(member_agent_run_response)
@@ -6113,6 +6137,7 @@ class Team:
                     knowledge_filters=knowledge_filters
                     if not member_agent.knowledge_filters and member_agent.knowledge
                     else None,
+                    yield_run_response=True
                 )
                 member_agent_run_response = None
                 for member_agent_run_response_event in member_agent_run_response_stream:
@@ -6186,6 +6211,10 @@ class Team:
                 task=task_description,
                 run_response=member_agent_run_response,  # type: ignore
             )
+
+            # Add the member run to the team run response
+            if self.store_member_responses and run_response:
+                run_response.add_member_run(member_agent_run_response)
 
             # Add the member run to the team session
             session.upsert_run(member_agent_run_response)
@@ -6332,6 +6361,10 @@ class Team:
                 run_response=member_agent_run_response,  # type: ignore
             )
 
+            # Add the member run to the team run response
+            if self.store_member_responses and run_response:
+                run_response.add_member_run(member_agent_run_response)
+
             # Add the member run to the team session
             session.upsert_run(member_agent_run_response)
 
@@ -6447,6 +6480,7 @@ class Team:
                     knowledge_filters=knowledge_filters
                     if not member_agent.knowledge_filters and member_agent.knowledge
                     else None,
+                    yield_run_response=True,
                 )
                 member_agent_run_response = None
                 for member_agent_run_response_chunk in member_agent_run_response_stream:
@@ -6516,6 +6550,10 @@ class Team:
                 task=message.get_content_string(),
                 run_response=member_agent_run_response,  # type: ignore
             )
+
+            # Add the member run to the team run response
+            if self.store_member_responses and run_response:
+                run_response.add_member_run(member_agent_run_response)
 
             # Add the member run to the team session
             session.upsert_run(member_agent_run_response)
@@ -6658,6 +6696,10 @@ class Team:
                 task=message.get_content_string(),
                 run_response=member_agent_run_response,  # type: ignore
             )
+
+            # Add the member run to the team run response
+            if self.store_member_responses and run_response:
+                run_response.add_member_run(member_agent_run_response)
 
             # Add the member run to the team session
             session.upsert_run(member_agent_run_response)

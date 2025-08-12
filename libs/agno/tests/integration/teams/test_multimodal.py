@@ -4,20 +4,20 @@ from agno.models.openai.chat import OpenAIChat
 from agno.team.team import Team
 
 
-def test_team_image_input(shared_db, shared_db):
+def test_team_image_input(shared_db):
     image_analyst = Agent(
         name="Image Analyst",
         role="Analyze images and provide insights.",
         model=OpenAIChat(id="gpt-4o-mini"),
         markdown=True,
-        storage=shared_db,
+        db=shared_db,
     )
 
     team = Team(
         model=OpenAIChat(id="gpt-4o-mini"),
         members=[image_analyst],
         name="Team",
-        storage=shared_db,
+        db=shared_db,
     )
 
     response = team.run(
@@ -26,15 +26,13 @@ def test_team_image_input(shared_db, shared_db):
     )
     assert response.content is not None
 
-    session_in_db = shared_db.read(response.session_id)
+    session_in_db = team.get_session(session_id=team.session_id)
     assert session_in_db is not None
-    assert session_in_db.memory["runs"] is not None
-    assert len(session_in_db.memory["runs"]) == 1
-    assert session_in_db.memory["runs"][0]["messages"] is not None
-    assert session_in_db.memory["runs"][0]["messages"][1]["role"] == "user"
-    assert session_in_db.memory["runs"][0]["messages"][1]["images"] is not None
+    assert session_in_db.runs[-1].messages is not None
+    assert session_in_db.runs[-1].messages[1].role == "user"
+    assert session_in_db.runs[-1].messages[1].images is not None
     assert (
-        session_in_db.memory["runs"][0]["messages"][1]["images"][0]["url"]
+        session_in_db.runs[-1].messages[1].images[0].url
         == "https://upload.wikimedia.org/wikipedia/commons/0/0c/GoldenGateBridge-001.jpg"
     )
 
@@ -45,14 +43,14 @@ def test_team_image_input_no_prompt(shared_db):
         role="Analyze images and provide insights.",
         model=OpenAIChat(id="gpt-4o-mini"),
         markdown=True,
-        storage=shared_db,
+        db=shared_db,
     )
 
     team = Team(
         model=OpenAIChat(id="gpt-4o-mini"),
         members=[image_analyst],
         name="Team",
-        storage=shared_db,
+        db=shared_db,
     )
 
     response = team.run(
@@ -61,14 +59,12 @@ def test_team_image_input_no_prompt(shared_db):
     )
     assert response.content is not None
 
-    session_in_db = shared_db.read(response.session_id)
+    session_in_db = team.get_session(session_id=team.session_id)
     assert session_in_db is not None
-    assert session_in_db.memory["runs"] is not None
-    assert len(session_in_db.memory["runs"]) == 1
-    assert session_in_db.memory["runs"][0]["messages"] is not None
-    assert session_in_db.memory["runs"][0]["messages"][1]["role"] == "user"
-    assert session_in_db.memory["runs"][0]["messages"][1]["images"] is not None
+    assert session_in_db.runs[-1].messages is not None
+    assert session_in_db.runs[-1].messages[1].role == "user"
+    assert session_in_db.runs[-1].messages[1].images is not None
     assert (
-        session_in_db.memory["runs"][0]["messages"][1]["images"][0]["url"]
+        session_in_db.runs[-1].messages[1].images[0].url
         == "https://upload.wikimedia.org/wikipedia/commons/0/0c/GoldenGateBridge-001.jpg"
     )
