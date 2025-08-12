@@ -85,36 +85,35 @@ class TeamSession:
             runs=serialized_runs,
             summary=data.get("summary"),
         )
-        
+
     def get_run(self, run_id: str) -> Optional[RunResponse]:
         for run in self.runs:
             if run.run_id == run_id:
                 return run
         return None
 
-    def upsert_run(self, run: Union[TeamRunResponse, RunResponse]):
+    def upsert_run(self, run_response: Union[TeamRunResponse, RunResponse]):
         """Adds a RunResponse, together with some calculated data, to the runs list."""
 
-        messages = run.messages
+        messages = run_response.messages
         for m in messages:
             if m.metrics is not None:
                 m.metrics.timer = None
 
         if not self.runs:
             self.runs = []
-            
+
         for i, existing_run in enumerate(self.runs):
-            if existing_run.run_id == run.run_id:
-                self.runs[i] = run
+            if existing_run.run_id == run_response.run_id:
+                self.runs[i] = run_response
                 break
         else:
-            self.runs.append(run)
+            self.runs.append(run_response)
 
         log_debug("Added RunResponse to Team Session")
 
     def get_messages_from_last_n_runs(
         self,
-        session_id: str,
         agent_id: Optional[str] = None,
         team_id: Optional[str] = None,
         last_n: Optional[int] = None,

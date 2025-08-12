@@ -292,10 +292,6 @@ class Agent:
     # Optional team ID. Indicates this agent is part of a team.
     team_id: Optional[str] = None
 
-    # --- If this Agent is part of an OS ---
-    # Optional OS ID. Indicates this agent is part of an OS.
-    os_id: Optional[str] = None
-
     # --- If this Agent is part of a workflow ---
     # Optional workflow ID. Indicates this agent is part of a workflow.
     workflow_id: Optional[str] = None
@@ -519,7 +515,7 @@ class Agent:
             self.agent_id = str(uuid4())
         return self.agent_id
 
-    def set_debug(self, debug_mode: Optional[bool] = None) -> None:
+    def _set_debug(self, debug_mode: Optional[bool] = None) -> None:
         # If the default debug mode is set, or passed on run, or via environment variable, set the debug mode to True
         if self.debug_mode or debug_mode or getenv("AGNO_DEBUG", "false").lower() == "true":
             set_log_level_to_debug(level=self.debug_level)
@@ -533,7 +529,7 @@ class Agent:
         if telemetry_env is not None:
             self.telemetry = telemetry_env.lower() == "true"
 
-    def set_default_model(self) -> None:
+    def _set_default_model(self) -> None:
         # Use the default Model (OpenAIChat) if no model is provided
         if self.model is None:
             try:
@@ -549,7 +545,7 @@ class Agent:
             log_info("Setting default model to OpenAI Chat")
             self.model = OpenAIChat(id="gpt-4o")
 
-    def set_memory_manager(self) -> None:
+    def _set_memory_manager(self) -> None:
         if self.db is None:
             log_warning("Database not provided. Memories will not be stored.")
 
@@ -566,7 +562,7 @@ class Agent:
                 self.enable_user_memories or self.enable_agentic_memory or self.memory_manager is not None
             )
 
-    def set_session_summary_manager(self) -> None:
+    def _set_session_summary_manager(self) -> None:
         if self.enable_session_summaries and self.session_summary_manager is None:
             self.session_summary_manager = SessionSummaryManager(model=self.model)
 
@@ -580,13 +576,13 @@ class Agent:
             )
 
     def initialize_agent(self, debug_mode: Optional[bool] = None) -> None:
-        self.set_default_model()
-        self.set_debug(debug_mode=debug_mode)
+        self._set_default_model()
+        self._set_debug(debug_mode=debug_mode)
         self.set_agent_id()
         if self.enable_user_memories or self.enable_agentic_memory or self.memory_manager is not None:
-            self.set_memory_manager()
+            self._set_memory_manager()
         if self.enable_session_summaries or self.session_summary_manager is not None:
-            self.set_session_summary_manager()
+            self._set_session_summary_manager()
 
         log_debug(f"Agent ID: {self.agent_id}", center=True)
 
@@ -750,15 +746,14 @@ class Agent:
 
 
         # 2. Process model response
-        for event in self._handle_model_response_stream(
+        yield from self._handle_model_response_stream(
             session=session,
             run_response=run_response,
             run_messages=run_messages,
             response_format=response_format,
             stream_intermediate_steps=stream_intermediate_steps,
             workflow_context=workflow_context,
-        ):
-            yield event
+        )
 
         # If a parser model is provided, structure the response separately
         yield from self._parse_response_with_parser_model_stream(
@@ -1153,7 +1148,8 @@ class Agent:
         # If a parser model is provided, structure the response separately
         async for event in self._aparse_response_with_parser_model_stream(
             session=session,
-            run_response=run_response, stream_intermediate_steps=stream_intermediate_steps
+            run_response=run_response,
+            stream_intermediate_steps=stream_intermediate_steps
         ):
             yield event
 
@@ -1537,7 +1533,7 @@ class Agent:
             raise ValueError("Either run_response or run_id must be provided.")
 
         # Prepare arguments for the model
-        self.set_default_model()
+        self._set_default_model()
         response_format = self._get_response_format()
         self.model = cast(Model, self.model)
 
@@ -2533,6 +2529,7 @@ class Agent:
     def update_session_metrics(self, session: AgentSession, run_messages: RunMessages):
         """Calculate session metrics"""
         session_metrics = self._get_session_metrics(session=session)
+        # Add the metrics for the current run to the session metrics
         session_metrics += self.calculate_metrics(run_messages.messages)
         session.session_data["session_metrics"] = session_metrics
 
@@ -3363,7 +3360,7 @@ class Agent:
             except Exception as e:
                 log_warning(f"Failed to resolve context for '{key}': {e}")
 
-    def get_agent_data(self) -> Dict[str, Any]:
+    def _get_agent_data(self) -> Dict[str, Any]:
         agent_data: Dict[str, Any] = {}
         if self.name is not None:
             agent_data["name"] = self.name
@@ -3373,24 +3370,8 @@ class Agent:
             agent_data["model"] = self.model.to_dict()
         return agent_data
 
-    # def get_session_data(self) -> Dict[str, Any]:
-    #     session_data: Dict[str, Any] = {}
-    #     if self.session_name is not None:
-    #         session_data["session_name"] = self.session_name
-    #     if self.session_state is not None and len(self.session_state) > 0:
-    #         session_data["session_state"] = self.session_state
-    #     if self.session_metrics is not None:
-    #         session_data["session_metrics"] = asdict(self.session_metrics) if self.session_metrics is not None else None
-    #     if self.images is not None:
-    #         session_data["images"] = [img.to_dict() for img in self.images]  # type: ignore
-    #     if self.videos is not None:
-    #         session_data["videos"] = [vid.to_dict() for vid in self.videos]  # type: ignore
-    #     if self.audio is not None:
-    #         session_data["audio"] = [aud.to_dict() for aud in self.audio]  # type: ignore
-    #     return session_data
-
     # -*- Session Database Functions
-    def read_session(self, session_id: str, session_type: SessionType) -> Optional[Session]:
+    def _read_session(self, session_id: str, session_type: SessionType) -> Optional[Session]:
         """Get a Session from the database."""
         try:
             if not self.db:
@@ -3466,27 +3447,6 @@ class Agent:
         else:
             return Metrics()
 
-        # # Get images, videos, and audios from the database
-        # if "images" in session.session_data:
-        #     images_from_db = session.session_data.get("images")
-        #     if images_from_db is not None and isinstance(images_from_db, list):
-        #         if self.images is None:
-        #             self.images = []
-        #         self.images.extend([ImageArtifact.model_validate(img) for img in images_from_db])
-        # if "videos" in session.session_data:
-        #     videos_from_db = session.session_data.get("videos")
-        #     if videos_from_db is not None and isinstance(videos_from_db, list):
-        #         if self.videos is None:
-        #             self.videos = []
-        #         self.videos.extend([VideoArtifact.model_validate(vid) for vid in videos_from_db])
-        # if "audio" in session.session_data:
-        #     audio_from_db = session.session_data.get("audio")
-        #     if audio_from_db is not None and isinstance(audio_from_db, list):
-        #         if self.audio is None:
-        #             self.audio = []
-        #         self.audio.extend([AudioArtifact.model_validate(aud) for aud in audio_from_db])
-
-
     def read_or_create_session(
         self,
         session_id: str,
@@ -3506,7 +3466,7 @@ class Agent:
             log_debug(f"Reading AgentSession: {session_id}")
 
             agent_session = cast(
-                AgentSession, self.read_session(session_id=session_id, session_type=SessionType.AGENT)
+                AgentSession, self._read_session(session_id=session_id, session_type=SessionType.AGENT)
             )
         if agent_session is None:
             # Creating new session if none found
@@ -3515,7 +3475,7 @@ class Agent:
                 session_id=session_id,
                 agent_id=self.agent_id,
                 user_id=user_id,
-                agent_data=self.get_agent_data(),
+                agent_data=self._get_agent_data(),
                 session_data={},
                 metadata=self.metadata,
                 created_at=int(time()),
@@ -3597,7 +3557,7 @@ class Agent:
 
         # Try to load from database
         if self.db is not None:
-            agent_session = cast(AgentSession, self.read_session(session_id=session_id_to_load, session_type=SessionType.AGENT))
+            agent_session = cast(AgentSession, self._read_session(session_id=session_id_to_load, session_type=SessionType.AGENT))
             return agent_session
 
         log_warning(f"AgentSession {session_id_to_load} not found in db")
@@ -3613,6 +3573,14 @@ class Agent:
         if self.db is not None and self.team_id is None and self.workflow_id is None:
             session.session_data["session_state"].pop("current_session_id", None)
             session.session_data["session_state"].pop("current_user_id", None)
+
+            # TODO: Add image/audio/video artifacts to the session correctly, from runs
+            if self.images is not None:
+                session.session_data["images"] = [img.to_dict() for img in self.images]  # type: ignore
+            if self.videos is not None:
+                session.session_data["videos"] = [vid.to_dict() for vid in self.videos]  # type: ignore
+            if self.audio is not None:
+                session.session_data["audio"] = [aud.to_dict() for aud in self.audio]  # type: ignore
 
             self.upsert_session(session=session)
             log_debug(f"Created or updated AgentSession record: {session.session_id}")
@@ -3822,7 +3790,7 @@ class Agent:
             if not user_id:
                 user_id = "default"
             if self.memory_manager is None:
-                self.set_memory_manager()
+                self._set_memory_manager()
                 _memory_manager_not_set = True
             user_memories = self.memory_manager.get_user_memories(user_id=user_id)  # type: ignore
             if user_memories and len(user_memories) > 0:
@@ -3899,7 +3867,7 @@ class Agent:
             else None
         )
 
-    def get_user_message(
+    def _get_user_message(
         self,
         *,
         run_response: RunResponse,
@@ -3993,6 +3961,25 @@ class Agent:
                     files=files,
                     **kwargs,
                 )
+
+            # If message is provided as a Message, use it directly
+            elif isinstance(message, Message):
+                return message
+            # If message is provided as a dict, try to validate it as a Message
+            elif isinstance(message, dict):
+                try:
+                    return Message.model_validate(message)
+                except Exception as e:
+                    log_warning(f"Failed to validate message: {e}")
+
+            # If message is provided as a BaseModel, convert it to a Message
+            elif isinstance(message, BaseModel):
+                try:
+                    # Create a user message with the BaseModel content
+                    content = message.model_dump_json(indent=2, exclude_none=True)
+                    return Message(role=self.user_message_role, content=content)
+                except Exception as e:
+                    log_warning(f"Failed to convert BaseModel to message: {e}")
             else:
 
                 user_msg_content = message
@@ -4041,12 +4028,12 @@ class Agent:
                 ):
                     user_msg_content_str += "\n\nUse the following references from the knowledge base if it helps:\n"
                     user_msg_content_str += "<references>\n"
-                    user_msg_content_str += self.convert_documents_to_string(references.references) + "\n"
+                    user_msg_content_str += self._convert_documents_to_string(references.references) + "\n"
                     user_msg_content_str += "</references>"
                 # 4.2 Add context to user message
                 if self.add_dependencies_to_context and self.dependencies is not None:
                     user_msg_content_str += "\n\n<additional context>\n"
-                    user_msg_content_str += self.convert_context_to_string(self.dependencies) + "\n"
+                    user_msg_content_str += self._convert_dependencies_to_string(self.dependencies) + "\n"
                     user_msg_content_str += "</additional context>"
 
                 # Use the string version for the final content
@@ -4168,35 +4155,17 @@ class Agent:
         # 4.Add user message to run_messages
         user_message: Optional[Message] = None
         # 4.1 Build user message if message is None, str or list
-        if message is None or isinstance(message, str) or isinstance(message, list) and messages is None:
-            user_message = self.get_user_message(
-                run_response=run_response,
-                session=session,
-                message=message,
-                audio=audio,
-                images=images,
-                videos=videos,
-                files=files,
-                knowledge_filters=knowledge_filters,
-                **kwargs,
-            )
-        # 4.2 If message is provided as a Message, use it directly
-        elif isinstance(message, Message):
-            user_message = message
-        # 4.3 If message is provided as a dict, try to validate it as a Message
-        elif isinstance(message, dict):
-            try:
-                user_message = Message.model_validate(message)
-            except Exception as e:
-                log_warning(f"Failed to validate message: {e}")
-        # 4.4 If message is provided as a BaseModel, convert it to a Message
-        elif isinstance(message, BaseModel):
-            try:
-                # Create a user message with the BaseModel content
-                content = message.model_dump_json(indent=2, exclude_none=True)
-                user_message = Message(role=self.user_message_role, content=content)
-            except Exception as e:
-                log_warning(f"Failed to convert BaseModel to message: {e}")
+        user_message = self._get_user_message(
+            run_response=run_response,
+            session=session,
+            message=message,
+            audio=audio,
+            images=images,
+            videos=videos,
+            files=files,
+            knowledge_filters=knowledge_filters,
+            **kwargs,
+        )
         # Add user message to run_messages
         if user_message is not None:
             run_messages.user_message = user_message
@@ -4529,7 +4498,7 @@ class Agent:
             log_warning(f"Error searching knowledge base: {e}")
             raise e
 
-    def convert_documents_to_string(self, docs: List[Union[Dict[str, Any], str]]) -> str:
+    def _convert_documents_to_string(self, docs: List[Union[Dict[str, Any], str]]) -> str:
         if docs is None or len(docs) == 0:
             return ""
 
@@ -4542,7 +4511,7 @@ class Agent:
 
         return json.dumps(docs, indent=2, ensure_ascii=False)
 
-    def convert_context_to_string(self, context: Dict[str, Any]) -> str:
+    def _convert_dependencies_to_string(self, context: Dict[str, Any]) -> str:
         """Convert the context dictionary to a string representation.
 
         Args:
@@ -5594,7 +5563,7 @@ class Agent:
 
             if docs_from_knowledge is None:
                 return "No documents found"
-            return self.convert_documents_to_string(docs_from_knowledge)
+            return self._convert_documents_to_string(docs_from_knowledge)
 
         async def asearch_knowledge_base(query: str) -> str:
             """Use this function to search the knowledge base for information about a query asynchronously.
@@ -5622,7 +5591,7 @@ class Agent:
 
             if docs_from_knowledge is None:
                 return "No documents found"
-            return self.convert_documents_to_string(docs_from_knowledge)
+            return self._convert_documents_to_string(docs_from_knowledge)
 
         if async_mode:
             search_knowledge_base_function = asearch_knowledge_base
@@ -5669,7 +5638,7 @@ class Agent:
 
             if docs_from_knowledge is None:
                 return "No documents found"
-            return self.convert_documents_to_string(docs_from_knowledge)
+            return self._convert_documents_to_string(docs_from_knowledge)
 
         async def asearch_knowledge_base(query: str, filters: Optional[Dict[str, Any]] = None) -> str:
             """Use this function to search the knowledge base for information about a query asynchronously.
@@ -5700,7 +5669,7 @@ class Agent:
 
             if docs_from_knowledge is None:
                 return "No documents found"
-            return self.convert_documents_to_string(docs_from_knowledge)
+            return self._convert_documents_to_string(docs_from_knowledge)
 
         if async_mode:
             search_knowledge_base_function = asearch_knowledge_base

@@ -66,8 +66,6 @@ class AgentOS:
 
         if self.agents:
             for agent in self.agents:
-                if not agent.os_id:
-                    agent.os_id = self.os_id
                 agent.initialize_agent()
 
                 # Required for the built-in routes to work
