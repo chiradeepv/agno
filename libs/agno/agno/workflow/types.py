@@ -107,6 +107,23 @@ class StepInput:
         if not step_output:
             return None
 
+        # Check if this is a parallel step with nested steps
+        if step_output.step_type == "Parallel" and step_output.steps:
+            # Return dict with {step_name: content} for each sub-step
+            parallel_content = {}
+            for sub_step in step_output.steps:
+                if sub_step.step_name and sub_step.content:
+                    # Check if this sub-step has its own nested steps (like Condition -> Research Step)
+                    if sub_step.steps and len(sub_step.steps) > 0:
+                        # This is a composite step (like Condition) - get content from its nested steps
+                        for nested_step in sub_step.steps:
+                            if nested_step.step_name and nested_step.content:
+                                parallel_content[nested_step.step_name] = str(nested_step.content)
+                    else:
+                        # This is a direct step - use its content
+                        parallel_content[sub_step.step_name] = str(sub_step.content)
+            return parallel_content if parallel_content else str(step_output.content)
+
         # Regular step, return content directly
         return step_output.content  # type: ignore[return-value]
 
