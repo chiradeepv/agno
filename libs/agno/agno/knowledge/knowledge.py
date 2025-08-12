@@ -348,7 +348,7 @@ class Knowledge:
                     log_info(f"Using Reader: {reader.__class__.__name__}")
                     if reader:
                         read_documents = reader.read(path, name=content.name or path.name)
-                print(f"Read documents: {len(read_documents)}")
+
                 if not content.file_type:
                     content.file_type = path.suffix
 

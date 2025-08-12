@@ -58,37 +58,7 @@ class OpenAIEmbedder(Embedder):
             params.update(self.client_params)
         self.async_client = AsyncOpenAI(**params)
         return self.async_client
-
-    # @property
-    # def aclient(self) -> AsyncOpenAI:
-    #     if self.async_client:
-    #         return self.async_client
-
-    #     params = {
-    #         "api_key": self.api_key,
-    #         "organization": self.organization,
-    #         "base_url": self.base_url,
-    #     }
-    #     params = {k: v for k, v in params.items() if v is not None}
-    #     if self.client_params:
-    #         params.update(self.client_params)
-
-    #     # Add connection limits and timeout settings
-    #     import httpx
-    #     limits = httpx.Limits(max_keepalive_connections=5, max_connections=10)
-    #     timeout = httpx.Timeout(60.0, connect=5.0)
-
-    #     # Create HTTP client with proper settings
-    #     http_client = httpx.AsyncClient(
-    #         limits=limits,
-    #         timeout=timeout,
-    #         # Important: Set follow_redirects and other settings
-    #         follow_redirects=True
-    #     )
-    #     params["http_client"] = http_client
-
-    #     self.async_client = AsyncOpenAI(**params)
-    #     return self.async_client
+        
 
     def response(self, text: str) -> CreateEmbeddingResponse:
         _request_params: Dict[str, Any] = {
