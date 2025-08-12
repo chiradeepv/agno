@@ -409,10 +409,12 @@ class Loop:
         user_id: Optional[str] = None,
         workflow_run_response: Optional[WorkflowRunResponse] = None,
         store_executor_responses: bool = True,
-    ) -> List[StepOutput]:
+    ) -> StepOutput:
         """Execute loop steps asynchronously with iteration control - mirrors workflow execution logic"""
         # Use workflow logger for async loop orchestration
         log_debug(f"Loop Start: {self.name}", center=True, symbol="=")
+
+        loop_step_id = str(uuid4())
 
         # Prepare steps first
         self._prepare_steps()
@@ -484,7 +486,16 @@ class Loop:
         for iteration_results in all_results:
             flattened_results.extend(iteration_results)
 
-        return flattened_results
+        return StepOutput(
+            step_name=self.name,
+            step_id=loop_step_id,
+            step_type="Loop",
+            content=f"Loop {self.name} completed {iteration} iterations with {len(flattened_results)} total steps",
+            success=all(result.success for result in flattened_results) if flattened_results else True,
+            error=None,
+            stop=False,
+            steps=flattened_results,
+        )
 
     async def aexecute_stream(
         self,

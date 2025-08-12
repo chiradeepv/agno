@@ -166,7 +166,16 @@ class Condition:
 
         if not condition_result:
             log_debug(f"Condition {self.name} not met, skipping {len(self.steps)} steps")
-            return []
+            return StepOutput(
+                step_name=self.name,
+                step_id=str(uuid4()),
+                step_type="Condition",
+                content=f"Condition {self.name} not met - skipped {len(self.steps)} steps",
+                success=True,
+                error=None,
+                stop=False,
+                steps=[],
+            )
 
         log_debug(f"Condition {self.name} met, executing {len(self.steps)} steps")
         all_results: List[StepOutput] = []
@@ -412,7 +421,16 @@ class Condition:
 
         if not condition_result:
             log_debug(f"Condition {self.name} not met, skipping {len(self.steps)} steps")
-            return []
+            return StepOutput(
+                step_name=self.name,
+                step_id=str(uuid4()),
+                step_type="Condition",
+                content=f"Condition {self.name} not met - skipped {len(self.steps)} steps",
+                success=True,
+                error=None,
+                stop=False,
+                steps=[],
+            )
 
         log_debug(f"Condition {self.name} met, executing {len(self.steps)} steps")
 
