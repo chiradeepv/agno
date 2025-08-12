@@ -261,21 +261,23 @@ class TeamResponse(BaseModel):
     description: Optional[str] = None
     mode: Optional[str] = None
     model: Optional[ModelResponse] = None
-    tools: Optional[List[Dict[str, Any]]] = None
-    instructions: Optional[Union[List[str], str]] = None
-    members: Optional[List[Union[AgentResponse, "TeamResponse"]]] = None
-    expected_output: Optional[str] = None
-    dependencies: Optional[str] = None
-    enable_agentic_context: Optional[bool] = None
-    memory: Optional[Dict[str, Any]] = None
+    tools: Optional[Dict[str, Any]] = None
+    sessions: Optional[Dict[str, Any]] = None
     knowledge: Optional[Dict[str, Any]] = None
-    async_mode: bool = False
-    session_table: Optional[str] = None
-    memory_table: Optional[str] = None
-    knowledge_table: Optional[str] = None
+    memory: Optional[Dict[str, Any]] = None
+    reasoning: Optional[Dict[str, Any]] = None
+    default_tools: Optional[Dict[str, Any]] = None
+    system_message: Optional[Dict[str, Any]] = None
+    response_settings: Optional[Dict[str, Any]] = None
+    streaming: Optional[Dict[str, Any]] = None
+    members: Optional[List[Union[AgentResponse, "TeamResponse"]]] = None
+    team_settings: Optional[Dict[str, Any]] = None
 
     @classmethod
     def from_team(cls, team: Team, memory_app: Optional[MemoryApp] = None) -> "TeamResponse":
+        def filter_none(d: Dict[str, Any]) -> Dict[str, Any]:
+            return {k: v for k, v in d.items() if v is not None}
+
         if team.model is None:
             raise ValueError("Team model is required")
 
@@ -285,7 +287,7 @@ class TeamResponse(BaseModel):
             async_mode=True,
         )
         team_tools = list(team._functions_for_model.values()) if team._functions_for_model else []
-        formatted_tools = format_team_tools(team_tools)
+        formatted_tools = format_team_tools(team_tools) if team_tools else None
 
         model_name = team.model.name or team.model.__class__.__name__ if team.model else None
         model_provider = team.model.provider or team.model.__class__.__name__ if team.model else ""
@@ -300,47 +302,144 @@ class TeamResponse(BaseModel):
         else:
             model_provider = ""
 
+        session_table = team.db.session_table_name if team.db else None
+        knowledge_table = team.db.knowledge_table_name if team.db and team.knowledge else None
+
+        tools_info = {
+            "tools": formatted_tools,
+            "tool_call_limit": team.tool_call_limit,
+            "tool_choice": team.tool_choice,
+        }
+
+        sessions_info = {
+            "session_table": session_table,
+            "add_history_to_context": team.add_history_to_context,
+            "enable_session_summaries": team.enable_session_summaries,
+            "num_history_runs": team.num_history_runs,
+            "add_session_summary_references": team.add_session_summary_references,
+            "cache_session": team.cache_session,
+        }
+
+        knowledge_info = {
+            "knowledge_table": knowledge_table,
+            "enable_agentic_knowledge_filters": team.enable_agentic_knowledge_filters,
+            "knowledge_filters": team.knowledge_filters,
+            "add_references": team.add_references,
+            "references_format": team.references_format,
+        }
+
         memory_info: Optional[Dict[str, Any]] = None
         if team.memory_manager is not None:
             memory_app_name = memory_app.display_name if memory_app else "Memory"
-            memory_info = {"app_name": memory_app_name, "app_url": memory_app.router_prefix if memory_app else None}
+            memory_info = {
+                "app_name": memory_app_name,
+                "app_url": memory_app.router_prefix if memory_app else None,
+                "enable_agentic_memory": team.enable_agentic_memory,
+                "enable_user_memories": team.enable_user_memories,
+                "add_memory_references": team.add_memory_references,
+                "memory_table": team.db.memory_table_name if team.db and team.enable_user_memories else None,
+            }
+
             if team.memory_manager.model is not None:
                 memory_info["model"] = ModelResponse(
                     name=team.memory_manager.model.name,
                     model=team.memory_manager.model.id,
                     provider=team.memory_manager.model.provider,
-                )
+                ).model_dump()
 
-        session_table = team.db.session_table_name if team.db else None
-        memory_table = team.db.memory_table_name if team.db and team.enable_user_memories else None
-        knowledge_table = team.db.knowledge_table_name if team.db and team.knowledge else None
+        reasoning_info = {
+            "reasoning": team.reasoning,
+            "reasoning_agent_id": team.reasoning_agent.agent_id if team.reasoning_agent else None,
+            "reasoning_min_steps": team.reasoning_min_steps,
+            "reasoning_max_steps": team.reasoning_max_steps,
+        }
+
+        if team.reasoning_model:
+            reasoning_info["reasoning_model"] = ModelResponse(
+                name=team.reasoning_model.name,
+                model=team.reasoning_model.id,
+                provider=team.reasoning_model.provider,
+            ).model_dump()
+
+        default_tools_info = {
+            "search_knowledge": team.search_knowledge,
+            "read_team_history": team.read_team_history,
+            "get_member_information_tool": team.get_member_information_tool,
+        }
 
         team_instructions = team.instructions() if isinstance(team.instructions, Callable) else team.instructions
+
+        system_message_info = {
+            "system_message": str(team.system_message) if team.system_message else None,
+            "system_message_role": team.system_message_role,
+            "description": team.description,
+            "instructions": team_instructions,
+            "expected_output": team.expected_output,
+            "additional_context": team.additional_context,
+            "markdown": team.markdown,
+            "add_datetime_to_context": team.add_datetime_to_context,
+            "add_location_to_context": team.add_location_to_context,
+            "add_member_tools_to_system_message": team.add_member_tools_to_system_message,
+            "add_state_in_messages": team.add_state_in_messages,
+        }
+
+        response_settings_info = {
+            "response_model_name": team.response_model.__name__ if team.response_model else None,
+            "parser_model_prompt": team.parser_model_prompt,
+            "parse_response": team.parse_response,
+            "use_json_mode": team.use_json_mode,
+        }
+
+        if team.parser_model:
+            response_settings_info["parser_model"] = ModelResponse(
+                name=team.parser_model.name,
+                model=team.parser_model.id,
+                provider=team.parser_model.provider,
+            ).model_dump()
+
+        streaming_info = {
+            "stream": team.stream,
+            "stream_intermediate_steps": team.stream_intermediate_steps,
+            "stream_member_events": team.stream_member_events,
+        }
+
+        team_settings_info = {
+            "mode": team.mode,
+            "enable_agentic_context": team.enable_agentic_context,
+            "share_member_interactions": team.share_member_interactions,
+            "dependencies": json.dumps(team.dependencies) if isinstance(team.dependencies, dict) else team.dependencies,
+            "add_dependencies_to_context": team.add_dependencies_to_context,
+            "parent_team_id": team.parent_team_id,
+            "workflow_id": team.workflow_id,
+            "workflow_session_id": team.workflow_session_id,
+            "role": team.role,
+            "extra_data": team.extra_data,
+            "store_events": team.store_events,
+            "os_id": team.os_id,
+        }
 
         return TeamResponse(
             team_id=team.team_id,
             name=team.name,
             model=ModelResponse(
-                name=team.model.name or team.model.__class__.__name__ if team.model else None,
-                model=team.model.id if team.model else None,
-                provider=team.model.provider or team.model.__class__.__name__ if team.model else None,
+                name=model_name,
+                model=model_id,
+                provider=model_provider,
             ),
-            instructions=team_instructions,
-            description=team.description,
-            tools=formatted_tools,
-            expected_output=team.expected_output,
-            dependencies=json.dumps(team.dependencies) if isinstance(team.dependencies, dict) else team.dependencies,
-            enable_agentic_context=team.enable_agentic_context,
-            mode=team.mode,
-            memory=memory_info,
-            knowledge={"name": team.knowledge.__class__.__name__} if team.knowledge else None,
-            session_table=session_table,
-            memory_table=memory_table,
-            knowledge_table=knowledge_table,
+            tools=filter_none(tools_info),
+            sessions=filter_none(sessions_info),
+            knowledge=filter_none(knowledge_info),
+            memory=filter_none(memory_info) if memory_info else None,
+            reasoning=filter_none(reasoning_info),
+            default_tools=filter_none(default_tools_info),
+            system_message=filter_none(system_message_info),
+            response_settings=filter_none(response_settings_info),
+            streaming=filter_none(streaming_info),
+            team_settings=filter_none(team_settings_info),
             members=[  # type: ignore
-                AgentResponse.from_agent(member)
+                AgentResponse.from_agent(member, memory_app)
                 if isinstance(member, Agent)
-                else TeamResponse.from_team(member)
+                else TeamResponse.from_team(member, memory_app)
                 if isinstance(member, Team)
                 else None
                 for member in team.members
