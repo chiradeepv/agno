@@ -107,14 +107,6 @@ class StepInput:
         if not step_output:
             return None
 
-        # If this is a parallel step with sub-outputs, return structured dict
-        if step_output.parallel_step_outputs:
-            return {
-                sub_step_name: sub_output.content  # type: ignore[misc]
-                for sub_step_name, sub_output in step_output.parallel_step_outputs.items()
-                if sub_output.content
-            }
-
         # Regular step, return content directly
         return step_output.content  # type: ignore[return-value]
 
@@ -184,13 +176,11 @@ class StepOutput:
 
     step_name: Optional[str] = None
     step_id: Optional[str] = None
+    step_type: Optional[str] = None
     executor_type: Optional[str] = None
     executor_name: Optional[str] = None
     # Primary output
     content: Optional[Union[str, Dict[str, Any], List[Any], BaseModel, Any]] = None
-
-    # For parallel steps: store individual step outputs
-    parallel_step_outputs: Optional[Dict[str, "StepOutput"]] = None
 
     # Link to the run ID of the step execution
     step_run_id: Optional[str] = None
@@ -208,6 +198,8 @@ class StepOutput:
 
     stop: bool = False
 
+    steps: Optional[List["StepOutput"]] = None
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary"""
         # Handle the unified content field
@@ -220,10 +212,11 @@ class StepOutput:
             else:
                 content_dict = str(self.content)
 
-        return {
+        result = {
             "content": content_dict,
             "step_name": self.step_name,
             "step_id": self.step_id,
+            "step_type": self.step_type,
             "executor_type": self.executor_type,
             "executor_name": self.executor_name,
             "step_run_id": self.step_run_id,
@@ -235,6 +228,12 @@ class StepOutput:
             "error": self.error,
             "stop": self.stop,
         }
+
+        # Add nested steps if they exist
+        if self.steps:
+            result["steps"] = [step.to_dict() for step in self.steps]
+
+        return result
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "StepOutput":
@@ -252,9 +251,16 @@ class StepOutput:
         if audio:
             audio = [AudioArtifact.model_validate(aud) for aud in audio]
 
+        # Handle nested steps
+        steps_data = data.get("steps")
+        steps = None
+        if steps_data:
+            steps = [cls.from_dict(step_data) for step_data in steps_data]
+
         return cls(
             step_name=data.get("step_name"),
             step_id=data.get("step_id"),
+            step_type=data.get("step_type"),
             executor_type=data.get("executor_type"),
             executor_name=data.get("executor_name"),
             content=data.get("content"),
@@ -266,6 +272,7 @@ class StepOutput:
             success=data.get("success", True),
             error=data.get("error"),
             stop=data.get("stop", False),
+            steps=steps,
         )
 
 

@@ -468,13 +468,13 @@ class Workflow:
 
             # Add step-specific metrics
             if step_output.step_name and step_output.metrics:
-                if step_output.parallel_step_outputs:
+                if step_output.step_type == "Parallel" and step_output.steps:
                     # This is a parallel step - create nested step metrics for each sub-step
                     parallel_step_metrics = {}
-                    for sub_step_name, sub_step_output in step_output.parallel_step_outputs.items():
-                        if sub_step_output.metrics:
-                            parallel_step_metrics[sub_step_name] = StepMetrics(
-                                step_name=sub_step_name,
+                    for sub_step_output in step_output.steps:
+                        if sub_step_output.metrics and sub_step_output.step_name:
+                            parallel_step_metrics[sub_step_output.step_name] = StepMetrics(
+                                step_name=sub_step_output.step_name,
                                 executor_type=sub_step_output.executor_type or "unknown",
                                 executor_name=sub_step_output.executor_name or "unknown",
                                 metrics=sub_step_output.metrics,
@@ -1133,7 +1133,7 @@ class Workflow:
                         workflow_run_response=workflow_run_response,
                         step_index=i,
                         store_executor_responses=self.store_executor_responses,
-                        parent_step_id=workflow_run_response.run_id
+                        parent_step_id=workflow_run_response.run_id,
                     ):
                         if isinstance(event, StepOutput):
                             step_output = event
@@ -1960,6 +1960,36 @@ class Workflow:
                 **kwargs,
             )
 
+    def _print_step_output_recursive(
+        self, step_output: StepOutput, step_number: int, markdown: bool, console, depth: int = 0
+    ) -> None:
+        """Recursively print step output and its nested steps"""
+        from rich.markdown import Markdown
+
+        from agno.utils.response import create_panel
+
+        # Print the current step
+        if step_output.content:
+            formatted_content = self._format_step_content_for_display(step_output)
+
+            # Create title with proper nesting indication
+            if depth == 0:
+                title = f"Step {step_number}: {step_output.step_name} (Completed)"
+            else:
+                title = f"{'  ' * depth}└─ {step_output.step_name} (Completed)"
+
+            step_panel = create_panel(
+                content=Markdown(formatted_content) if markdown else formatted_content,
+                title=title,
+                border_style="orange3",
+            )
+            console.print(step_panel)
+
+        # Print nested steps if they exist
+        if step_output.steps:
+            for j, nested_step in enumerate(step_output.steps):
+                self._print_step_output_recursive(nested_step, j + 1, markdown, console, depth + 1)
+
     def _print_response(
         self,
         message: Optional[Union[str, Dict[str, Any], List[Any], BaseModel]] = None,
@@ -2052,28 +2082,7 @@ class Workflow:
 
                 if show_step_details and workflow_response.step_results:
                     for i, step_output in enumerate(workflow_response.step_results):
-                        # Handle both single StepOutput and List[StepOutput] (from loop/parallel steps)
-                        if isinstance(step_output, list):
-                            # This is a loop or parallel step with multiple outputs
-                            for j, sub_step_output in enumerate(step_output):
-                                if sub_step_output.content:
-                                    formatted_content = self._format_step_content_for_display(sub_step_output)
-                                    step_panel = create_panel(
-                                        content=Markdown(formatted_content) if markdown else formatted_content,
-                                        title=f"Step {i + 1}.{j + 1}: {sub_step_output.step_name} (Completed)",
-                                        border_style="orange3",
-                                    )
-                                    console.print(step_panel)  # type: ignore
-                        else:
-                            # This is a regular single step
-                            if step_output.content:
-                                formatted_content = self._format_step_content_for_display(step_output)
-                                step_panel = create_panel(
-                                    content=Markdown(formatted_content) if markdown else formatted_content,
-                                    title=f"Step {i + 1}: {step_output.step_name} (Completed)",
-                                    border_style="orange3",
-                                )
-                                console.print(step_panel)  # type: ignore
+                        self._print_step_output_recursive(step_output, i + 1, markdown, console)
 
                 # For callable functions, show the content directly since there are no step_results
                 elif show_step_details and callable(self.steps) and workflow_response.content:

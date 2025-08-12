@@ -131,7 +131,7 @@ class Loop:
         user_id: Optional[str] = None,
         workflow_run_response: Optional[WorkflowRunResponse] = None,
         store_executor_responses: bool = True,
-    ) -> List[StepOutput]:
+    ) -> StepOutput:
         """Execute loop steps with iteration control - mirrors workflow execution logic"""
         # Use workflow logger for loop orchestration
         log_debug(f"Loop Start: {self.name}", center=True, symbol="=")
@@ -203,7 +203,16 @@ class Loop:
         for iteration_results in all_results:
             flattened_results.extend(iteration_results)
 
-        return flattened_results
+        return StepOutput(
+            step_name=self.name,
+            step_id=str(uuid4()),
+            step_type="Loop",
+            content=f"Loop {self.name} completed {iteration} iterations with {len(flattened_results)} total steps",
+            success=all(result.success for result in flattened_results) if flattened_results else True,
+            error=None,
+            stop=False,
+            steps=flattened_results,
+        )
 
     def execute_stream(
         self,
@@ -378,9 +387,20 @@ class Loop:
                 parent_step_id=parent_step_id,
             )
 
+        flattened_results = []
         for iteration_results in all_results:
-            for step_output in iteration_results:
-                yield step_output
+            flattened_results.extend(iteration_results)
+
+        yield StepOutput(
+            step_name=self.name,
+            step_id=loop_step_id,
+            step_type="Loop",
+            content=f"Loop {self.name} completed {iteration} iterations with {len(flattened_results)} total steps",
+            success=all(result.success for result in flattened_results) if flattened_results else True,
+            error=None,
+            stop=False,
+            steps=flattened_results,
+        )
 
     async def aexecute(
         self,
@@ -642,6 +662,17 @@ class Loop:
                 parent_step_id=parent_step_id,
             )
 
+        flattened_results = []
         for iteration_results in all_results:
-            for step_output in iteration_results:
-                yield step_output
+            flattened_results.extend(iteration_results)
+
+        yield StepOutput(
+            step_name=self.name,
+            step_id=loop_step_id,
+            step_type="Loop",
+            content=f"Loop {self.name} completed {iteration} iterations with {len(flattened_results)} total steps",
+            success=all(result.success for result in flattened_results) if flattened_results else True,
+            error=None,
+            stop=False,
+            steps=flattened_results,
+        )

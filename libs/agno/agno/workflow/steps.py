@@ -122,6 +122,8 @@ class Steps:
         """Execute all steps in sequence and return the final result"""
         log_debug(f"Steps Start: {self.name} ({len(self.steps)} steps)", center=True, symbol="-")
 
+        steps_id = str(uuid4())
+
         self._prepare_steps()
 
         if not self.steps:
@@ -170,7 +172,17 @@ class Steps:
                 )
 
             log_debug(f"Steps End: {self.name} ({len(all_results)} results)", center=True, symbol="-")
-            return all_results
+
+            return StepOutput(
+                step_name=self.name,
+                step_id=steps_id,
+                step_type="Steps",
+                content=f"Steps {self.name} completed with {len(all_results)} results",
+                success=all(result.success for result in all_results) if all_results else True,
+                error=None,
+                stop=False,
+                steps=all_results,
+            )
 
         except Exception as e:
             logger.error(f"Steps execution failed: {e}")
@@ -192,7 +204,7 @@ class Steps:
         stream_intermediate_steps: bool = False,
         step_index: Optional[Union[int, tuple]] = None,
         store_executor_responses: bool = True,
-        parent_step_id: Optional[str] = None
+        parent_step_id: Optional[str] = None,
     ) -> Iterator[Union[WorkflowRunResponseEvent, TeamRunResponseEvent, RunResponseEvent, StepOutput]]:
         """Execute all steps in sequence with streaming support"""
         log_debug(f"Steps Start: {self.name} ({len(self.steps)} steps)", center=True, symbol="-")
@@ -212,7 +224,7 @@ class Steps:
                 step_index=step_index,
                 steps_count=len(self.steps),
                 step_id=steps_id,
-                parent_step_id=parent_step_id
+                parent_step_id=parent_step_id,
             )
 
         if not self.steps:
@@ -247,7 +259,7 @@ class Steps:
                     workflow_run_response=workflow_run_response,
                     step_index=child_step_index,
                     store_executor_responses=store_executor_responses,
-                    parent_step_id=steps_id
+                    parent_step_id=steps_id,
                 ):
                     if isinstance(event, StepOutput):
                         step_outputs_for_step.append(event)
@@ -295,11 +307,19 @@ class Steps:
                     executed_steps=len(all_results),
                     step_results=all_results,
                     step_id=steps_id,
-                    parent_step_id=parent_step_id
+                    parent_step_id=parent_step_id,
                 )
 
-            for result in all_results:
-                yield result
+            yield StepOutput(
+                step_name=self.name,
+                step_id=steps_id,
+                step_type="Steps",
+                content=f"Steps {self.name} completed with {len(all_results)} results",
+                success=all(result.success for result in all_results) if all_results else True,
+                error=None,
+                stop=False,
+                steps=all_results,
+            )
 
         except Exception as e:
             logger.error(f"Steps streaming failed: {e}")
@@ -321,6 +341,8 @@ class Steps:
     ) -> List[StepOutput]:
         """Execute all steps in sequence asynchronously and return the final result"""
         log_debug(f"Steps Start: {self.name} ({len(self.steps)} steps)", center=True, symbol="-")
+
+        steps_id = str(uuid4())
 
         self._prepare_steps()
 
@@ -369,7 +391,17 @@ class Steps:
                 )
 
             log_debug(f"Steps End: {self.name} ({len(all_results)} results)", center=True, symbol="-")
-            return all_results
+
+            return StepOutput(
+                step_name=self.name,
+                step_id=steps_id,
+                step_type="Steps",
+                content=f"Steps {self.name} completed with {len(all_results)} results",
+                success=all(result.success for result in all_results) if all_results else True,
+                error=None,
+                stop=False,
+                steps=all_results,
+            )
 
         except Exception as e:
             logger.error(f"Async steps execution failed: {e}")
@@ -391,7 +423,7 @@ class Steps:
         stream_intermediate_steps: bool = False,
         step_index: Optional[Union[int, tuple]] = None,
         store_executor_responses: bool = True,
-        parent_step_id: Optional[str] = None
+        parent_step_id: Optional[str] = None,
     ) -> AsyncIterator[Union[WorkflowRunResponseEvent, TeamRunResponseEvent, RunResponseEvent, StepOutput]]:
         """Execute all steps in sequence with async streaming support"""
         log_debug(f"Steps Start: {self.name} ({len(self.steps)} steps)", center=True, symbol="-")
@@ -411,7 +443,7 @@ class Steps:
                 step_index=step_index,
                 steps_count=len(self.steps),
                 step_id=steps_id,
-                parent_step_id=parent_step_id
+                parent_step_id=parent_step_id,
             )
 
         if not self.steps:
@@ -446,7 +478,7 @@ class Steps:
                     workflow_run_response=workflow_run_response,
                     step_index=child_step_index,
                     store_executor_responses=store_executor_responses,
-                    parent_step_id=steps_id
+                    parent_step_id=steps_id,
                 ):
                     if isinstance(event, StepOutput):
                         step_outputs_for_step.append(event)
@@ -493,11 +525,19 @@ class Steps:
                     executed_steps=len(all_results),
                     step_results=all_results,
                     step_id=steps_id,
-                    parent_step_id=parent_step_id
+                    parent_step_id=parent_step_id,
                 )
 
-            for result in all_results:
-                yield result
+            yield StepOutput(
+                step_name=self.name,
+                step_id=steps_id,
+                step_type="Steps",
+                content=f"Steps {self.name} completed with {len(all_results)} results",
+                success=all(result.success for result in all_results) if all_results else True,
+                error=None,
+                stop=False,
+                steps=all_results,
+            )
 
         except Exception as e:
             logger.error(f"Async steps streaming failed: {e}")

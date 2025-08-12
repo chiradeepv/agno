@@ -149,9 +149,11 @@ class Router:
         user_id: Optional[str] = None,
         workflow_run_response: Optional[WorkflowRunResponse] = None,
         store_executor_responses: bool = True,
-    ) -> List[StepOutput]:
+    ) -> StepOutput:
         """Execute the router and its selected steps with sequential chaining"""
         log_debug(f"Router Start: {self.name}", center=True, symbol="-")
+
+        router_step_id = str(uuid4())
 
         self._prepare_steps()
 
@@ -212,7 +214,17 @@ class Router:
                 break
 
         log_debug(f"Router End: {self.name} ({len(all_results)} results)", center=True, symbol="-")
-        return all_results
+
+        return StepOutput(
+            step_name=self.name,
+            step_id=router_step_id,
+            step_type="Router",
+            content=f"Router {self.name} completed with {len(all_results)} results",
+            success=all(result.success for result in all_results) if all_results else True,
+            error=None,
+            stop=False,
+            steps=all_results,
+        )
 
     def execute_stream(
         self,
@@ -223,7 +235,7 @@ class Router:
         workflow_run_response: Optional[WorkflowRunResponse] = None,
         step_index: Optional[Union[int, tuple]] = None,
         store_executor_responses: bool = True,
-        parent_step_id: Optional[str] = None
+        parent_step_id: Optional[str] = None,
     ) -> Iterator[Union[WorkflowRunResponseEvent, StepOutput]]:
         """Execute the router with streaming support"""
         log_debug(f"Router Start: {self.name}", center=True, symbol="-")
@@ -349,8 +361,16 @@ class Router:
                 parent_step_id=parent_step_id,
             )
 
-        for result in all_results:
-            yield result
+        yield StepOutput(
+            step_name=self.name,
+            step_id=router_step_id,
+            step_type="Router",
+            content=f"Router {self.name} completed with {len(all_results)} results",
+            success=all(result.success for result in all_results) if all_results else True,
+            error=None,
+            stop=False,
+            steps=all_results,
+        )
 
     async def aexecute(
         self,
@@ -362,6 +382,8 @@ class Router:
     ) -> List[StepOutput]:
         """Async execute the router and its selected steps with sequential chaining"""
         log_debug(f"Router Start: {self.name}", center=True, symbol="-")
+
+        router_step_id = str(uuid4())
 
         self._prepare_steps()
 
@@ -425,7 +447,17 @@ class Router:
                 break  # Stop on first error
 
         log_debug(f"Router End: {self.name} ({len(all_results)} results)", center=True, symbol="-")
-        return all_results
+
+        return StepOutput(
+            step_name=self.name,
+            step_id=router_step_id,
+            step_type="Router",
+            content=f"Router {self.name} completed with {len(all_results)} results",
+            success=all(result.success for result in all_results) if all_results else True,
+            error=None,
+            stop=False,
+            steps=all_results,
+        )
 
     async def aexecute_stream(
         self,
@@ -564,5 +596,13 @@ class Router:
                 parent_step_id=parent_step_id,
             )
 
-        for result in all_results:
-            yield result
+        yield StepOutput(
+            step_name=self.name,
+            step_id=router_step_id,
+            step_type="Router",
+            content=f"Router {self.name} completed with {len(all_results)} results",
+            success=all(result.success for result in all_results) if all_results else True,
+            error=None,
+            stop=False,
+            steps=all_results,
+        )

@@ -826,6 +826,7 @@ class Step:
         if isinstance(response, StepOutput):
             response.step_name = self.name or "unnamed_step"
             response.step_id = self.step_id
+            response.step_type = "Step"
             response.executor_type = self._executor_type
             response.executor_name = self.executor_name
             return response
@@ -841,6 +842,7 @@ class Step:
         return StepOutput(
             step_name=self.name or "unnamed_step",
             step_id=self.step_id,
+            step_type="Step",
             executor_type=self._executor_type,
             executor_name=self.executor_name,
             content=response.content,
