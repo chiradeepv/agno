@@ -5073,7 +5073,7 @@ class Team:
         if self.add_session_summary_to_context and session.summary is not None:
             system_message_content += "Here is a brief summary of your previous interactions:\n\n"
             system_message_content += "<summary_of_previous_interactions>\n"
-            system_message_content += session.summary
+            system_message_content += session.summary.summary
             system_message_content += "\n</summary_of_previous_interactions>\n\n"
             system_message_content += (
                 "Note: this information is from previous interactions and may be outdated. "
@@ -5683,7 +5683,7 @@ class Team:
 
         return get_team_history
 
-    def update_session_state_tool(session_state: Dict[str, Any], updates: Dict[str, Any]) -> str:
+    def update_session_state_tool(self, session_state: Dict[str, Any], updates: Dict[str, Any]) -> str:
         """
         Update the shared session state.
 
@@ -5699,11 +5699,16 @@ class Team:
 
         log_info(f"Adding messages from history for {member_agent.name}")
 
+        if hasattr(member_agent, "parent_team_id"):
+            team_id = member_agent.parent_team_id
+        else:
+            team_id = member_agent.team_id
+
         history = session.get_messages_from_last_n_runs(
             last_n=member_agent.num_history_runs or self.num_history_runs,
             skip_role=self.system_message_role,
             agent_id=member_agent.agent_id,
-            team_id=member_agent.team_id if member_agent.agent_id is None else None,
+            team_id=team_id,
             member_runs=True,
         )
 
@@ -5716,6 +5721,7 @@ class Team:
                 _msg.from_history = True
 
             return history_copy
+        return []
 
     def _determine_team_member_interactions(
         self, team_run_context: Dict[str, Any], images: List[Image], videos: List[Video], audio: List[Audio]
@@ -5900,11 +5906,12 @@ class Team:
                 )
 
                 # Add the member run to the team run response
-                if self.store_member_responses and run_response:
+                if self.store_member_responses and run_response and member_agent_run_response:
                     run_response.add_member_run(member_agent_run_response)
 
                 # Add the member run to the team session
-                session.upsert_run(member_agent_run_response)
+                if member_agent_run_response:
+                    session.upsert_run(member_agent_run_response)
 
                 # Update team session state
                 merge_dictionaries(session_state, member_session_state_copy)  # type: ignore
@@ -6214,11 +6221,12 @@ class Team:
             )
 
             # Add the member run to the team run response
-            if self.store_member_responses and run_response:
+            if self.store_member_responses and run_response and member_agent_run_response:
                 run_response.add_member_run(member_agent_run_response)
 
             # Add the member run to the team session
-            session.upsert_run(member_agent_run_response)
+            if member_agent_run_response:
+                session.upsert_run(member_agent_run_response)
 
             # Update team session state
             merge_dictionaries(session_state, member_session_state_copy)  # type: ignore
@@ -6278,7 +6286,7 @@ class Team:
 
             member_session_state_copy = copy(session_state)
             if stream:
-                member_agent_run_response_stream = member_agent.arun(
+                member_agent_run_response_stream = member_agent.arun(  # type: ignore
                     message=member_agent_task if history is None else None,
                     user_id=user_id,
                     # All members have the same session_id
@@ -6307,7 +6315,7 @@ class Team:
                     check_if_run_cancelled(member_agent_run_response_event)
                     yield member_agent_run_response_event
             else:
-                member_agent_run_response = await member_agent.arun(
+                member_agent_run_response = await member_agent.arun(  # type: ignore
                     message=member_agent_task if history is None else None,
                     user_id=user_id,
                     # All members have the same session_id
@@ -6363,11 +6371,12 @@ class Team:
             )
 
             # Add the member run to the team run response
-            if self.store_member_responses and run_response:
+            if self.store_member_responses and run_response and member_agent_run_response:
                 run_response.add_member_run(member_agent_run_response)
 
             # Add the member run to the team session
-            session.upsert_run(member_agent_run_response)
+            if member_agent_run_response:
+                session.upsert_run(member_agent_run_response)
 
             # Update team session state
             merge_dictionaries(session_state, member_session_state_copy)  # type: ignore
@@ -6553,11 +6562,12 @@ class Team:
             )
 
             # Add the member run to the team run response
-            if self.store_member_responses and run_response:
+            if self.store_member_responses and run_response and member_agent_run_response:
                 run_response.add_member_run(member_agent_run_response)
 
             # Add the member run to the team session
-            session.upsert_run(member_agent_run_response)
+            if member_agent_run_response:
+                session.upsert_run(member_agent_run_response)
 
             # Update team session state
             merge_dictionaries(session_state, member_session_state_copy)  # type: ignore
@@ -6615,7 +6625,7 @@ class Team:
             # 2. Get the response from the member agent
             member_session_state_copy = copy(session_state)
             if stream:
-                member_agent_run_response_stream = member_agent.arun(
+                member_agent_run_response_stream = member_agent.arun(  # type: ignore
                     message=member_agent_task if history is None else None,
                     user_id=user_id,
                     # All members have the same session_id
@@ -6644,7 +6654,7 @@ class Team:
                     check_if_run_cancelled(member_agent_run_response_event)
                     yield member_agent_run_response_event
             else:
-                member_agent_run_response = await member_agent.arun(
+                member_agent_run_response = await member_agent.arun(  # type: ignore
                     message=member_agent_task if history is None else None,
                     user_id=user_id,
                     # All members have the same session_id
@@ -6699,11 +6709,12 @@ class Team:
             )
 
             # Add the member run to the team run response
-            if self.store_member_responses and run_response:
+            if self.store_member_responses and run_response and member_agent_run_response:
                 run_response.add_member_run(member_agent_run_response)
 
             # Add the member run to the team session
-            session.upsert_run(member_agent_run_response)
+            if member_agent_run_response:
+                session.upsert_run(member_agent_run_response)
 
             # Update team session state
             merge_dictionaries(session_state, member_session_state_copy)  # type: ignore
@@ -6732,7 +6743,7 @@ class Team:
             if not self.db:
                 raise ValueError("Db not initialized")
             session = self.db.get_session(session_id=session_id, session_type=SessionType.TEAM)
-            return session
+            return session  # type: ignore
         except Exception as e:
             log_warning(f"Error getting session from db: {e}")
             return None
@@ -6743,10 +6754,10 @@ class Team:
         try:
             if not self.db:
                 raise ValueError("Db not initialized")
-            return self.db.upsert_session(session=session)
+            return self.db.upsert_session(session=session)  # type: ignore
         except Exception as e:
             log_warning(f"Error upserting session into db: {e}")
-            return None
+        return None
 
     def get_run_response(self, run_id: str, session_id: Optional[str] = None) -> Optional[TeamRunResponse]:
         """
@@ -6786,13 +6797,13 @@ class Team:
         if self._team_session is not None and self._team_session.runs is not None and len(self._team_session.runs) > 0:
             run_response = self._team_session.runs[-1]
             if run_response is not None:
-                return run_response
+                return run_response  # type: ignore
         else:
             agent_session = self.get_session(session_id=session_id)
             if agent_session is not None and agent_session.runs is not None and len(agent_session.runs) > 0:
                 run_response = agent_session.runs[-1]
                 if run_response is not None:
-                    return run_response
+                    return run_response  # type: ignore
             else:
                 log_warning(f"No run responses found in AgentSession {session_id}")
                 return None
@@ -6853,7 +6864,7 @@ class Team:
 
         # Try to load from database
         if self.db is not None:
-            team_session = cast(TeamSession, self._read_session(session_id=session_id_to_load))
+            team_session = cast(TeamSession, self._read_session(session_id=session_id_to_load))  # type: ignore
             return team_session
 
         log_warning(f"TeamSession {session_id_to_load} not found in db")
@@ -6862,8 +6873,9 @@ class Team:
     def save_session(self, session: TeamSession) -> None:
         """Save the TeamSession to storage"""
         if self.db is not None and self.parent_team_id is None and self.workflow_id is None:
-            session.session_data["session_state"].pop("current_session_id", None)
-            session.session_data["session_state"].pop("current_user_id", None)
+            if "session_state" in session.session_data:
+                session.session_data["session_state"].pop("current_session_id", None)
+                session.session_data["session_state"].pop("current_user_id", None)
 
             # TODO: Add image/audio/video artifacts to the session correctly, from runs
             if self.images is not None:
@@ -6882,7 +6894,7 @@ class Team:
         from agno.utils.merge_dict import merge_dictionaries
 
         # Get the session_state from the database and update the current session_state
-        if "session_state" in session.session_data:
+        if session.session_data is not None and "session_state" in session.session_data:
             session_state_from_db = session.session_data.get("session_state")
 
             if (
@@ -6896,7 +6908,8 @@ class Team:
                 session_state = session_state_from_db
 
         # Update the session_state in the session
-        session.session_data["session_state"] = session_state
+        if session.session_data is not None:
+            session.session_data["session_state"] = session_state
 
         return session_state
 
@@ -6971,7 +6984,8 @@ class Team:
             raise Exception("Session Name is not set")
 
         # -*- Rename session
-        session.session_data["session_name"] = session_name
+        if session.session_data is not None:
+            session.session_data["session_name"] = session_name
 
         # -*- Save to storage
         self.save_session(session=session)  # type: ignore
@@ -7021,7 +7035,7 @@ class Team:
 
         session = self.get_session(session_id=session_id)
 
-        return session.get_session_summary()
+        return session.get_session_summary()  # type: ignore
 
     def get_user_memories(self, user_id: Optional[str] = None) -> Optional[List[UserMemory]]:
         """Get the user memories for the given user ID."""

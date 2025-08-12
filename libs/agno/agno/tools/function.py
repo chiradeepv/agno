@@ -121,6 +121,8 @@ class Function(BaseModel):
     _agent: Optional[Any] = None
     # The team that the function is associated with
     _team: Optional[Any] = None
+    # The session state that the function is associated with
+    _session_state: Optional[Dict[str, Any]] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return self.model_dump(
