@@ -1,6 +1,7 @@
 import inspect
 from dataclasses import dataclass
 from typing import AsyncIterator, Awaitable, Callable, Dict, Iterator, List, Optional, Union
+from uuid import uuid4
 
 from agno.run.response import RunResponseEvent
 from agno.run.team import TeamRunResponseEvent
@@ -232,9 +233,12 @@ class Condition:
         workflow_run_response: Optional[WorkflowRunResponse] = None,
         step_index: Optional[Union[int, tuple]] = None,
         store_executor_responses: bool = True,
+        parent_step_id: Optional[str] = None
     ) -> Iterator[Union[WorkflowRunResponseEvent, StepOutput]]:
         """Execute the condition with streaming support - mirrors Loop logic"""
         log_debug(f"Condition Start: {self.name}", center=True, symbol="-")
+
+        conditional_step_id = str(uuid4())
 
         self._prepare_steps()
 
@@ -252,6 +256,8 @@ class Condition:
                 step_name=self.name,
                 step_index=step_index,
                 condition_result=condition_result,
+                step_id=conditional_step_id,
+                parent_step_id=parent_step_id
             )
 
         if not condition_result:
@@ -267,6 +273,8 @@ class Condition:
                     condition_result=False,
                     executed_steps=0,
                     step_results=[],
+                    step_id=conditional_step_id,
+                    parent_step_id=parent_step_id
                 )
             return
 
@@ -296,6 +304,7 @@ class Condition:
                     workflow_run_response=workflow_run_response,
                     step_index=child_step_index,
                     store_executor_responses=store_executor_responses,
+                    parent_step_id=conditional_step_id
                 ):
                     if isinstance(event, StepOutput):
                         step_outputs_for_step.append(event)
@@ -355,6 +364,8 @@ class Condition:
                 condition_result=True,
                 executed_steps=len(self.steps),
                 step_results=all_results,
+                step_id=conditional_step_id,
+                parent_step_id=parent_step_id
             )
 
         for result in all_results:
@@ -448,9 +459,12 @@ class Condition:
         workflow_run_response: Optional[WorkflowRunResponse] = None,
         step_index: Optional[Union[int, tuple]] = None,
         store_executor_responses: bool = True,
+        parent_step_id: Optional[str] = None
     ) -> AsyncIterator[Union[WorkflowRunResponseEvent, TeamRunResponseEvent, RunResponseEvent, StepOutput]]:
         """Async execute the condition with streaming support - mirrors Loop logic"""
         log_debug(f"Condition Start: {self.name}", center=True, symbol="-")
+
+        conditional_step_id = str(uuid4())
 
         self._prepare_steps()
 
@@ -468,6 +482,8 @@ class Condition:
                 step_name=self.name,
                 step_index=step_index,
                 condition_result=condition_result,
+                step_id=conditional_step_id,
+                parent_step_id=parent_step_id
             )
 
         if not condition_result:
@@ -483,6 +499,8 @@ class Condition:
                     condition_result=False,
                     executed_steps=0,
                     step_results=[],
+                    step_id=conditional_step_id,
+                    parent_step_id=parent_step_id
                 )
             return
 
@@ -514,6 +532,7 @@ class Condition:
                     workflow_run_response=workflow_run_response,
                     step_index=child_step_index,
                     store_executor_responses=store_executor_responses,
+                    parent_step_id=conditional_step_id
                 ):
                     if isinstance(event, StepOutput):
                         step_outputs_for_step.append(event)
@@ -574,6 +593,8 @@ class Condition:
                 condition_result=True,
                 executed_steps=len(self.steps),
                 step_results=all_results,
+                step_id=conditional_step_id,
+                parent_step_id=parent_step_id
             )
 
         for result in all_results:

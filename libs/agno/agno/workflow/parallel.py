@@ -2,6 +2,7 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from typing import AsyncIterator, Awaitable, Callable, Iterator, List, Optional, Union
+from uuid import uuid4
 
 from agno.models.metrics import Metrics
 from agno.run.response import RunResponseEvent
@@ -285,9 +286,12 @@ class Parallel:
         workflow_run_response: Optional[WorkflowRunResponse] = None,
         step_index: Optional[Union[int, tuple]] = None,
         store_executor_responses: bool = True,
+        parent_step_id: Optional[str] = None
     ) -> Iterator[Union[WorkflowRunResponseEvent, StepOutput]]:
         """Execute all steps in parallel with streaming support"""
         log_debug(f"Parallel Start: {self.name} ({len(self.steps)} steps)", center=True, symbol="=")
+
+        parallel_step_id = str(uuid4())
 
         self._prepare_steps()
 
@@ -301,6 +305,8 @@ class Parallel:
                 step_name=self.name,
                 step_index=step_index,
                 parallel_step_count=len(self.steps),
+                step_id=parallel_step_id,
+                parent_step_id=parent_step_id
             )
 
         def execute_step_stream_with_index(step_with_index):
@@ -327,6 +333,7 @@ class Parallel:
                     workflow_run_response=workflow_run_response,
                     step_index=sub_step_index,
                     store_executor_responses=store_executor_responses,
+                    parent_step_id=parallel_step_id
                 ):
                     events.append(event)
                 return (index, events)
@@ -420,6 +427,8 @@ class Parallel:
                 step_index=step_index,
                 parallel_step_count=len(self.steps),
                 step_results=[aggregated_result],  # Now single aggregated result
+                step_id=parallel_step_id,
+                parent_step_id=parent_step_id
             )
 
     async def aexecute(
@@ -522,9 +531,12 @@ class Parallel:
         workflow_run_response: Optional[WorkflowRunResponse] = None,
         step_index: Optional[Union[int, tuple]] = None,
         store_executor_responses: bool = True,
+        parent_step_id: Optional[str] = None
     ) -> AsyncIterator[Union[WorkflowRunResponseEvent, TeamRunResponseEvent, RunResponseEvent, StepOutput]]:
         """Execute all steps in parallel with async streaming support"""
         log_debug(f"Parallel Start: {self.name} ({len(self.steps)} steps)", center=True, symbol="=")
+
+        parallel_step_id = str(uuid4())
 
         self._prepare_steps()
 
@@ -538,6 +550,8 @@ class Parallel:
                 step_name=self.name,
                 step_index=step_index,
                 parallel_step_count=len(self.steps),
+                step_id=parallel_step_id,
+                parent_step_id=parent_step_id
             )
 
         async def execute_step_stream_async_with_index(step_with_index):
@@ -564,6 +578,7 @@ class Parallel:
                     workflow_run_response=workflow_run_response,
                     step_index=sub_step_index,
                     store_executor_responses=store_executor_responses,
+                    parent_step_id=parallel_step_id
                 ):  # type: ignore[union-attr]
                     events.append(event)
                 return (index, events)
@@ -655,4 +670,6 @@ class Parallel:
                 step_index=step_index,
                 parallel_step_count=len(self.steps),
                 step_results=[aggregated_result],  # Now single aggregated result
+                step_id=parallel_step_id,
+                parent_step_id=parent_step_id
             )

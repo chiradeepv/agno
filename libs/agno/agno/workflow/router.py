@@ -1,6 +1,7 @@
 import inspect
 from dataclasses import dataclass
 from typing import AsyncIterator, Awaitable, Callable, Dict, Iterator, List, Optional, Union
+from uuid import uuid4
 
 from agno.run.response import RunResponseEvent
 from agno.run.team import TeamRunResponseEvent
@@ -222,11 +223,14 @@ class Router:
         workflow_run_response: Optional[WorkflowRunResponse] = None,
         step_index: Optional[Union[int, tuple]] = None,
         store_executor_responses: bool = True,
+        parent_step_id: Optional[str] = None
     ) -> Iterator[Union[WorkflowRunResponseEvent, StepOutput]]:
         """Execute the router with streaming support"""
         log_debug(f"Router Start: {self.name}", center=True, symbol="-")
 
         self._prepare_steps()
+
+        router_step_id = str(uuid4())
 
         # Route to appropriate steps
         steps_to_execute = self._route_steps(step_input)
@@ -242,6 +246,8 @@ class Router:
                 step_name=self.name,
                 step_index=step_index,
                 selected_steps=[getattr(step, "name", f"step_{i}") for i, step in enumerate(steps_to_execute)],
+                step_id=router_step_id,
+                parent_step_id=parent_step_id,
             )
 
         if not steps_to_execute:
@@ -257,6 +263,8 @@ class Router:
                     selected_steps=[],
                     executed_steps=0,
                     step_results=[],
+                    step_id=router_step_id,
+                    parent_step_id=parent_step_id,
                 )
             return
 
@@ -276,6 +284,7 @@ class Router:
                     workflow_run_response=workflow_run_response,
                     step_index=step_index,
                     store_executor_responses=store_executor_responses,
+                    parent_step_id=router_step_id,
                 ):
                     if isinstance(event, StepOutput):
                         step_outputs_for_step.append(event)
@@ -336,6 +345,8 @@ class Router:
                 selected_steps=[getattr(step, "name", f"step_{i}") for i, step in enumerate(steps_to_execute)],
                 executed_steps=len(steps_to_execute),
                 step_results=all_results,
+                step_id=router_step_id,
+                parent_step_id=parent_step_id,
             )
 
         for result in all_results:
@@ -425,11 +436,14 @@ class Router:
         workflow_run_response: Optional[WorkflowRunResponse] = None,
         step_index: Optional[Union[int, tuple]] = None,
         store_executor_responses: bool = True,
+        parent_step_id: Optional[str] = None,
     ) -> AsyncIterator[Union[WorkflowRunResponseEvent, TeamRunResponseEvent, RunResponseEvent, StepOutput]]:
         """Async execute the router with streaming support"""
         log_debug(f"Router Start: {self.name}", center=True, symbol="-")
 
         self._prepare_steps()
+
+        router_step_id = str(uuid4())
 
         # Route to appropriate steps
         steps_to_execute = await self._aroute_steps(step_input)
@@ -445,6 +459,8 @@ class Router:
                 step_name=self.name,
                 step_index=step_index,
                 selected_steps=[getattr(step, "name", f"step_{i}") for i, step in enumerate(steps_to_execute)],
+                step_id=router_step_id,
+                parent_step_id=parent_step_id,
             )
 
         if not steps_to_execute:
@@ -460,6 +476,8 @@ class Router:
                     selected_steps=[],
                     executed_steps=0,
                     step_results=[],
+                    step_id=router_step_id,
+                    parent_step_id=parent_step_id,
                 )
             return
 
@@ -481,6 +499,7 @@ class Router:
                     workflow_run_response=workflow_run_response,
                     step_index=step_index,
                     store_executor_responses=store_executor_responses,
+                    parent_step_id=router_step_id,
                 ):
                     if isinstance(event, StepOutput):
                         step_outputs_for_step.append(event)
@@ -541,6 +560,8 @@ class Router:
                 selected_steps=[getattr(step, "name", f"step_{i}") for i, step in enumerate(steps_to_execute)],
                 executed_steps=len(steps_to_execute),
                 step_results=all_results,
+                step_id=router_step_id,
+                parent_step_id=parent_step_id,
             )
 
         for result in all_results:

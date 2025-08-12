@@ -291,6 +291,7 @@ class Step:
         workflow_run_response: Optional["WorkflowRunResponse"] = None,
         step_index: Optional[Union[int, tuple]] = None,
         store_executor_responses: bool = True,
+        parent_step_id: Optional[str] = None,
     ) -> Iterator[Union[WorkflowRunResponseEvent, StepOutput]]:
         """Execute the step with event-driven streaming support"""
 
@@ -307,6 +308,7 @@ class Step:
                 step_name=self.name,
                 step_index=step_index,
                 step_id=self.step_id,
+                parent_step_id=parent_step_id,
             )
 
         # Execute with retries and streaming
@@ -432,6 +434,7 @@ class Step:
                         step_index=step_index,
                         content=final_response.content,
                         step_response=final_response,
+                        parent_step_id=parent_step_id,
                     )
 
                 return
@@ -599,6 +602,7 @@ class Step:
         workflow_run_response: Optional["WorkflowRunResponse"] = None,
         step_index: Optional[Union[int, tuple]] = None,
         store_executor_responses: bool = True,
+        parent_step_id: Optional[str] = None,
     ) -> AsyncIterator[Union[WorkflowRunResponseEvent, StepOutput]]:
         """Execute the step with event-driven streaming support"""
 
@@ -615,6 +619,7 @@ class Step:
                 step_name=self.name,
                 step_index=step_index,
                 step_id=self.step_id,
+                parent_step_id=parent_step_id,
             )
 
         # Execute with retries and streaming
@@ -758,6 +763,7 @@ class Step:
                         step_id=self.step_id,
                         content=final_response.content,
                         step_response=final_response,
+                        parent_step_id=parent_step_id,
                     )
                 return
 

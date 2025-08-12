@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from typing import Any, AsyncIterator, Awaitable, Callable, Dict, Iterator, List, Optional, Union
+from uuid import uuid4
 
 from agno.run.response import RunResponseEvent
 from agno.run.team import TeamRunResponseEvent
@@ -191,9 +192,12 @@ class Steps:
         stream_intermediate_steps: bool = False,
         step_index: Optional[Union[int, tuple]] = None,
         store_executor_responses: bool = True,
+        parent_step_id: Optional[str] = None
     ) -> Iterator[Union[WorkflowRunResponseEvent, TeamRunResponseEvent, RunResponseEvent, StepOutput]]:
         """Execute all steps in sequence with streaming support"""
         log_debug(f"Steps Start: {self.name} ({len(self.steps)} steps)", center=True, symbol="-")
+
+        steps_id = str(uuid4())
 
         self._prepare_steps()
 
@@ -207,6 +211,8 @@ class Steps:
                 step_name=self.name,
                 step_index=step_index,
                 steps_count=len(self.steps),
+                step_id=steps_id,
+                parent_step_id=parent_step_id
             )
 
         if not self.steps:
@@ -241,6 +247,7 @@ class Steps:
                     workflow_run_response=workflow_run_response,
                     step_index=child_step_index,
                     store_executor_responses=store_executor_responses,
+                    parent_step_id=steps_id
                 ):
                     if isinstance(event, StepOutput):
                         step_outputs_for_step.append(event)
@@ -287,6 +294,8 @@ class Steps:
                     steps_count=len(self.steps),
                     executed_steps=len(all_results),
                     step_results=all_results,
+                    step_id=steps_id,
+                    parent_step_id=parent_step_id
                 )
 
             for result in all_results:
@@ -382,9 +391,12 @@ class Steps:
         stream_intermediate_steps: bool = False,
         step_index: Optional[Union[int, tuple]] = None,
         store_executor_responses: bool = True,
+        parent_step_id: Optional[str] = None
     ) -> AsyncIterator[Union[WorkflowRunResponseEvent, TeamRunResponseEvent, RunResponseEvent, StepOutput]]:
         """Execute all steps in sequence with async streaming support"""
         log_debug(f"Steps Start: {self.name} ({len(self.steps)} steps)", center=True, symbol="-")
+
+        steps_id = str(uuid4())
 
         self._prepare_steps()
 
@@ -398,6 +410,8 @@ class Steps:
                 step_name=self.name,
                 step_index=step_index,
                 steps_count=len(self.steps),
+                step_id=steps_id,
+                parent_step_id=parent_step_id
             )
 
         if not self.steps:
@@ -432,6 +446,7 @@ class Steps:
                     workflow_run_response=workflow_run_response,
                     step_index=child_step_index,
                     store_executor_responses=store_executor_responses,
+                    parent_step_id=steps_id
                 ):
                     if isinstance(event, StepOutput):
                         step_outputs_for_step.append(event)
@@ -477,6 +492,8 @@ class Steps:
                     steps_count=len(self.steps),
                     executed_steps=len(all_results),
                     step_results=all_results,
+                    step_id=steps_id,
+                    parent_step_id=parent_step_id
                 )
 
             for result in all_results:
