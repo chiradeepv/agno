@@ -544,7 +544,6 @@ class PgVector(VectorDb):
                     log_info(f"Processing batch starting at index {i}, size: {len(batch_docs)}")
                     try:
                         embed_tasks = [doc.async_embed(embedder=self.embedder) for doc in batch_docs]
-
                         await asyncio.gather(*embed_tasks, return_exceptions=True)
 
                         # Prepare documents for upserting

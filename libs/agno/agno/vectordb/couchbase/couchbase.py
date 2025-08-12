@@ -299,6 +299,11 @@ class CouchbaseSearch(VectorDb):
 
         docs_to_insert: Dict[str, Any] = {}
         for document in documents:
+            if document.embedding is None:
+                document.embed(embedder=self.embedder)
+
+            if document.embedding is None:
+                raise ValueError(f"Failed to generate embedding for document: {document.name}")
             try:
                 doc_data = self.prepare_doc(content_hash, document)
                 if filters:
