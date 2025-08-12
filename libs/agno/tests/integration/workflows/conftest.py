@@ -5,20 +5,12 @@ import pytest
 
 from agno.agent.agent import Agent
 from agno.db.json import JsonDb
-from agno.db.sqlite import SqliteDb
 from agno.models.openai import OpenAIChat
 from agno.team.team import Team
 from agno.workflow import Condition, Loop, Parallel, Router
 from agno.workflow.step import Step
 from agno.workflow.types import StepInput, StepOutput
 from agno.workflow.workflow import Workflow
-
-
-@pytest.fixture
-def shared_db(tmp_path):
-    """Create a workflow storage for testing."""
-    db = SqliteDb(session_table="workflow_session", db_file=str(tmp_path / "test_workflow_v2.db"))
-    return db
 
 
 @pytest.fixture

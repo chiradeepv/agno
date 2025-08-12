@@ -400,7 +400,7 @@ def test_intermediate_steps_with_parser_model(shared_db):
         events[run_response_delta.event].append(run_response_delta)
 
     run_response = team.get_last_run_response()
-    
+
     assert events.keys() == {
         TeamRunEvent.run_started,
         TeamRunEvent.parser_model_response_started,

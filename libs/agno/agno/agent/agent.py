@@ -46,7 +46,7 @@ from agno.run.response import (
     RunResponsePausedEvent,
 )
 from agno.run.team import TeamRunResponseEvent
-from agno.session import AgentSession, Session, SessionSummaryManager
+from agno.session import AgentSession, SessionSummaryManager
 from agno.tools.function import Function
 from agno.tools.toolkit import Toolkit
 from agno.utils.events import (
@@ -146,8 +146,6 @@ class Agent:
     enable_user_memories: bool = False
     # If True, the agent adds a reference to the user memories in the response
     add_memories_to_context: Optional[bool] = None
-    # Metadata stored with this agent
-    metadata: Optional[Dict[str, Any]] = None
 
     # --- Database ---
     # Database to use for this agent
@@ -303,6 +301,9 @@ class Agent:
     # --- If this Agent is part of a workflow ---
     # Optional workflow ID. Indicates this agent is part of a workflow.
     workflow_id: Optional[str] = None
+
+    # Metadata stored with this agent
+    metadata: Optional[Dict[str, Any]] = None
 
     # --- Debug ---
     # Enable debug logs
@@ -893,7 +894,7 @@ class Agent:
         self._update_metadata(session=agent_session)
 
         # Update session state from DB
-        session_state = self.update_session_state(session=agent_session, session_state=session_state)
+        session_state = self._update_session_state(session=agent_session, session_state=session_state)
 
         # Resolve dependencies
         if self.dependencies is not None:
@@ -1209,7 +1210,7 @@ class Agent:
 
         if stream_intermediate_steps:
             yield completed_event
-        
+
         if yield_run_response:
             yield run_response
 
@@ -1293,7 +1294,7 @@ class Agent:
         self._update_metadata(session=agent_session)
 
         # Update session state from DB
-        session_state = self.update_session_state(session=agent_session, session_state=session_state)
+        session_state = self._update_session_state(session=agent_session, session_state=session_state)
 
         # Extract workflow context from kwargs if present
         workflow_context = kwargs.pop("workflow_context", None)
@@ -1509,7 +1510,7 @@ class Agent:
         self._update_metadata(session=agent_session)
 
         # Update session state from DB
-        session_state = self.update_session_state(session=agent_session, session_state=session_state)
+        session_state = self._update_session_state(session=agent_session, session_state=session_state)
 
         # Resolve dependencies
         if self.dependencies is not None:
@@ -1866,7 +1867,7 @@ class Agent:
         self._update_metadata(session=agent_session)
 
         # Update session state from DB
-        session_state = self.update_session_state(session=agent_session, session_state=session_state)
+        session_state = self._update_session_state(session=agent_session, session_state=session_state)
 
         effective_filters = knowledge_filters
 
@@ -3434,12 +3435,12 @@ class Agent:
         return agent_data
 
     # -*- Session Database Functions
-    def _read_session(self, session_id: str, session_type: SessionType) -> Optional[Session]:
+    def _read_session(self, session_id: str) -> Optional[AgentSession]:
         """Get a Session from the database."""
         try:
             if not self.db:
                 raise ValueError("Db not initialized")
-            session = self.db.get_session(session_id=session_id, session_type=session_type)
+            session = self.db.get_session(session_id=session_id, session_type=SessionType.AGENT)
             return session
         except Exception as e:
             log_warning(f"Error getting session from db: {e}")
@@ -3447,20 +3448,16 @@ class Agent:
 
     def _upsert_session(self, session: AgentSession) -> Optional[AgentSession]:
         """Upsert a Session into the database."""
-        from copy import deepcopy
-
-        session_copy = deepcopy(session)
-        session_copy.summary = deepcopy(session.summary)
 
         try:
             if not self.db:
                 raise ValueError("Db not initialized")
-            return self.db.upsert_session(session=session_copy)
+            return self.db.upsert_session(session=session)
         except Exception as e:
             log_warning(f"Error upserting session into db: {e}")
             return None
 
-    def update_session_state(self, session: AgentSession, session_state: Dict[str, Any]):
+    def _update_session_state(self, session: AgentSession, session_state: Dict[str, Any]):
         """Load the existing Agent from an AgentSession (from the database)"""
 
         from agno.utils.merge_dict import merge_dictionaries
@@ -3516,8 +3513,6 @@ class Agent:
     ) -> AgentSession:
         from time import time
 
-        from agno.db.base import SessionType
-
         # Returning cached session if we have one
         if self._agent_session is not None and self._agent_session.session_id == session_id:
             return self._agent_session
@@ -3527,9 +3522,7 @@ class Agent:
         if self.db is not None and self.team_id is None and self.workflow_id is None:
             log_debug(f"Reading AgentSession: {session_id}")
 
-            agent_session = cast(
-                AgentSession, self._read_session(session_id=session_id, session_type=SessionType.AGENT)
-            )
+            agent_session = cast(AgentSession, self._read_session(session_id=session_id))
         if agent_session is None:
             # Creating new session if none found
             log_debug(f"Creating new AgentSession: {session_id}")
@@ -3613,8 +3606,6 @@ class Agent:
         Returns:
             AgentSession: The AgentSession loaded from the database or created if it does not exist.
         """
-        from agno.db.base import SessionType
-
         if not session_id and not self.session_id:
             raise Exception("No session_id provided")
 
@@ -3622,9 +3613,7 @@ class Agent:
 
         # Try to load from database
         if self.db is not None:
-            agent_session = cast(
-                AgentSession, self._read_session(session_id=session_id_to_load, session_type=SessionType.AGENT)
-            )
+            agent_session = cast(AgentSession, self._read_session(session_id=session_id_to_load))
             return agent_session
 
         log_warning(f"AgentSession {session_id_to_load} not found in db")
@@ -4723,7 +4712,7 @@ class Agent:
 
     def set_session_name(
         self, session_id: Optional[str] = None, autogenerate: bool = False, session_name: Optional[str] = None
-    ) -> None:
+    ) -> AgentSession:
         """Set the session name and save to storage"""
         session_id = session_id or self.session_id
 
@@ -4748,6 +4737,8 @@ class Agent:
 
         # -*- Save to storage
         self.save_session(session=session)  # type: ignore
+
+        return session
 
     def _generate_session_name(self, session: AgentSession) -> str:
         """Generate a name for the session using the first 6 messages from the memory"""

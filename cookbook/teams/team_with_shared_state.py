@@ -11,9 +11,7 @@ def add_item(session_state, item: str) -> str:
         item (str): The item to add to the shopping list.
     """
     # Add the item if it's not already in the list
-    if item.lower() not in [
-        i.lower() for i in session_state["shopping_list"]
-    ]:
+    if item.lower() not in [i.lower() for i in session_state["shopping_list"]]:
         session_state["shopping_list"].append(item)
         return f"Added '{item}' to the shopping list"
     else:
@@ -87,23 +85,23 @@ shopping_team.print_response(
     "Add milk, eggs, and bread to the shopping list", stream=True
 )
 session = shopping_team.get_session()
-print(f"Session state: {session.session_data["session_state"]}")
+print(f"Session state: {session.session_data['session_state']}")
 
 shopping_team.print_response("I got bread", stream=True)
 session = shopping_team.get_session()
-print(f"Session state: {session.session_data["session_state"]}")
+print(f"Session state: {session.session_data['session_state']}")
 
 shopping_team.print_response("I need apples and oranges", stream=True)
 session = shopping_team.get_session()
-print(f"Session state: {session.session_data["session_state"]}")
+print(f"Session state: {session.session_data['session_state']}")
 
 shopping_team.print_response("whats on my list?", stream=True)
 session = shopping_team.get_session()
-print(f"Session state: {session.session_data["session_state"]}")
+print(f"Session state: {session.session_data['session_state']}")
 
 shopping_team.print_response(
     "Clear everything from my list and start over with just bananas and yogurt",
     stream=True,
 )
 session = shopping_team.get_session()
-print(f"Session state: {session.session_data["session_state"]}")
+print(f"Session state: {session.session_data['session_state']}")

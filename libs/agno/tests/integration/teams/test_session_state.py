@@ -28,11 +28,11 @@ def test_team_default_state(shared_db):
     team = team_factory(shared_db, session_id, session_state)
 
     response = team.run("Hello, how are you?")
-    
+
     assert response.run_id is not None
     assert team.session_id == session_id
     assert team.session_state == session_state
-    
+
     session_from_storage = team.get_session(session_id=session_id)
     assert session_from_storage is not None
     assert session_from_storage.session_id == session_id
@@ -45,7 +45,7 @@ def test_team_set_session_name(shared_db):
 
     team = team_factory(shared_db, session_id, session_state)
 
-    response = team.run("Hello, how are you?")
+    team.run("Hello, how are you?")
 
     team.set_session_name(session_id=session_id, session_name="my_test_session")
 
@@ -69,13 +69,13 @@ def test_team_session_state_switch_session_id(shared_db):
     assert session_from_storage.session_data["session_state"] == session_state
 
     # Second run with different session ID
-    response = team.run("What can you do?", session_id=session_id_2)
+    team.run("What can you do?", session_id=session_id_2)
     session_from_storage = team.get_session(session_id=session_id_2)
     assert session_from_storage.session_id == session_id_2
     assert session_from_storage.session_data["session_state"] == session_state
 
     # Third run with the original session ID
-    response = team.run("What can you do?", session_id=session_id_1)
+    team.run("What can you do?", session_id=session_id_1)
     session_from_storage = team.get_session(session_id=session_id_1)
     assert session_from_storage.session_id == session_id_1
     assert session_from_storage.session_data["session_state"] == session_state
@@ -144,7 +144,6 @@ def test_team_with_state_on_team_stream(shared_db):
         run_response.messages[1].content
         == 'Current shopping list: [\'oranges\']. Other random json ```json { "properties": { "title": { "title": "a" } } }```'
     )
-
 
 
 def test_team_with_state_on_run(shared_db):
@@ -291,14 +290,13 @@ async def test_team_with_state_on_run_stream_async(shared_db):
     )
 
 
-
 def test_team_with_state_shared_with_members(shared_db):
     # Define a tool that increments our counter and returns the new value
     def add_item(session_state: Dict[str, Any], item: str) -> str:
         """Add an item to the shopping list."""
         session_state["shopping_list"].append(item)
         return f"The shopping list is now {session_state['shopping_list']}"
-    
+
     shopping_agent = Agent(
         tools=[add_item],
     )

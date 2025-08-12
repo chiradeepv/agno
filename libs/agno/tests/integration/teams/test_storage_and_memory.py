@@ -1,10 +1,9 @@
-
 import pytest
 
 from agno.agent.agent import Agent
+from agno.db.base import SessionType
 from agno.models.google.gemini import Gemini
 from agno.models.openai.chat import OpenAIChat
-from agno.db.base import SessionType
 from agno.team.team import Team
 
 
@@ -56,7 +55,7 @@ async def test_run_history_persistence(route_team, shared_db):
     user_id = "john@example.com"
     session_id = "session_123"
     num_turns = 5
-    
+
     shared_db.clear_memories()
 
     # Perform multiple turns
@@ -221,4 +220,3 @@ async def test_multi_user_multi_session_route_team(route_team, shared_db):
     user_3_sessions = shared_db.get_sessions(user_id=user_3_id, session_type=SessionType.TEAM)
     assert len(user_3_sessions) == 1
     assert user_3_session_1_id in [session.session_id for session in user_3_sessions]
-

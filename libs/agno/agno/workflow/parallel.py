@@ -1,7 +1,7 @@
 import asyncio
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
-from typing import AsyncIterator, Awaitable, Callable, Iterator, List, Optional, Union
+from typing import Any, AsyncIterator, Awaitable, Callable, Dict, Iterator, List, Optional, Union
 
 from agno.models.metrics import Metrics
 from agno.run.response import RunResponseEvent
@@ -15,7 +15,6 @@ from agno.run.workflow import (
 from agno.utils.log import log_debug, logger
 from agno.workflow.condition import Condition
 from agno.workflow.step import Step
-from agno.workflow.steps import Steps
 from agno.workflow.types import StepInput, StepOutput
 
 WorkflowSteps = List[
@@ -193,6 +192,7 @@ class Parallel:
         user_id: Optional[str] = None,
         workflow_run_response: Optional[WorkflowRunResponse] = None,
         store_executor_responses: bool = True,
+        session_state: Optional[Dict[str, Any]] = None,
     ) -> StepOutput:
         """Execute all steps in parallel and return aggregated result"""
         # Use workflow logger for parallel orchestration
@@ -210,6 +210,7 @@ class Parallel:
                     user_id=user_id,
                     workflow_run_response=workflow_run_response,
                     store_executor_responses=store_executor_responses,
+                    session_state=session_state,
                 )  # type: ignore[union-attr]
                 return (index, result)
             except Exception as e:
@@ -285,6 +286,7 @@ class Parallel:
         workflow_run_response: Optional[WorkflowRunResponse] = None,
         step_index: Optional[Union[int, tuple]] = None,
         store_executor_responses: bool = True,
+        session_state: Optional[Dict[str, Any]] = None,
     ) -> Iterator[Union[WorkflowRunResponseEvent, StepOutput]]:
         """Execute all steps in parallel with streaming support"""
         log_debug(f"Parallel Start: {self.name} ({len(self.steps)} steps)", center=True, symbol="=")
@@ -327,6 +329,7 @@ class Parallel:
                     workflow_run_response=workflow_run_response,
                     step_index=sub_step_index,
                     store_executor_responses=store_executor_responses,
+                    session_state=session_state,
                 ):
                     events.append(event)
                 return (index, events)
@@ -429,6 +432,7 @@ class Parallel:
         user_id: Optional[str] = None,
         workflow_run_response: Optional[WorkflowRunResponse] = None,
         store_executor_responses: bool = True,
+        session_state: Optional[Dict[str, Any]] = None,
     ) -> StepOutput:
         """Execute all steps in parallel using asyncio and return aggregated result"""
         # Use workflow logger for async parallel orchestration
@@ -446,6 +450,7 @@ class Parallel:
                     user_id=user_id,
                     workflow_run_response=workflow_run_response,
                     store_executor_responses=store_executor_responses,
+                    session_state=session_state,
                 )  # type: ignore[union-attr]
                 return (index, result)
             except Exception as e:
@@ -522,6 +527,7 @@ class Parallel:
         workflow_run_response: Optional[WorkflowRunResponse] = None,
         step_index: Optional[Union[int, tuple]] = None,
         store_executor_responses: bool = True,
+        session_state: Optional[Dict[str, Any]] = None,
     ) -> AsyncIterator[Union[WorkflowRunResponseEvent, TeamRunResponseEvent, RunResponseEvent, StepOutput]]:
         """Execute all steps in parallel with async streaming support"""
         log_debug(f"Parallel Start: {self.name} ({len(self.steps)} steps)", center=True, symbol="=")
@@ -564,6 +570,7 @@ class Parallel:
                     workflow_run_response=workflow_run_response,
                     step_index=sub_step_index,
                     store_executor_responses=store_executor_responses,
+                    session_state=session_state,
                 ):  # type: ignore[union-attr]
                     events.append(event)
                 return (index, events)

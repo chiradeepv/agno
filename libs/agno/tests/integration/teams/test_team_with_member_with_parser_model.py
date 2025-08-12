@@ -48,7 +48,7 @@ def test_team_with_parser_model_stream():
     response = team.run("Tell me about Yosemite National Park.", stream=True)
     for event in response:
         print(event.event)
-    
+
     run_response = team.get_last_run_response()
 
     assert run_response.content is not None

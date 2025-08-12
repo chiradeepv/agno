@@ -1,12 +1,8 @@
-from dataclasses import replace
 from typing import Iterator
 
 from agno.agent import Agent
-from agno.models.metrics import Metrics
 from agno.models.openai import OpenAIChat
-from agno.db.sqlite import SqliteDb
 from agno.team.team import Team
-from agno.tools.hackernews import HackerNewsTools
 from agno.tools.yfinance import YFinanceTools
 
 
@@ -121,6 +117,7 @@ def test_team_metrics_multiple_runs(shared_db):
     session_from_db = team.get_session(session_id=team.session_id)
     assert session_from_db.session_data["session_metrics"]["total_tokens"] > response.metrics.total_tokens
 
+
 def test_team_metrics_with_history(shared_db):
     """Test session metrics are correctly aggregated when history is enabled"""
 
@@ -135,9 +132,9 @@ def test_team_metrics_with_history(shared_db):
     run_response = team.get_last_run_response()
     assert run_response.metrics is not None
     assert run_response.metrics.input_tokens is not None
-    
+
     session_from_db = team.get_session(session_id=team.session_id)
-    
+
     # Check the session metrics (team.session_metrics) coincide with the sum of run metrics
     assert run_response.metrics.input_tokens == session_from_db.session_data["session_metrics"]["input_tokens"]
     assert run_response.metrics.output_tokens == session_from_db.session_data["session_metrics"]["output_tokens"]
@@ -148,9 +145,9 @@ def test_team_metrics_with_history(shared_db):
     run_response = team.get_last_run_response()
     assert run_response.metrics is not None
     assert run_response.metrics.input_tokens is not None
-    
+
     session_from_db = team.get_session(session_id=team.session_id)
-    
+
     # run metrics are less than session metrics because we add the history to the context
     assert run_response.metrics.input_tokens < session_from_db.session_data["session_metrics"]["input_tokens"]
     assert run_response.metrics.output_tokens < session_from_db.session_data["session_metrics"]["output_tokens"]

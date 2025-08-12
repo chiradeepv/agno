@@ -1,8 +1,6 @@
 import uuid
 from typing import Any, Dict, Optional
 
-import pytest
-
 from agno.agent.agent import Agent
 from agno.db.base import SessionType
 from agno.models.openai.chat import OpenAIChat
@@ -42,7 +40,7 @@ def test_agent_set_session_name(shared_db):
     session_id = "session_1"
     chat_agent = chat_agent_factory(shared_db, session_id)
 
-    response = chat_agent.run("Hello, how are you?")
+    chat_agent.run("Hello, how are you?")
 
     chat_agent.set_session_name(session_id=session_id, session_name="my_test_session")
 
@@ -66,14 +64,14 @@ def test_agent_session_state_switch_session_id(shared_db):
     assert session_from_storage.session_data["session_state"] == {"test_key": "test_value"}
 
     # Second run with different session ID, and override session state
-    response = chat_agent.run("What can you do?", session_id=session_id_2, session_state={"test_key": "test_value_2"})
+    chat_agent.run("What can you do?", session_id=session_id_2, session_state={"test_key": "test_value_2"})
     session_from_storage = shared_db.get_session(session_id=session_id_2, session_type=SessionType.AGENT)
     assert session_from_storage is not None
     assert session_from_storage.session_id == session_id_2
     assert session_from_storage.session_data["session_state"] == {"test_key": "test_value_2"}
 
     # Third run with the original session ID
-    response = chat_agent.run("What can you do?", session_id=session_id_1)
+    chat_agent.run("What can you do?", session_id=session_id_1)
     session_from_storage = shared_db.get_session(session_id=session_id_1, session_type=SessionType.AGENT)
     assert session_from_storage is not None
     assert session_from_storage.session_id == session_id_1

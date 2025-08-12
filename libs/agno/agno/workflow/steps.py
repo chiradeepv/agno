@@ -116,6 +116,7 @@ class Steps:
         session_id: Optional[str] = None,
         user_id: Optional[str] = None,
         workflow_run_response: Optional[WorkflowRunResponse] = None,
+        session_state: Optional[Dict[str, Any]] = None,
         store_executor_responses: bool = True,
     ) -> List[StepOutput]:
         """Execute all steps in sequence and return the final result"""
@@ -143,6 +144,7 @@ class Steps:
                     user_id=user_id,
                     workflow_run_response=workflow_run_response,
                     store_executor_responses=store_executor_responses,
+                    session_state=session_state,
                 )  # type: ignore
 
                 # Handle both single StepOutput and List[StepOutput] (from Loop/Condition/Router steps)
@@ -186,6 +188,7 @@ class Steps:
         self,
         step_input: StepInput,
         workflow_run_response: WorkflowRunResponse,
+        session_state: Optional[Dict[str, Any]] = None,
         session_id: Optional[str] = None,
         user_id: Optional[str] = None,
         stream_intermediate_steps: bool = False,
@@ -237,6 +240,7 @@ class Steps:
                     current_step_input,
                     session_id=session_id,
                     user_id=user_id,
+                    session_state=session_state,
                     stream_intermediate_steps=stream_intermediate_steps,
                     workflow_run_response=workflow_run_response,
                     step_index=child_step_index,
@@ -308,6 +312,7 @@ class Steps:
         session_id: Optional[str] = None,
         user_id: Optional[str] = None,
         workflow_run_response: Optional[WorkflowRunResponse] = None,
+        session_state: Optional[Dict[str, Any]] = None,
         store_executor_responses: bool = True,
     ) -> List[StepOutput]:
         """Execute all steps in sequence asynchronously and return the final result"""
@@ -335,6 +340,7 @@ class Steps:
                     user_id=user_id,
                     workflow_run_response=workflow_run_response,
                     store_executor_responses=store_executor_responses,
+                    session_state=session_state,
                 )  # type: ignore
 
                 # Handle both single StepOutput and List[StepOutput] (from Loop/Condition/Router steps)
@@ -377,6 +383,7 @@ class Steps:
         self,
         step_input: StepInput,
         workflow_run_response: WorkflowRunResponse,
+        session_state: Optional[Dict[str, Any]] = None,
         session_id: Optional[str] = None,
         user_id: Optional[str] = None,
         stream_intermediate_steps: bool = False,
@@ -428,6 +435,7 @@ class Steps:
                     current_step_input,
                     session_id=session_id,
                     user_id=user_id,
+                    session_state=session_state,
                     stream_intermediate_steps=stream_intermediate_steps,
                     workflow_run_response=workflow_run_response,
                     step_index=child_step_index,

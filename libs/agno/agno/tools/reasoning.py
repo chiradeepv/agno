@@ -105,7 +105,7 @@ Confidence: {step_parsed.confidence}
 
     def analyze(
         self,
-        agent: Union[Agent, Team],
+        session_state: Dict[str, Any],
         title: str,
         result: str,
         analysis: str,
@@ -144,12 +144,12 @@ Confidence: {step_parsed.confidence}
             )
 
             # Add this step to the Agent's session state
-            if agent.session_state is None:
-                agent.session_state = {}
-            if "reasoning_steps" not in agent.session_state:
-                agent.session_state["reasoning_steps"] = {}
-            if agent.run_id not in agent.session_state["reasoning_steps"]:
-                agent.session_state["reasoning_steps"][agent.run_id] = []
+            if session_state is None:
+                session_state = {}
+            if "reasoning_steps" not in session_state:
+                session_state["reasoning_steps"] = {}
+            if agent.run_id not in session_state["reasoning_steps"]:
+                session_state["reasoning_steps"][agent.run_id] = []
             agent.session_state["reasoning_steps"][agent.run_id].append(reasoning_step.model_dump_json())
 
             # Return all previous reasoning_steps and the new reasoning_step

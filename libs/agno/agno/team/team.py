@@ -1,7 +1,7 @@
 import asyncio
 import json
-from copy import copy
 from collections import ChainMap, defaultdict, deque
+from copy import copy
 from dataclasses import asdict, dataclass
 from os import getenv
 from textwrap import dedent
@@ -800,7 +800,7 @@ class Team:
 
         if stream_intermediate_steps:
             yield completed_event
-            
+
         if yield_run_response:
             yield run_response
 
@@ -1216,7 +1216,7 @@ class Team:
 
         if stream_intermediate_steps:
             yield completed_event
-            
+
         if yield_run_response:
             yield run_response
 
@@ -5958,6 +5958,7 @@ class Team:
                         history.append(Message(role="user", content=member_agent_task))
 
                 member_session_state_copy = copy(session_state)
+
                 async def run_member_agent(agent=current_agent, idx=current_index) -> str:
                     member_agent_run_response = await agent.arun(
                         message=member_agent_task if history is None else None,
@@ -6137,7 +6138,7 @@ class Team:
                     knowledge_filters=knowledge_filters
                     if not member_agent.knowledge_filters and member_agent.knowledge
                     else None,
-                    yield_run_response=True
+                    yield_run_response=True,
                 )
                 member_agent_run_response = None
                 for member_agent_run_response_event in member_agent_run_response_stream:
@@ -6725,12 +6726,12 @@ class Team:
     ###########################################################################
     # Session Management
     ###########################################################################
-    def _read_session(self, session_id: str, session_type: SessionType) -> Optional[TeamSession]:
+    def _read_session(self, session_id: str) -> Optional[TeamSession]:
         """Get a Session from the database."""
         try:
             if not self.db:
                 raise ValueError("Db not initialized")
-            session = self.db.get_session(session_id=session_id, session_type=session_type)
+            session = self.db.get_session(session_id=session_id, session_type=SessionType.TEAM)
             return session
         except Exception as e:
             log_warning(f"Error getting session from db: {e}")
@@ -6738,15 +6739,11 @@ class Team:
 
     def _upsert_session(self, session: TeamSession) -> Optional[TeamSession]:
         """Upsert a Session into the database."""
-        from copy import deepcopy
-
-        session_copy = deepcopy(session)
-        session_copy.summary = deepcopy(session.summary)
 
         try:
             if not self.db:
                 raise ValueError("Db not initialized")
-            return self.db.upsert_session(session=session_copy)
+            return self.db.upsert_session(session=session)
         except Exception as e:
             log_warning(f"Error upserting session into db: {e}")
             return None
@@ -6817,7 +6814,7 @@ class Team:
         # Try to load from database
         team_session = None
         if self.db is not None and self.parent_team_id is None and self.workflow_id is None:
-            team_session = cast(TeamSession, self._read_session(session_id=session_id, session_type=SessionType.TEAM))
+            team_session = cast(TeamSession, self._read_session(session_id=session_id))
 
         # Create new session if none found
         if team_session is None:
@@ -6849,8 +6846,6 @@ class Team:
         Returns:
             TeamSession: The TeamSession loaded from the database or created if it does not exist.
         """
-        from agno.db.base import SessionType
-
         if not session_id and not self.session_id:
             raise Exception("No session_id provided")
 
@@ -6858,9 +6853,7 @@ class Team:
 
         # Try to load from database
         if self.db is not None:
-            team_session = cast(
-                TeamSession, self._read_session(session_id=session_id_to_load, session_type=SessionType.TEAM)
-            )
+            team_session = cast(TeamSession, self._read_session(session_id=session_id_to_load))
             return team_session
 
         log_warning(f"TeamSession {session_id_to_load} not found in db")
@@ -6957,7 +6950,7 @@ class Team:
 
     def set_session_name(
         self, session_id: Optional[str] = None, autogenerate: bool = False, session_name: Optional[str] = None
-    ) -> None:
+    ) -> TeamSession:
         """Set the session name and save to storage"""
         session_id = session_id or self.session_id
 
@@ -6982,6 +6975,8 @@ class Team:
 
         # -*- Save to storage
         self.save_session(session=session)  # type: ignore
+
+        return session
 
     def delete_session(self, session_id: str) -> None:
         """Delete the current session and save to storage"""

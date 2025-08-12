@@ -28,7 +28,13 @@ def test_route_team_basic():
         tools=[get_stock_price],
     )
 
-    team = Team(name="Router Team", mode="route", model=OpenAIChat("gpt-4o"), members=[web_agent, finance_agent], store_member_responses=True)
+    team = Team(
+        name="Router Team",
+        mode="route",
+        model=OpenAIChat("gpt-4o"),
+        members=[web_agent, finance_agent],
+        store_member_responses=True,
+    )
 
     # This should route to the finance agent
     response = team.run("What is the current stock price of AAPL?")
@@ -69,7 +75,13 @@ def test_route_team_structured_output():
         tools=[get_stock_price],
     )
 
-    team = Team(name="Router Team", mode="route", model=OpenAIChat("gpt-4o"), members=[web_agent, finance_agent], store_member_responses=True)
+    team = Team(
+        name="Router Team",
+        mode="route",
+        model=OpenAIChat("gpt-4o"),
+        members=[web_agent, finance_agent],
+        store_member_responses=True,
+    )
 
     # This should route to the finance agent
     response = team.run("What is the current stock price of AAPL?")
@@ -133,7 +145,11 @@ def test_route_team_with_expected_output():
     math_agent = Agent(name="Math Agent", model=OpenAIChat("gpt-4o"), role="Solve mathematical problems")
 
     team = Team(
-        name="Specialized Router Team", mode="route", model=OpenAIChat("gpt-4o"), members=[qa_agent, math_agent], store_member_responses=True
+        name="Specialized Router Team",
+        mode="route",
+        model=OpenAIChat("gpt-4o"),
+        members=[qa_agent, math_agent],
+        store_member_responses=True,
     )
 
     # This should route to the math agent with specific expected output
@@ -171,7 +187,13 @@ def test_route_team_multiple_calls():
         tools=[get_stock_price],
     )
 
-    team = Team(name="Router Team", mode="route", model=OpenAIChat("gpt-4o"), members=[web_agent, finance_agent], store_member_responses=True)
+    team = Team(
+        name="Router Team",
+        mode="route",
+        model=OpenAIChat("gpt-4o"),
+        members=[web_agent, finance_agent],
+        store_member_responses=True,
+    )
 
     # This should route to the finance agent
     response = team.run("What is the current stock price of AAPL?")

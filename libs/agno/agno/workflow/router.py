@@ -1,6 +1,6 @@
 import inspect
 from dataclasses import dataclass
-from typing import AsyncIterator, Awaitable, Callable, Dict, Iterator, List, Optional, Union
+from typing import Any, AsyncIterator, Awaitable, Callable, Dict, Iterator, List, Optional, Union
 
 from agno.run.response import RunResponseEvent
 from agno.run.team import TeamRunResponseEvent
@@ -147,6 +147,7 @@ class Router:
         session_id: Optional[str] = None,
         user_id: Optional[str] = None,
         workflow_run_response: Optional[WorkflowRunResponse] = None,
+        session_state: Optional[Dict[str, Any]] = None,
         store_executor_responses: bool = True,
     ) -> List[StepOutput]:
         """Execute the router and its selected steps with sequential chaining"""
@@ -173,6 +174,7 @@ class Router:
                     user_id=user_id,
                     workflow_run_response=workflow_run_response,
                     store_executor_responses=store_executor_responses,
+                    session_state=session_state,
                 )
 
                 # Handle both single StepOutput and List[StepOutput]
@@ -218,6 +220,7 @@ class Router:
         step_input: StepInput,
         session_id: Optional[str] = None,
         user_id: Optional[str] = None,
+        session_state: Optional[Dict[str, Any]] = None,
         stream_intermediate_steps: bool = False,
         workflow_run_response: Optional[WorkflowRunResponse] = None,
         step_index: Optional[Union[int, tuple]] = None,
@@ -276,6 +279,7 @@ class Router:
                     workflow_run_response=workflow_run_response,
                     step_index=step_index,
                     store_executor_responses=store_executor_responses,
+                    session_state=session_state,
                 ):
                     if isinstance(event, StepOutput):
                         step_outputs_for_step.append(event)
@@ -347,6 +351,7 @@ class Router:
         session_id: Optional[str] = None,
         user_id: Optional[str] = None,
         workflow_run_response: Optional[WorkflowRunResponse] = None,
+        session_state: Optional[Dict[str, Any]] = None,
         store_executor_responses: bool = True,
     ) -> List[StepOutput]:
         """Async execute the router and its selected steps with sequential chaining"""
@@ -374,6 +379,7 @@ class Router:
                     user_id=user_id,
                     workflow_run_response=workflow_run_response,
                     store_executor_responses=store_executor_responses,
+                    session_state=session_state,
                 )
                 # Handle both single StepOutput and List[StepOutput]
                 if isinstance(step_output, list):
@@ -421,6 +427,7 @@ class Router:
         step_input: StepInput,
         session_id: Optional[str] = None,
         user_id: Optional[str] = None,
+        session_state: Optional[Dict[str, Any]] = None,
         stream_intermediate_steps: bool = False,
         workflow_run_response: Optional[WorkflowRunResponse] = None,
         step_index: Optional[Union[int, tuple]] = None,
@@ -481,6 +488,7 @@ class Router:
                     workflow_run_response=workflow_run_response,
                     step_index=step_index,
                     store_executor_responses=store_executor_responses,
+                    session_state=session_state,
                 ):
                     if isinstance(event, StepOutput):
                         step_outputs_for_step.append(event)

@@ -31,10 +31,7 @@ def add_step(
 
 def delete_step(session_state, step_name: str) -> str:
     """Delete a step from the team's workflow session state."""
-    if (
-        session_state is None
-        or "steps" not in session_state
-    ):
+    if session_state is None or "steps" not in session_state:
         return "❌ No steps found to delete"
 
     steps = session_state["steps"]
@@ -53,10 +50,7 @@ def update_step_status(
     agent: Agent, step_name: str, new_status: str, notes: str = ""
 ) -> str:
     """Update the status of a step in the workflow session state."""
-    if (
-        session_state is None
-        or "steps" not in session_state
-    ):
+    if session_state is None or "steps" not in session_state:
         return "❌ No steps found in workflow session state"
 
     steps = session_state["steps"]
@@ -80,10 +74,7 @@ def update_step_status(
 
 def assign_step(session_state, step_name: str, new_assignee: str) -> str:
     """Reassign a step to a different person."""
-    if (
-        session_state is None
-        or "steps" not in session_state
-    ):
+    if session_state is None or "steps" not in session_state:
         return "❌ No steps found in workflow session state"
 
     steps = session_state["steps"]

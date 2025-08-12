@@ -100,7 +100,7 @@ class AgentResponse(BaseModel):
 
     @classmethod
     def from_agent(cls, agent: Agent, memory_app: Optional[MemoryApp] = None) -> "AgentResponse":
-        agent_tools = agent.get_tools(session_id=str(uuid4()), async_mode=True)
+        agent_tools = agent.get_tools(session=AgentSession(session_id=str(uuid4()), session_data={}), async_mode=True)
         formatted_tools = format_tools(agent_tools) if agent_tools else None
 
         model_name = agent.model.name or agent.model.__class__.__name__ if agent.model else None
@@ -177,7 +177,7 @@ class TeamResponse(BaseModel):
 
         team.determine_tools_for_model(
             model=team.model,
-            session_id=str(uuid4()),
+            session=TeamSession(session_id=str(uuid4()), session_data={}),
             async_mode=True,
         )
         team_tools = list(team._functions_for_model.values()) if team._functions_for_model else []

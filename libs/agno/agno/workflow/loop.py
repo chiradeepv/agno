@@ -1,6 +1,6 @@
 import inspect
 from dataclasses import dataclass
-from typing import AsyncIterator, Awaitable, Callable, Dict, Iterator, List, Optional, Union
+from typing import Any, AsyncIterator, Awaitable, Callable, Dict, Iterator, List, Optional, Union
 
 from agno.run.response import RunResponseEvent
 from agno.run.team import TeamRunResponseEvent
@@ -130,6 +130,7 @@ class Loop:
         user_id: Optional[str] = None,
         workflow_run_response: Optional[WorkflowRunResponse] = None,
         store_executor_responses: bool = True,
+        session_state: Optional[Dict[str, Any]] = None,
     ) -> List[StepOutput]:
         """Execute loop steps with iteration control - mirrors workflow execution logic"""
         # Use workflow logger for loop orchestration
@@ -154,6 +155,7 @@ class Loop:
                     user_id=user_id,
                     workflow_run_response=workflow_run_response,
                     store_executor_responses=store_executor_responses,
+                    session_state=session_state,
                 )  # type: ignore[union-attr]
 
                 # Handle both single StepOutput and List[StepOutput] (from Loop/Condition steps)
@@ -213,6 +215,7 @@ class Loop:
         workflow_run_response: Optional[WorkflowRunResponse] = None,
         step_index: Optional[Union[int, tuple]] = None,
         store_executor_responses: bool = True,
+        session_state: Optional[Dict[str, Any]] = None,
     ) -> Iterator[Union[WorkflowRunResponseEvent, StepOutput]]:
         """Execute loop steps with streaming support - mirrors workflow execution logic"""
         log_debug(f"Loop Start: {self.name}", center=True, symbol="=")
@@ -277,6 +280,7 @@ class Loop:
                     workflow_run_response=workflow_run_response,
                     step_index=composite_step_index,
                     store_executor_responses=store_executor_responses,
+                    session_state=session_state,
                 ):
                     if isinstance(event, StepOutput):
                         step_outputs_for_iteration.append(event)
@@ -376,6 +380,7 @@ class Loop:
         user_id: Optional[str] = None,
         workflow_run_response: Optional[WorkflowRunResponse] = None,
         store_executor_responses: bool = True,
+        session_state: Optional[Dict[str, Any]] = None,
     ) -> List[StepOutput]:
         """Execute loop steps asynchronously with iteration control - mirrors workflow execution logic"""
         # Use workflow logger for async loop orchestration
@@ -400,6 +405,7 @@ class Loop:
                     user_id=user_id,
                     workflow_run_response=workflow_run_response,
                     store_executor_responses=store_executor_responses,
+                    session_state=session_state,
                 )  # type: ignore[union-attr]
 
                 # Handle both single StepOutput and List[StepOutput] (from Loop/Condition steps)
@@ -462,6 +468,7 @@ class Loop:
         workflow_run_response: Optional[WorkflowRunResponse] = None,
         step_index: Optional[Union[int, tuple]] = None,
         store_executor_responses: bool = True,
+        session_state: Optional[Dict[str, Any]] = None,
     ) -> AsyncIterator[Union[WorkflowRunResponseEvent, TeamRunResponseEvent, RunResponseEvent, StepOutput]]:
         """Execute loop steps with async streaming support - mirrors workflow execution logic"""
         log_debug(f"Loop Start: {self.name}", center=True, symbol="=")
@@ -526,6 +533,7 @@ class Loop:
                     workflow_run_response=workflow_run_response,
                     step_index=composite_step_index,
                     store_executor_responses=store_executor_responses,
+                    session_state=session_state,
                 ):
                     if isinstance(event, StepOutput):
                         step_outputs_for_iteration.append(event)
