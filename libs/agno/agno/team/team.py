@@ -1939,10 +1939,10 @@ class Team:
                             )
 
                             metrics = tool_call.metrics
-                            if metrics is not None and metrics.time is not None and reasoning_state is not None:
+                            if metrics is not None and metrics.duration is not None and reasoning_state is not None:
                                 reasoning_state["reasoning_time_taken"] = reasoning_state[
                                     "reasoning_time_taken"
-                                ] + float(metrics.time)
+                                ] + float(metrics.duration)
 
                         yield self._handle_event(
                             create_team_tool_call_completed_event(
@@ -4136,10 +4136,11 @@ class Team:
                 yield item
 
     def _calculate_session_metrics(self, messages: List[Message]) -> Metrics:
+        """Sum the metrics of the given messages into a Metrics object"""
         session_metrics = Metrics()
         assistant_message_role = self.model.assistant_message_role if self.model is not None else "assistant"
 
-        # Get metrics of the team-agent's messages
+        # Get metrics of the team leader's messages
         for m in messages:
             if m.role == assistant_message_role and m.metrics is not None:
                 session_metrics += m.metrics
@@ -4147,10 +4148,13 @@ class Team:
         return session_metrics
 
     def _calculate_full_team_session_metrics(self, messages: List[Message]) -> Metrics:
+        """Sum the metrics of the given messages into a Metrics object"""
+
         current_session_metrics = self.session_metrics or self._calculate_session_metrics(messages)
         current_session_metrics = replace(current_session_metrics)
         assistant_message_role = self.model.assistant_message_role if self.model is not None else "assistant"
 
+        # Sum the metrics of all messages in the session (this includes members' responses)
         for run in self.team_session.runs:  # type: ignore
             if run.messages is not None:
                 for m in run.messages:
@@ -4159,23 +4163,27 @@ class Team:
 
         return current_session_metrics
 
-    def calculate_metrics(self, messages: List[Message], for_session: bool = False) -> Metrics:
+    def calculate_metrics(self, messages: List[Message], for_session: bool = False) -> Union[Metrics, Dict[str, Any]]:
+        """Sum the metrics of the given messages into a Metrics object"""
         metrics = Metrics()
         assistant_message_role = self.model.assistant_message_role if self.model is not None else "assistant"
+
         for m in messages:
             if m.role == assistant_message_role and m.metrics is not None and m.from_history is False:
                 metrics += m.metrics
 
-        return metrics if for_session else metrics.to_dict()  # type: ignore
+        return metrics if for_session else metrics.to_dict()
 
-    def set_session_metrics(self, run_messages: RunMessages):
+    def set_session_metrics(self, run_messages: RunMessages) -> None:
         """Calculate session metrics"""
-        # Calculate initial metrics
+
+        # If the session metrics are not set yet, set them to the first run metrics
         if self.session_metrics is None:
-            self.session_metrics = self.calculate_metrics(run_messages.messages, for_session=True)
-        # Update metrics
+            self.session_metrics = self.calculate_metrics(run_messages.messages, for_session=True)  # type: ignore
+
+        # If the session metrics are set, add the new run metrics to them
         else:
-            self.session_metrics += self.calculate_metrics(run_messages.messages, for_session=True)
+            self.session_metrics += self.calculate_metrics(run_messages.messages, for_session=True)  # type: ignore
 
     def update_session_metrics(self):
         """Calculate session metrics"""
@@ -6900,7 +6908,9 @@ class Team:
     # Storage
     ###########################################################################
 
-    def get_team_session(self, session_id: str, user_id: Optional[str] = None) -> Optional[TeamSession]:
+    def get_team_session(
+        self, session_id: str, user_id: Optional[str] = None, create_if_not_found: bool = True
+    ) -> Optional[TeamSession]:
         """Load the TeamSession from storage
 
         Returns:
@@ -6922,6 +6932,9 @@ class Team:
             if self.team_session is not None:
                 self.load_team_session(session=self.team_session)
                 return self.team_session
+
+        if not create_if_not_found:
+            return None
 
         # Create new session if none found
         log_debug(f"Creating new TeamSession: {session_id}")
@@ -7006,7 +7019,9 @@ class Team:
             raise Exception("Session name is not set")
 
         # Read from storage
-        self.get_team_session(session_id=session_id)  # type: ignore
+        self.get_team_session(session_id=session_id, create_if_not_found=False)  # type: ignore
+        if not self.team_session:
+            return None
 
         # -*- Rename session
         self.session_name = session_name
@@ -7828,7 +7843,7 @@ class Team:
         if self.workflow_session_state is not None and len(self.workflow_session_state) > 0:
             session_data["workflow_session_state"] = self.workflow_session_state
         if self.session_metrics is not None:
-            session_data["session_metrics"] = asdict(self.session_metrics) if self.session_metrics is not None else None
+            session_data["session_metrics"] = self.session_metrics.to_dict() if self.session_metrics else None
         if self.images is not None:
             session_data["images"] = [img.to_dict() for img in self.images]  # type: ignore
         if self.videos is not None:
