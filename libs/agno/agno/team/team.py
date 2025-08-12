@@ -6870,6 +6870,7 @@ class Team:
         log_warning(f"TeamSession {session_id_to_load} not found in db")
         return None
 
+
     def save_session(self, session: TeamSession) -> None:
         """Save the TeamSession to storage"""
         if self.db is not None and self.parent_team_id is None and self.workflow_id is None:
