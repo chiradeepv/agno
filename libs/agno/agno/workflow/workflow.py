@@ -1754,13 +1754,23 @@ class Workflow:
         if self.steps and not callable(self.steps):
             steps_dict = []
             for step in self.steps:  # type: ignore
-                # TODO: The step should have a type field
-                step_type = STEP_TYPE_MAPPING[type(step)]
-                step_dict = {
-                    "name": step.name if hasattr(step, "name") else step.__name__,
-                    "description": step.description if hasattr(step, "description") else "User-defined callable step",
-                    "type": step_type.value,
-                }
+                if not isinstance(step, (Step, Steps, Loop, Parallel, Condition, Router)):
+                    # This is a raw function, agent, team, or other callable - handle it directly
+                    step_dict = {
+                        "name": getattr(step, "name", getattr(step, "__name__", "anonymous_step")),
+                        "description": getattr(step, "description", "User-defined callable step"),
+                        "type": StepType.STEP.value,  # Treat all non-workflow objects as basic steps
+                    }
+                else:
+                    # This is a workflow step object - use the mapping
+                    step_type = STEP_TYPE_MAPPING[type(step)]
+                    step_dict = {
+                        "name": step.name if hasattr(step, "name") else step.__name__,
+                        "description": step.description
+                        if hasattr(step, "description")
+                        else "User-defined callable step",
+                        "type": step_type.value,
+                    }
                 steps_dict.append(step_dict)
 
             workflow_data["steps"] = steps_dict
