@@ -614,6 +614,7 @@ class Agent:
 
     def _initialize_session(
         self,
+        run_id: str,
         session_id: Optional[str] = None,
         user_id: Optional[str] = None,
         session_state: Optional[Dict[str, Any]] = None,
@@ -642,6 +643,8 @@ class Agent:
             session_state["current_user_id"] = user_id
         if session_id is not None:
             session_state["current_session_id"] = session_id
+        if run_id is not None:
+            session_state["current_run_id"] = run_id
 
         return session_id, user_id, session_state  # type: ignore
 
@@ -882,8 +885,11 @@ class Agent:
     ) -> Union[RunResponse, Iterator[RunResponseEvent]]:
         """Run the Agent and return the response."""
 
+        # Create a run_id for this specific run
+        run_id = str(uuid4())
+
         session_id, user_id, session_state = self._initialize_session(
-            session_id=session_id, user_id=user_id, session_state=session_state
+            run_id=run_id, session_id=session_id, user_id=user_id, session_state=session_state
         )
 
         # Initialize the Agent
@@ -929,9 +935,6 @@ class Agent:
         # Prepare arguments for the model
         response_format = self._get_response_format() if self.parser_model is None else None
         self.model = cast(Model, self.model)
-
-        # Create a run_id for this specific run
-        run_id = str(uuid4())
 
         # Create a new run_response for this attempt
         run_response = RunResponse(
@@ -1282,8 +1285,11 @@ class Agent:
     ) -> Union[RunResponse, AsyncIterator[RunResponseEvent]]:
         """Async Run the Agent and return the response."""
 
+        # Create a run_id for this specific run
+        run_id = str(uuid4())
+
         session_id, user_id, session_state = self._initialize_session(
-            session_id=session_id, user_id=user_id, session_state=session_state
+            run_id=run_id, session_id=session_id, user_id=user_id, session_state=session_state
         )
 
         # Initialize the Agent
@@ -1323,9 +1329,6 @@ class Agent:
         # Prepare arguments for the model
         response_format = self._get_response_format() if self.parser_model is None else None
         self.model = cast(Model, self.model)
-
-        # Create a run_id for this specific run
-        run_id = str(uuid4())
 
         # Create a new run_response for this attempt
         run_response = RunResponse(
@@ -1501,7 +1504,9 @@ class Agent:
 
         session_id = run_response.session_id if run_response else session_id
 
-        session_id, user_id, session_state = self._initialize_session(session_id=session_id, user_id=user_id)
+        session_id, user_id, session_state = self._initialize_session(
+            run_id=run_id, session_id=session_id, user_id=user_id
+        )
         # Initialize the Agent
         self.initialize_agent(debug_mode=debug_mode)
 
@@ -1857,7 +1862,9 @@ class Agent:
         if not run_response and (run_id is not None and (session_id is None and self.session_id is None)):
             raise ValueError("Session ID is required to continue a run from a run_id.")
 
-        session_id, user_id, session_state = self._initialize_session(session_id=session_id, user_id=user_id)
+        session_id, user_id, session_state = self._initialize_session(
+            run_id=run_id, session_id=session_id, user_id=user_id
+        )
 
         # Initialize the Agent
         self.initialize_agent(debug_mode=debug_mode)
@@ -3629,6 +3636,7 @@ class Agent:
         if self.db is not None and self.team_id is None and self.workflow_id is None:
             session.session_data["session_state"].pop("current_session_id", None)
             session.session_data["session_state"].pop("current_user_id", None)
+            session.session_data["session_state"].pop("current_run_id", None)
 
             # TODO: Add image/audio/video artifacts to the session correctly, from runs
             if self.images is not None:

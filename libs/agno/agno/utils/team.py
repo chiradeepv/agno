@@ -3,7 +3,6 @@ from typing import TYPE_CHECKING, Optional, Union
 from agno.agent import Agent
 from agno.utils.string import is_valid_uuid, url_safe_string
 
-
 if TYPE_CHECKING:
     from agno.team.team import Team
 

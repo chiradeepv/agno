@@ -74,7 +74,7 @@ def test_workflow_session_state_switch_session_id(shared_db):
     workflow = workflow_factory(shared_db, session_id_1, session_state)
 
     # First run with a different session ID
-    response = workflow.run("Test 1", session_id=session_id_1)
+    workflow.run("Test 1", session_id=session_id_1)
     session_from_storage = workflow.get_session(session_id=session_id_1)
     assert session_from_storage.session_id == session_id_1
     assert session_from_storage.session_data["session_state"] == session_state

@@ -651,7 +651,7 @@ class FunctionCall(BaseModel):
                 execution_chain = self._build_nested_execution_chain(entrypoint_args=entrypoint_args)
                 result = execution_chain(self.function.name, self.function.entrypoint, self.arguments or {})
             else:
-                result = self.function.entrypoint(**entrypoint_args, **self.arguments)
+                result = self.function.entrypoint(**entrypoint_args, **self.arguments)  # type: ignore
 
             updated_session_state = None
             if entrypoint_args.get("session_state") is not None:

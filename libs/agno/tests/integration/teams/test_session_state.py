@@ -63,7 +63,7 @@ def test_team_session_state_switch_session_id(shared_db):
     team = team_factory(shared_db, session_id_1, session_state)
 
     # First run with a different session ID
-    response = team.run("What can you do?", session_id=session_id_1)
+    team.run("What can you do?", session_id=session_id_1)
     session_from_storage = team.get_session(session_id=session_id_1)
     assert session_from_storage.session_id == session_id_1
     assert session_from_storage.session_data["session_state"] == session_state

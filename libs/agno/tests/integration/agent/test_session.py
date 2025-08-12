@@ -57,7 +57,7 @@ def test_agent_session_state_switch_session_id(shared_db):
     chat_agent = chat_agent_factory(shared_db, session_id_1, session_state={"test_key": "test_value"})
 
     # First run with a session ID (reset should not happen)
-    response = chat_agent.run("What can you do?")
+    chat_agent.run("What can you do?")
     session_from_storage = shared_db.get_session(session_id=session_id_1, session_type=SessionType.AGENT)
     assert session_from_storage is not None
     assert session_from_storage.session_id == session_id_1

@@ -230,7 +230,7 @@ class StepOutput:
             "images": [img.to_dict() for img in self.images] if self.images else None,
             "videos": [vid.to_dict() for vid in self.videos] if self.videos else None,
             "audio": [aud.to_dict() for aud in self.audio] if self.audio else None,
-            "metrics": self.metrics.to_dict() if hasattr(self.metrics, "to_dict") else self.metrics,
+            "metrics": self.metrics.to_dict() if self.metrics is not None and hasattr(self.metrics, "to_dict") else self.metrics,
             "success": self.success,
             "error": self.error,
             "stop": self.stop,
@@ -296,7 +296,7 @@ class StepMetrics:
             result["parallel_steps"] = {name: step.to_dict() for name, step in self.parallel_steps.items()}  # type: ignore[assignment]
         elif self.executor_type != "parallel":
             # For non-parallel steps, include metrics (even if None)
-            result["metrics"] = self.metrics.to_dict() if hasattr(self.metrics, "to_dict") else self.metrics  # type: ignore[assignment]
+            result["metrics"] = self.metrics.to_dict() if self.metrics is not None and hasattr(self.metrics, "to_dict") else self.metrics  # type: ignore[assignment]
 
         return result
 

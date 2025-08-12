@@ -50,7 +50,7 @@ class MessageData:
     # Data from the provider that we might need on subsequent messages
     response_provider_data: Optional[Dict[str, Any]] = None
 
-    metadata: Optional[Dict[str, Any]] = None
+    extra: Optional[Dict[str, Any]] = None
 
 
 def _log_messages(messages: List[Message]) -> None:
@@ -830,9 +830,9 @@ class Model(ABC):
                 function_call_count += len(function_call_results)
 
                 # Format and add results to messages
-                if stream_data and stream_data.metadata is not None:
+                if stream_data and stream_data.extra is not None:
                     self.format_function_call_results(
-                        messages=messages, function_call_results=function_call_results, **stream_data.metadata
+                        messages=messages, function_call_results=function_call_results, **stream_data.extra
                     )
                 else:
                     self.format_function_call_results(messages=messages, function_call_results=function_call_results)
@@ -977,9 +977,9 @@ class Model(ABC):
                 function_call_count += len(function_call_results)
 
                 # Format and add results to messages
-                if stream_data and stream_data.metadata is not None:
+                if stream_data and stream_data.extra is not None:
                     self.format_function_call_results(
-                        messages=messages, function_call_results=function_call_results, **stream_data.metadata
+                        messages=messages, function_call_results=function_call_results, **stream_data.extra
                     )
                 else:
                     self.format_function_call_results(messages=messages, function_call_results=function_call_results)
@@ -1079,9 +1079,9 @@ class Model(ABC):
                 stream_data.response_image = model_response_delta.image
 
         if model_response_delta.extra is not None:
-            if stream_data.metadata is None:
-                stream_data.metadata = {}
-            stream_data.metadata.update(model_response_delta.extra)
+            if stream_data.extra is None:
+                stream_data.extra = {}
+            stream_data.extra.update(model_response_delta.extra)
 
         if model_response_delta.response_usage is not None:
             _add_usage_metrics_to_assistant_message(

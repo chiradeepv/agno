@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from datetime import datetime
 from textwrap import dedent
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Type, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Type, Union, cast
 
 from pydantic import BaseModel, Field
 
@@ -119,6 +119,7 @@ class SessionSummaryManager:
         session: Optional["Session"] = None,
     ) -> List[Message]:
         """Prepare messages for session summary generation"""
+        self.model = cast(Model, self.model)
         response_format = self.get_response_format(self.model)
 
         return [
@@ -156,7 +157,7 @@ class SessionSummaryManager:
             try:
                 from agno.utils.string import parse_response_model_str
 
-                parsed_summary = parse_response_model_str(summary_response.content, SessionSummaryResponse)
+                parsed_summary: SessionSummaryResponse = parse_response_model_str(summary_response.content, SessionSummaryResponse)
 
                 if parsed_summary is not None:
                     session_summary = SessionSummary(

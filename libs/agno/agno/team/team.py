@@ -588,6 +588,7 @@ class Team:
 
     def _initialize_session(
         self,
+        run_id: str,
         user_id: Optional[str] = None,
         session_id: Optional[str] = None,
         session_state: Optional[Dict[str, Any]] = None,
@@ -614,6 +615,7 @@ class Team:
             session_state["current_user_id"] = user_id
         if session_id is not None:
             session_state["current_session_id"] = session_id
+        session_state["current_run_id"] = run_id
 
         return session_id, user_id, session_state  # type: ignore
 
@@ -879,8 +881,11 @@ class Team:
         if store_member_responses is not None:
             self.store_member_responses = store_member_responses
 
+        # Create a run_id for this specific run
+        run_id = str(uuid4())
+
         session_id, user_id, session_state = self._initialize_session(
-            session_id=session_id, user_id=user_id, session_state=session_state
+            run_id=run_id, session_id=session_id, user_id=user_id, session_state=session_state
         )
 
         # Initialize Team
@@ -928,9 +933,6 @@ class Team:
             self._get_response_format() if self.parser_model is None else None
         )
         self.model = cast(Model, self.model)
-
-        # Create a run_id for this specific run
-        run_id = str(uuid4())
 
         # Create a new run_response for this attempt
         run_response = TeamRunResponse(
@@ -1296,8 +1298,11 @@ class Team:
         if store_member_responses is not None:
             self.store_member_responses = store_member_responses
 
+        # Create a run_id for this specific run
+        run_id = str(uuid4())
+
         session_id, user_id, session_state = self._initialize_session(
-            session_id=session_id, user_id=user_id, session_state=session_state
+            run_id=run_id, session_id=session_id, user_id=user_id, session_state=session_state
         )
 
         # Initialize Team
@@ -1340,9 +1345,6 @@ class Team:
         )
 
         self.model = cast(Model, self.model)
-
-        # Create a run_id for this specific run
-        run_id = str(uuid4())
 
         # Create a new run_response for this attempt
         run_response = TeamRunResponse(
@@ -4091,7 +4093,8 @@ class Team:
         # Calculate initial metrics
         session_metrics = self._calculate_session_metrics(session_messages)
 
-        session.session_data["session_metrics"] = session_metrics
+        if session.session_data is not None:
+            session.session_data["session_metrics"] = session_metrics
 
     def _aggregate_metrics_from_messages(self, messages: List[Message]) -> Dict[str, Any]:
         aggregated_metrics: Dict[str, Any] = defaultdict(list)
@@ -4626,7 +4629,7 @@ class Team:
         run_response: TeamRunResponse,
         team_run_context: Dict[str, Any],
         session: TeamSession,
-        session_state: Optional[Dict[str, Any]] = None,
+        session_state: Dict[str, Any],
         user_id: Optional[str] = None,
         async_mode: bool = False,
         knowledge_filters: Optional[Dict[str, Any]] = None,
@@ -5366,7 +5369,11 @@ class Team:
 
                 if self.add_state_in_messages:
                     user_msg_content = self._format_message_with_state_variables(
-                        user_msg_content, user_id=user_id, session_state=session.session_data.get("session_state")
+                        user_msg_content,
+                        user_id=user_id,
+                        session_state=session.session_data.get("session_state")
+                        if session.session_data is not None
+                        else None,
                     )
 
                 # Convert to string for concatenation operations
@@ -5699,18 +5706,22 @@ class Team:
 
         log_info(f"Adding messages from history for {member_agent.name}")
 
+        # We know the member is a team
         if hasattr(member_agent, "parent_team_id"):
-            team_id = member_agent.parent_team_id
+            history = session.get_messages_from_last_n_runs(
+                last_n=member_agent.num_history_runs or self.num_history_runs,
+                skip_role=self.system_message_role,
+                team_id=member_agent.team_id,
+                member_runs=True,
+            )
+        # Else, the member is an agent
         else:
-            team_id = member_agent.team_id
-
-        history = session.get_messages_from_last_n_runs(
-            last_n=member_agent.num_history_runs or self.num_history_runs,
-            skip_role=self.system_message_role,
-            agent_id=member_agent.agent_id,
-            team_id=team_id,
-            member_runs=True,
-        )
+            history = session.get_messages_from_last_n_runs(
+                last_n=member_agent.num_history_runs or self.num_history_runs,
+                skip_role=self.system_message_role,
+                agent_id=member_agent.agent_id,
+                member_runs=True,
+            )
 
         if len(history) > 0:
             # Create a deep copy of the history messages to avoid modifying the original messages
@@ -6782,7 +6793,7 @@ class Team:
                     return run_response
                 else:
                     log_warning(f"RunResponse {run_id} not found in AgentSession {session_id}")
-                    return None
+        return None
 
     def get_last_run_response(self, session_id: Optional[str] = None) -> Optional[TeamRunResponse]:
         """
@@ -6870,13 +6881,13 @@ class Team:
         log_warning(f"TeamSession {session_id_to_load} not found in db")
         return None
 
-
     def save_session(self, session: TeamSession) -> None:
         """Save the TeamSession to storage"""
         if self.db is not None and self.parent_team_id is None and self.workflow_id is None:
-            if "session_state" in session.session_data:
-                session.session_data["session_state"].pop("current_session_id", None)
-                session.session_data["session_state"].pop("current_user_id", None)
+            if session.session_data is not None and "session_state" in session.session_data:
+                session.session_data["session_state"].pop("current_session_id", None)  # type: ignore
+                session.session_data["session_state"].pop("current_user_id", None)  # type: ignore
+                session.session_data["session_state"].pop("current_run_id", None)  # type: ignore
 
             # TODO: Add image/audio/video artifacts to the session correctly, from runs
             if self.images is not None:

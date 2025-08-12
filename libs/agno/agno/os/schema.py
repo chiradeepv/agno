@@ -15,6 +15,8 @@ from agno.os.utils import (
     get_session_name,
     get_workflow_input_schema_dict,
 )
+from agno.run.response import RunResponse
+from agno.run.team import TeamRunResponse
 from agno.session import AgentSession, TeamSession, WorkflowSession
 from agno.team.team import Team
 from agno.workflow.workflow import Workflow
@@ -100,7 +102,11 @@ class AgentResponse(BaseModel):
 
     @classmethod
     def from_agent(cls, agent: Agent, memory_app: Optional[MemoryApp] = None) -> "AgentResponse":
-        agent_tools = agent.get_tools(session=AgentSession(session_id=str(uuid4()), session_data={}), async_mode=True)
+        agent_tools = agent.get_tools(
+            session=AgentSession(session_id=str(uuid4()), session_data={}),
+            run_response=RunResponse(run_id=str(uuid4())),
+            async_mode=True,
+        )
         formatted_tools = format_tools(agent_tools) if agent_tools else None
 
         model_name = agent.model.name or agent.model.__class__.__name__ if agent.model else None
@@ -178,23 +184,12 @@ class TeamResponse(BaseModel):
         team.determine_tools_for_model(
             model=team.model,
             session=TeamSession(session_id=str(uuid4()), session_data={}),
+            run_response=TeamRunResponse(run_id=str(uuid4())),
             async_mode=True,
+            team_run_context={},
         )
         team_tools = list(team._functions_for_model.values()) if team._functions_for_model else []
         formatted_tools = format_team_tools(team_tools)
-
-        model_name = team.model.name or team.model.__class__.__name__ if team.model else None
-        model_provider = team.model.provider or team.model.__class__.__name__ if team.model else ""
-        model_id = team.model.id if team.model else None
-
-        if model_provider and model_id:
-            model_provider = f"{model_provider} {model_id}"
-        elif model_name and model_id:
-            model_provider = f"{model_name} {model_id}"
-        elif model_id:
-            model_provider = model_id
-        else:
-            model_provider = ""
 
         memory_info: Optional[Dict[str, Any]] = None
         if team.memory_manager is not None:
