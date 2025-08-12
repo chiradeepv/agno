@@ -1,9 +1,8 @@
 from agno.agent import Agent
 from agno.memory import Memory, SessionSummarizer
 from agno.models.openai import OpenAIChat
-from rich.pretty import pprint
-
 from agno.utils.pprint import pprint_run_response
+from rich.pretty import pprint
 
 # You can also override the entire `system_message` for the session summarizer if you wanted
 session_summarizer = SessionSummarizer(

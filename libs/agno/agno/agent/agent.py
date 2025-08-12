@@ -67,6 +67,7 @@ from agno.utils.events import (
     create_tool_call_completed_event,
     create_tool_call_started_event,
 )
+from agno.utils.knowledge import get_agentic_or_user_search_filters
 from agno.utils.log import (
     log_debug,
     log_error,
@@ -78,6 +79,11 @@ from agno.utils.log import (
 )
 from agno.utils.message import get_text_from_message
 from agno.utils.prompts import get_json_output_prompt, get_response_model_format_prompt
+from agno.utils.reasoning import (
+    add_reasoning_metrics_to_metadata,
+    add_reasoning_step_to_metadata,
+    append_to_reasoning_content,
+)
 from agno.utils.response import (
     async_generator_wrapper,
     create_panel,
@@ -111,6 +117,10 @@ class Agent:
     session_id: Optional[str] = None
     # Default session state (stored in the database to persist across runs)
     session_state: Optional[Dict[str, Any]] = None
+    # If True, the agent can update the session state
+    enable_agentic_state: bool = False
+    # If True, cache the session in memory
+    cache_session: bool = False
 
     search_session_history: Optional[bool] = False
     num_history_sessions: Optional[int] = None
@@ -120,8 +130,6 @@ class Agent:
     add_session_summary_to_context: Optional[bool] = None
     # Session summary manager
     session_summary_manager: Optional[SessionSummaryManager] = None
-    # If True, cache the session in memory
-    cache_session: bool = False
 
     # --- Agent Dependencies ---
     # Dependencies available for tools and prompt functions
@@ -603,7 +611,6 @@ class Agent:
         self.tools = tools
         self._rebuild_tools = True
 
-
     def _initialize_session(
         self,
         session_id: Optional[str] = None,
@@ -689,7 +696,9 @@ class Agent:
             )
 
         # 5. Update Agent Memory
-        response_iterator = self._make_memories_and_summaries(run_response=run_response, run_messages=run_messages, session=session, user_id=user_id)
+        response_iterator = self._make_memories_and_summaries(
+            run_response=run_response, run_messages=run_messages, session=session, user_id=user_id
+        )
         # Consume the response iterator to ensure the memory is updated before the run is completed
         deque(response_iterator, maxlen=0)
 
@@ -705,7 +714,9 @@ class Agent:
         self.save_session(session=session)
 
         # 8. Optional: Save output to file if save_response_to_file is set
-        self.save_run_response_to_file(run_response=run_response, message=run_messages.user_message, session_id=session.session_id, user_id=user_id)
+        self.save_run_response_to_file(
+            run_response=run_response, message=run_messages.user_message, session_id=session.session_id, user_id=user_id
+        )
 
         # Log Agent Run
         self._log_agent_run(user_id=user_id, session_id=session.session_id)
@@ -723,6 +734,7 @@ class Agent:
         response_format: Optional[Union[Dict, Type[BaseModel]]] = None,
         stream_intermediate_steps: bool = False,
         workflow_context: Optional[Dict] = None,
+        yield_run_response: bool = False,
     ) -> Iterator[RunResponseEvent]:
         """Run the Agent and yield the RunResponse.
 
@@ -744,7 +756,6 @@ class Agent:
         # 1. Reason about the task if reasoning is enabled
         yield from self._handle_reasoning_stream(run_response=run_response, run_messages=run_messages)
 
-
         # 2. Process model response
         yield from self._handle_model_response_stream(
             session=session,
@@ -757,8 +768,7 @@ class Agent:
 
         # If a parser model is provided, structure the response separately
         yield from self._parse_response_with_parser_model_stream(
-            session=session,
-            run_response=run_response, stream_intermediate_steps=stream_intermediate_steps
+            session=session, run_response=run_response, stream_intermediate_steps=stream_intermediate_steps
         )
 
         # 3. Add RunResponse to Agent Session
@@ -772,7 +782,9 @@ class Agent:
             return
 
         # 4. Update Agent Memory
-        yield from self._make_memories_and_summaries(run_response=run_response, run_messages=run_messages, session=session, user_id=user_id)
+        yield from self._make_memories_and_summaries(
+            run_response=run_response, run_messages=run_messages, session=session, user_id=user_id
+        )
 
         # 5. Calculate session metrics
         self.update_session_metrics(session=session, run_messages=run_messages)
@@ -780,17 +792,22 @@ class Agent:
         run_response.status = RunStatus.completed
 
         completed_event = self._handle_event(
-                create_run_response_completed_event(from_run_response=run_response), run_response, workflow_context
-            )
+            create_run_response_completed_event(from_run_response=run_response), run_response, workflow_context
+        )
 
         # 6. Save session to storage
         self.save_session(session=session)
 
         # 7. Optional: Save output to file if save_response_to_file is set
-        self.save_run_response_to_file(run_response=run_response, message=run_messages.user_message, session_id=session.session_id, user_id=user_id)
+        self.save_run_response_to_file(
+            run_response=run_response, message=run_messages.user_message, session_id=session.session_id, user_id=user_id
+        )
 
         if stream_intermediate_steps:
             yield completed_event
+
+        if yield_run_response:
+            yield run_response
 
         # Log Agent Run
         self._log_agent_run(user_id=user_id, session_id=session.session_id)
@@ -838,6 +855,7 @@ class Agent:
         knowledge_filters: Optional[Dict[str, Any]] = None,
         debug_mode: Optional[bool] = None,
         refresh_session_before_write: Optional[bool] = False,
+        yield_run_response: bool = False,
         **kwargs: Any,
     ) -> Iterator[RunResponseEvent]: ...
 
@@ -858,6 +876,7 @@ class Agent:
         retries: Optional[int] = None,
         knowledge_filters: Optional[Dict[str, Any]] = None,
         debug_mode: Optional[bool] = None,
+        yield_run_response: bool = False,
         **kwargs: Any,
     ) -> Union[RunResponse, Iterator[RunResponseEvent]]:
         """Run the Agent and return the response."""
@@ -871,7 +890,7 @@ class Agent:
 
         # Read existing session from database
         agent_session = self.read_or_create_session(session_id=session_id, user_id=user_id)
-        self.update_metadata(session=agent_session)
+        self._update_metadata(session=agent_session)
 
         # Update session state from DB
         session_state = self.update_session_state(session=agent_session, session_state=session_state)
@@ -934,7 +953,6 @@ class Agent:
             knowledge_filters=effective_filters,
         )
 
-
         # If no retries are set, use the agent's default retries
         retries = retries if retries is not None else self.retries
 
@@ -943,7 +961,6 @@ class Agent:
 
         for attempt in range(num_attempts):
             try:
-
                 # Prepare run messages
                 run_messages: RunMessages = self.get_run_messages(
                     run_response=run_response,
@@ -970,6 +987,7 @@ class Agent:
                         response_format=response_format,
                         stream_intermediate_steps=stream_intermediate_steps,
                         workflow_context=workflow_context,
+                        yield_run_response=yield_run_response,
                     )
                     return response_iterator
                 else:
@@ -1075,7 +1093,9 @@ class Agent:
             )
 
         # 5. Update Agent Memory
-        async for _ in self._amake_memories_and_summaries(run_response=run_response, run_messages=run_messages, session=session, user_id=user_id):
+        async for _ in self._amake_memories_and_summaries(
+            run_response=run_response, run_messages=run_messages, session=session, user_id=user_id
+        ):
             pass
 
         # 6. Calculate session metrics
@@ -1090,7 +1110,9 @@ class Agent:
         self.save_session(session=session)
 
         # 8. Optional: Save output to file if save_response_to_file is set
-        self.save_run_response_to_file(run_response=run_response, message=run_messages.user_message, session_id=session.session_id, user_id=user_id)
+        self.save_run_response_to_file(
+            run_response=run_response, message=run_messages.user_message, session_id=session.session_id, user_id=user_id
+        )
 
         # Log Agent Run
         await self._alog_agent_run(user_id=user_id, session_id=session.session_id)
@@ -1108,6 +1130,7 @@ class Agent:
         response_format: Optional[Union[Dict, Type[BaseModel]]] = None,
         stream_intermediate_steps: bool = False,
         workflow_context: Optional[Dict] = None,
+        yield_run_response: Optional[bool] = None,
     ) -> AsyncIterator[RunResponseEvent]:
         """Run the Agent and yield the RunResponse.
 
@@ -1123,7 +1146,6 @@ class Agent:
         # Resolving here for async requirement
         if self.dependencies is not None:
             await self.aresolve_run_dependencies()
-
 
         log_debug(f"Agent Run Start: {run_response.run_id}", center=True)
         # Start the Run by yielding a RunStarted event
@@ -1147,9 +1169,7 @@ class Agent:
 
         # If a parser model is provided, structure the response separately
         async for event in self._aparse_response_with_parser_model_stream(
-            session=session,
-            run_response=run_response,
-            stream_intermediate_steps=stream_intermediate_steps
+            session=session, run_response=run_response, stream_intermediate_steps=stream_intermediate_steps
         ):
             yield event
 
@@ -1165,7 +1185,9 @@ class Agent:
             return
 
         # 5. Update Agent Memory
-        async for event in self._amake_memories_and_summaries(run_response=run_response, run_messages=run_messages, session=session, user_id=user_id):
+        async for event in self._amake_memories_and_summaries(
+            run_response=run_response, run_messages=run_messages, session=session, user_id=user_id
+        ):
             yield event
 
         # 6. Calculate session metrics
@@ -1174,17 +1196,22 @@ class Agent:
         run_response.status = RunStatus.completed
 
         completed_event = self._handle_event(
-                create_run_response_completed_event(from_run_response=run_response), run_response, workflow_context
-            )
+            create_run_response_completed_event(from_run_response=run_response), run_response, workflow_context
+        )
 
         # 6. Save session to storage
         self.save_session(session=session)
 
         # 8. Optional: Save output to file if save_response_to_file is set
-        self.save_run_response_to_file(run_response=run_response, message=run_messages.user_message, session_id=session.session_id, user_id=user_id)
+        self.save_run_response_to_file(
+            run_response=run_response, message=run_messages.user_message, session_id=session.session_id, user_id=user_id
+        )
 
         if stream_intermediate_steps:
             yield completed_event
+        
+        if yield_run_response:
+            yield run_response
 
         # Log Agent Run
         await self._alog_agent_run(user_id=user_id, session_id=session.session_id)
@@ -1228,6 +1255,7 @@ class Agent:
         retries: Optional[int] = None,
         knowledge_filters: Optional[Dict[str, Any]] = None,
         debug_mode: Optional[bool] = None,
+        yield_run_response: Optional[bool] = None,
         **kwargs: Any,
     ) -> AsyncIterator[RunResponseEvent]: ...
 
@@ -1248,6 +1276,7 @@ class Agent:
         retries: Optional[int] = None,
         knowledge_filters: Optional[Dict[str, Any]] = None,
         debug_mode: Optional[bool] = None,
+        yield_run_response: Optional[bool] = None,
         **kwargs: Any,
     ) -> Union[RunResponse, AsyncIterator[RunResponseEvent]]:
         """Async Run the Agent and return the response."""
@@ -1261,7 +1290,7 @@ class Agent:
 
         # Read existing session from storage
         agent_session = self.read_or_create_session(session_id=session_id, user_id=user_id)
-        self.update_metadata(session=agent_session)
+        self._update_metadata(session=agent_session)
 
         # Update session state from DB
         session_state = self.update_session_state(session=agent_session, session_state=session_state)
@@ -1326,7 +1355,6 @@ class Agent:
 
         for attempt in range(num_attempts):
             try:
-
                 # Prepare run messages
                 run_messages: RunMessages = self.get_run_messages(
                     run_response=run_response,
@@ -1356,6 +1384,7 @@ class Agent:
                         response_format=response_format,
                         stream_intermediate_steps=stream_intermediate_steps,
                         workflow_context=workflow_context,
+                        yield_run_response=yield_run_response,
                     )  # type: ignore[assignment]
                 else:
                     return self._arun(
@@ -1471,15 +1500,13 @@ class Agent:
 
         session_id = run_response.session_id if run_response else session_id
 
-        session_id, user_id, session_state = self._initialize_session(
-            session_id=session_id, user_id=user_id
-        )
+        session_id, user_id, session_state = self._initialize_session(session_id=session_id, user_id=user_id)
         # Initialize the Agent
         self.initialize_agent(debug_mode=debug_mode)
 
         # Read existing session from storage
         agent_session = self.read_or_create_session(session_id=session_id, user_id=user_id)
-        self.update_metadata(session=agent_session)
+        self._update_metadata(session=agent_session)
 
         # Update session state from DB
         session_state = self.update_session_state(session=agent_session, session_state=session_state)
@@ -1518,7 +1545,6 @@ class Agent:
             # The run is continued from a provided run_response. This contains the updated tools.
             messages = run_response.messages or []
         elif run_id is not None:
-
             # The run is continued from a run_id. This requires the updated tools to be passed.
             if updated_tools is None:
                 raise ValueError("Updated tools are required to continue a run from a run_id.")
@@ -1666,7 +1692,9 @@ class Agent:
             )
 
         # 4. Update Agent Memory
-        response_iterator = self._make_memories_and_summaries(run_response=run_response, run_messages=run_messages, session=session, user_id=user_id)
+        response_iterator = self._make_memories_and_summaries(
+            run_response=run_response, run_messages=run_messages, session=session, user_id=user_id
+        )
         # Consume the response iterator to ensure the memory is updated before the run is completed
         deque(response_iterator, maxlen=0)
 
@@ -1682,7 +1710,9 @@ class Agent:
         self.save_session(session=session)
 
         # 7. Save output to file if save_response_to_file is set
-        self.save_run_response_to_file(run_response=run_response, message=run_messages.user_message, session_id=session.session_id, user_id=user_id)
+        self.save_run_response_to_file(
+            run_response=run_response, message=run_messages.user_message, session_id=session.session_id, user_id=user_id
+        )
 
         run_response.status = RunStatus.running
 
@@ -1736,7 +1766,9 @@ class Agent:
             return
 
         # 4. Update Agent Memory
-        yield from self._make_memories_and_summaries(run_response=run_response, run_messages=run_messages, session=session, user_id=user_id)
+        yield from self._make_memories_and_summaries(
+            run_response=run_response, run_messages=run_messages, session=session, user_id=user_id
+        )
 
         # 5. Calculate session metrics
         self.update_session_metrics(session=session, run_messages=run_messages)
@@ -1749,7 +1781,9 @@ class Agent:
         self.save_session(session=session)
 
         # 7. Save output to file if save_response_to_file is set
-        self.save_run_response_to_file(run_response=run_response, message=run_messages.user_message, session_id=session.session_id, user_id=user_id)
+        self.save_run_response_to_file(
+            run_response=run_response, message=run_messages.user_message, session_id=session.session_id, user_id=user_id
+        )
 
         if stream_intermediate_steps:
             yield completed_event
@@ -1814,6 +1848,7 @@ class Agent:
             session_id: The session id to continue the run for.
             retries: The number of retries to continue the run for.
             knowledge_filters: The knowledge filters to use for the run.
+            debug_mode: Whether to enable debug mode.
         """
         if not run_response and not run_id:
             raise ValueError("Either run_response or run_id must be provided.")
@@ -1821,16 +1856,14 @@ class Agent:
         if not run_response and (run_id is not None and (session_id is None and self.session_id is None)):
             raise ValueError("Session ID is required to continue a run from a run_id.")
 
-        session_id, user_id, session_state = self._initialize_session(
-            session_id=session_id, user_id=user_id
-        )
+        session_id, user_id, session_state = self._initialize_session(session_id=session_id, user_id=user_id)
 
         # Initialize the Agent
         self.initialize_agent(debug_mode=debug_mode)
 
         # Read existing session from storage
         agent_session = self.read_or_create_session(session_id=session_id, user_id=user_id)
-        self.update_metadata(session=agent_session)
+        self._update_metadata(session=agent_session)
 
         # Update session state from DB
         session_state = self.update_session_state(session=agent_session, session_state=session_state)
@@ -1877,7 +1910,6 @@ class Agent:
             messages = run_response.messages or []
         else:
             raise ValueError("Either run_response or run_id must be provided.")
-
 
         # Prepare arguments for the model
         response_format = self._get_response_format()
@@ -1986,7 +2018,6 @@ class Agent:
         if self.dependencies is not None:
             await self.aresolve_run_dependencies()
 
-
         self.model = cast(Model, self.model)
 
         # 1. Handle the updated tools
@@ -2014,7 +2045,9 @@ class Agent:
             )
 
         # 4. Update Agent Memory
-        async for _ in self._amake_memories_and_summaries(run_response=run_response, run_messages=run_messages, session=session, user_id=user_id):
+        async for _ in self._amake_memories_and_summaries(
+            run_response=run_response, run_messages=run_messages, session=session, user_id=user_id
+        ):
             pass
 
         # 5. Calculate session metrics
@@ -2029,7 +2062,9 @@ class Agent:
         self.save_session(session=session)
 
         # 7. Save output to file if save_response_to_file is set
-        self.save_run_response_to_file(run_response=run_response, message=run_messages.user_message, session_id=session.session_id, user_id=user_id)
+        self.save_run_response_to_file(
+            run_response=run_response, message=run_messages.user_message, session_id=session.session_id, user_id=user_id
+        )
 
         log_debug(f"Agent Run End: {run_response.run_id}", center=True, symbol="*")
 
@@ -2091,7 +2126,9 @@ class Agent:
             return
 
         # 4. Update Agent Memory
-        async for event in self._amake_memories_and_summaries(run_response=run_response, run_messages=run_messages, session=session, user_id=user_id):
+        async for event in self._amake_memories_and_summaries(
+            run_response=run_response, run_messages=run_messages, session=session, user_id=user_id
+        ):
             yield event
 
         # 5. Calculate session metrics
@@ -2105,7 +2142,9 @@ class Agent:
         self.save_session(session=session)
 
         # 6. Save output to file if save_response_to_file is set
-        self.save_run_response_to_file(run_response=run_response, message=run_messages.user_message, session_id=session.session_id, user_id=user_id)
+        self.save_run_response_to_file(
+            run_response=run_response, message=run_messages.user_message, session_id=session.session_id, user_id=user_id
+        )
 
         if stream_intermediate_steps:
             yield completed_event
@@ -2131,7 +2170,9 @@ class Agent:
         log_debug(f"Agent Run Paused: {run_response.run_id}", center=True, symbol="*")
 
         # Save output to file if save_response_to_file is set
-        self.save_run_response_to_file(run_response=run_response, message=run_messages.user_message, session_id=session.session_id, user_id=user_id)
+        self.save_run_response_to_file(
+            run_response=run_response, message=run_messages.user_message, session_id=session.session_id, user_id=user_id
+        )
 
         # We return and await confirmation/completion for the tools that require it
         return run_response
@@ -2158,12 +2199,13 @@ class Agent:
             run_response,
         )
 
-
         # Save session to storage
         self.save_session(session=session)
 
         # Save output to file if save_response_to_file is set
-        self.save_run_response_to_file(run_response=run_response, message=run_messages.user_message, session_id=session.session_id, user_id=user_id)
+        self.save_run_response_to_file(
+            run_response=run_response, message=run_messages.user_message, session_id=session.session_id, user_id=user_id
+        )
 
         log_debug(f"Agent Run Paused: {run_response.run_id}", center=True, symbol="*")
 
@@ -2239,7 +2281,9 @@ class Agent:
             )
         )
 
-    def _run_tool(self, run_response: RunResponse, run_messages: RunMessages, tool: ToolExecution) -> Iterator[RunResponseEvent]:
+    def _run_tool(
+        self, run_response: RunResponse, run_messages: RunMessages, tool: ToolExecution
+    ) -> Iterator[RunResponseEvent]:
         self.model = cast(Model, self.model)
         # Execute the tool
         function_call = self.model.get_function_call_to_run_from_tool_execution(tool, self._functions_for_model)
@@ -2507,7 +2551,9 @@ class Agent:
                 tool_name = tool_call.tool_name or ""
                 if tool_name.lower() in ["think", "analyze"]:
                     tool_args = tool_call.tool_args or {}
-                    self.update_reasoning_content_from_tool_call(run_response=run_response, tool_name=tool_name, tool_args=tool_args)
+                    self.update_reasoning_content_from_tool_call(
+                        run_response=run_response, tool_name=tool_name, tool_args=tool_args
+                    )
 
         # Update the run_response audio with the model response audio
         if model_response.audio is not None:
@@ -2524,15 +2570,14 @@ class Agent:
         # Update the RunResponse messages
         run_response.messages = messages_for_run_response
         # Update the RunResponse metrics
-        run_response.metrics = self.calculate_metrics(messages_for_run_response)
+        run_response.metrics = self._calculate_metrics(messages_for_run_response)
 
     def update_session_metrics(self, session: AgentSession, run_messages: RunMessages):
         """Calculate session metrics"""
         session_metrics = self._get_session_metrics(session=session)
         # Add the metrics for the current run to the session metrics
-        session_metrics += self.calculate_metrics(run_messages.messages)
+        session_metrics += self._calculate_metrics(run_messages.messages)
         session.session_data["session_metrics"] = session_metrics
-
 
     def _handle_model_response_stream(
         self,
@@ -2583,7 +2628,9 @@ class Agent:
                 all_reasoning_steps = cast(List[ReasoningStep], run_response.metadata.reasoning_steps)
 
             if all_reasoning_steps:
-                self._add_reasoning_metrics_to_metadata(run_response=run_response, reasoning_time_taken=reasoning_state["reasoning_time_taken"])
+                add_reasoning_metrics_to_metadata(
+                    run_response=run_response, reasoning_time_taken=reasoning_state["reasoning_time_taken"]
+                )
                 yield self._handle_event(
                     create_reasoning_completed_event(
                         from_run_response=run_response,
@@ -2599,7 +2646,7 @@ class Agent:
         # Update the RunResponse messages
         run_response.messages = messages_for_run_response
         # Update the RunResponse metrics
-        run_response.metrics = self.calculate_metrics(messages_for_run_response)
+        run_response.metrics = self._calculate_metrics(messages_for_run_response)
 
         # Update the run_response audio if streaming
         if model_response.audio is not None:
@@ -2656,7 +2703,9 @@ class Agent:
                 all_reasoning_steps = cast(List[ReasoningStep], run_response.metadata.reasoning_steps)
 
             if all_reasoning_steps:
-                self._add_reasoning_metrics_to_metadata(run_response=run_response, reasoning_time_taken=reasoning_state["reasoning_time_taken"])
+                add_reasoning_metrics_to_metadata(
+                    run_response=run_response, reasoning_time_taken=reasoning_state["reasoning_time_taken"]
+                )
                 yield self._handle_event(
                     create_reasoning_completed_event(
                         from_run_response=run_response,
@@ -2672,7 +2721,7 @@ class Agent:
         # Update the RunResponse messages
         run_response.messages = messages_for_run_response
         # Update the RunResponse metrics
-        run_response.metrics = self.calculate_metrics(messages_for_run_response)
+        run_response.metrics = self._calculate_metrics(messages_for_run_response)
 
         # Update the run_response audio if streaming
         if model_response.audio is not None:
@@ -2846,7 +2895,10 @@ class Agent:
             elif model_response_event.event == ModelResponseEvent.tool_call_completed.value:
                 if model_response_event.updated_session_state is not None:
                     from agno.utils.merge_dict import merge_dictionaries
-                    merge_dictionaries(session.session_data["session_state"], model_response_event.updated_session_state)
+
+                    merge_dictionaries(
+                        session.session_data["session_state"], model_response_event.updated_session_state
+                    )
 
                 reasoning_step: Optional[ReasoningStep] = None
 
@@ -2873,7 +2925,9 @@ class Agent:
                         if tool_name.lower() in ["think", "analyze"]:
                             tool_args = tool_call.tool_args or {}
 
-                            reasoning_step = self.update_reasoning_content_from_tool_call(run_response=run_response, tool_name=tool_name, tool_args=tool_args)
+                            reasoning_step = self.update_reasoning_content_from_tool_call(
+                                run_response=run_response, tool_name=tool_name, tool_args=tool_args
+                            )
 
                             metrics = tool_call.metrics
                             if metrics is not None and metrics.time is not None and reasoning_state is not None:
@@ -3149,6 +3203,9 @@ class Agent:
             agent_tools.append(self.get_update_user_memory_function(user_id=user_id, async_mode=async_mode))
             self._rebuild_tools = True
 
+        if self.enable_agentic_state:
+            agent_tools.append(self.update_session_state_tool)
+
         # Add tools for accessing knowledge
         if self.knowledge is not None or self.knowledge_retriever is not None:
             # Check if knowledge retriever is an async function but used in sync mode
@@ -3170,7 +3227,9 @@ class Agent:
                     )
                 else:
                     agent_tools.append(
-                        self.search_knowledge_base_function(run_response=run_response, async_mode=async_mode, knowledge_filters=knowledge_filters)
+                        self.search_knowledge_base_function(
+                            run_response=run_response, async_mode=async_mode, knowledge_filters=knowledge_filters
+                        )
                     )
                 self._rebuild_tools = True
 
@@ -3193,7 +3252,11 @@ class Agent:
             self._rebuild_tools = False
 
             agent_tools = self.get_tools(
-                run_response=run_response, session=session, async_mode=async_mode, user_id=user_id, knowledge_filters=knowledge_filters
+                run_response=run_response,
+                session=session,
+                async_mode=async_mode,
+                user_id=user_id,
+                knowledge_filters=knowledge_filters,
             )
 
             self._tools_for_model = []
@@ -3382,7 +3445,7 @@ class Agent:
             log_warning(f"Error getting session from db: {e}")
             return None
 
-    def upsert_session(self, session: Session) -> Optional[Session]:
+    def _upsert_session(self, session: AgentSession) -> Optional[AgentSession]:
         """Upsert a Session into the database."""
         from copy import deepcopy
 
@@ -3421,7 +3484,7 @@ class Agent:
 
         return session_state
 
-    def update_metadata(self, session: AgentSession):
+    def _update_metadata(self, session: AgentSession):
         """Update the extra_data in the session"""
         from agno.utils.merge_dict import merge_dictionaries
 
@@ -3433,7 +3496,6 @@ class Agent:
                 merge_dictionaries(session.metadata, self.metadata)
             # Update the current metadata with the metadata from the database which is updated in place
             self.metadata = session.metadata
-
 
     def _get_session_metrics(self, session: AgentSession):
         # Get the session_metrics from the database
@@ -3521,7 +3583,11 @@ class Agent:
         Returns:
             RunResponse: The last run response from the database.
         """
-        if self._agent_session is not None and self._agent_session.runs is not None and len(self._agent_session.runs) > 0:
+        if (
+            self._agent_session is not None
+            and self._agent_session.runs is not None
+            and len(self._agent_session.runs) > 0
+        ):
             run_response = self._agent_session.runs[-1]
             if run_response is not None:
                 return run_response
@@ -3534,7 +3600,6 @@ class Agent:
             else:
                 log_warning(f"No run responses found in AgentSession {session_id}")
                 return None
-
 
     def get_session(
         self,
@@ -3557,7 +3622,9 @@ class Agent:
 
         # Try to load from database
         if self.db is not None:
-            agent_session = cast(AgentSession, self._read_session(session_id=session_id_to_load, session_type=SessionType.AGENT))
+            agent_session = cast(
+                AgentSession, self._read_session(session_id=session_id_to_load, session_type=SessionType.AGENT)
+            )
             return agent_session
 
         log_warning(f"AgentSession {session_id_to_load} not found in db")
@@ -3582,9 +3649,8 @@ class Agent:
             if self.audio is not None:
                 session.session_data["audio"] = [aud.to_dict() for aud in self.audio]  # type: ignore
 
-            self.upsert_session(session=session)
+            self._upsert_session(session=session)
             log_debug(f"Created or updated AgentSession record: {session.session_id}")
-
 
     def get_chat_history(self, session_id: str) -> List[Message]:
         """Read the chat history from the session"""
@@ -3592,11 +3658,13 @@ class Agent:
 
         return session.get_chat_history()
 
-    def format_message_with_state_variables(self, message: Any, user_id: Optional[str] = None, session_state: Optional[Dict[str, Any]] = None) -> Any:
+    def format_message_with_state_variables(
+        self, message: Any, user_id: Optional[str] = None, session_state: Optional[Dict[str, Any]] = None
+    ) -> Any:
         """Format a message with the session state variables."""
-        from copy import deepcopy
         import re
         import string
+        from copy import deepcopy
 
         if not isinstance(message, str):
             return message
@@ -3646,7 +3714,9 @@ class Agent:
 
             # Format the system message with the session state variables
             if self.add_state_in_messages:
-                sys_message_content = self.format_message_with_state_variables(sys_message_content, user_id=user_id, session_state=session.session_data.get("session_state"))
+                sys_message_content = self.format_message_with_state_variables(
+                    sys_message_content, user_id=user_id, session_state=session.session_data.get("session_state")
+                )
 
             # type: ignore
             return Message(role=self.system_message_role, content=sys_message_content)
@@ -3776,7 +3846,9 @@ class Agent:
 
         # Format the system message with the session state variables
         if self.add_state_in_messages:
-            system_message_content = self.format_message_with_state_variables(system_message_content, user_id=user_id, session_state=session.session_data.get("session_state"))
+            system_message_content = self.format_message_with_state_variables(
+                system_message_content, user_id=user_id, session_state=session.session_data.get("session_state")
+            )
 
         # 3.3.7 Then add the expected output
         if self.expected_output is not None:
@@ -3826,10 +3898,7 @@ class Agent:
                 )
 
         # 3.3.11 Then add a summary of the interaction to the system prompt
-        if (
-            self.add_session_summary_to_context
-            and session.summary is not None
-        ):
+        if self.add_session_summary_to_context and session.summary is not None:
             system_message_content += "Here is a brief summary of your previous interactions:\n\n"
             system_message_content += "<summary_of_previous_interactions>\n"
             system_message_content += session.summary.summary
@@ -3903,7 +3972,9 @@ class Agent:
                     raise Exception("user_message must return a string")
 
             if self.add_state_in_messages:
-                user_message_content = self.format_message_with_state_variables(user_message_content, user_id=user_id, session_state=session.session_data.get("session_state"))
+                user_message_content = self.format_message_with_state_variables(
+                    user_message_content, user_id=user_id, session_state=session.session_data.get("session_state")
+                )
 
             return Message(
                 role=self.user_message_role,
@@ -3981,7 +4052,6 @@ class Agent:
                 except Exception as e:
                     log_warning(f"Failed to convert BaseModel to message: {e}")
             else:
-
                 user_msg_content = message
                 if self.add_knowledge_to_context:
                     if isinstance(message, str):
@@ -3999,7 +4069,9 @@ class Agent:
                         )
                         if docs_from_knowledge is not None:
                             references = MessageReferences(
-                                query=user_msg_content, references=docs_from_knowledge, time=round(retrieval_timer.elapsed, 4)
+                                query=user_msg_content,
+                                references=docs_from_knowledge,
+                                time=round(retrieval_timer.elapsed, 4),
                             )
                             # Add the references to the run_response
                             if run_response.metadata is None:
@@ -4013,8 +4085,9 @@ class Agent:
                         log_warning(f"Failed to get references: {e}")
 
                 if self.add_state_in_messages:
-                    user_msg_content = self.format_message_with_state_variables(user_msg_content, user_id=user_id, session_state=session.session_data.get("session_state"))
-
+                    user_msg_content = self.format_message_with_state_variables(
+                        user_msg_content, user_id=user_id, session_state=session.session_data.get("session_state")
+                    )
 
                 # Convert to string for concatenation operations
                 user_msg_content_str = get_text_from_message(user_msg_content) if user_msg_content is not None else ""
@@ -4121,9 +4194,7 @@ class Agent:
             if len(messages_to_add_to_run_response) > 0:
                 log_debug(f"Adding {len(messages_to_add_to_run_response)} extra messages")
                 if run_response.metadata is None:
-                    run_response.metadata = RunResponseMetaData(
-                        additional_messages=messages_to_add_to_run_response
-                    )
+                    run_response.metadata = RunResponseMetaData(additional_messages=messages_to_add_to_run_response)
                 else:
                     if run_response.metadata.additional_messages is None:
                         run_response.metadata.additional_messages = messages_to_add_to_run_response
@@ -4547,7 +4618,11 @@ class Agent:
                 return str(context)
 
     def save_run_response_to_file(
-        self, run_response: RunResponse, message: Optional[Union[str, List, Dict, Message]] = None, session_id: Optional[str] = None, user_id: Optional[str] = None
+        self,
+        run_response: RunResponse,
+        message: Optional[Union[str, List, Dict, Message]] = None,
+        session_id: Optional[str] = None,
+        user_id: Optional[str] = None,
     ) -> None:
         if self.save_response_to_file is not None and run_response is not None:
             message_str = None
@@ -4617,7 +4692,7 @@ class Agent:
         else:
             run_response.reasoning_content += reasoning_content
 
-    def calculate_metrics(self, messages: List[Message]) -> Optional[Metrics]:
+    def _calculate_metrics(self, messages: List[Message]) -> Optional[Metrics]:
         metrics = Metrics()
         assistant_message_role = self.model.assistant_message_role if self.model is not None else "assistant"
         for m in messages:
@@ -4749,13 +4824,11 @@ class Agent:
             self.videos = []
         self.videos.append(video)
 
-
     def add_audio(self, audio: AudioArtifact) -> None:
         # TODO: Remove and replace with proper handling of audio as tool results
         if self.audio is None:
             self.audio = []
         self.audio.append(audio)
-
 
     def get_images(self) -> Optional[List[ImageArtifact]]:
         return self.images
@@ -4777,7 +4850,9 @@ class Agent:
             # Consume the generator without yielding
             deque(reasoning_generator, maxlen=0)
 
-    def _handle_reasoning_stream(self, run_response: RunResponse, run_messages: RunMessages) -> Iterator[RunResponseEvent]:
+    def _handle_reasoning_stream(
+        self, run_response: RunResponse, run_messages: RunMessages
+    ) -> Iterator[RunResponseEvent]:
         if self.reasoning or self.reasoning_model is not None:
             reasoning_generator = self.reason(run_response=run_response, run_messages=run_messages)
             yield from reasoning_generator
@@ -4789,7 +4864,9 @@ class Agent:
             async for _ in reason_generator:
                 pass
 
-    async def _ahandle_reasoning_stream(self, run_response: RunResponse, run_messages: RunMessages) -> AsyncIterator[RunResponseEvent]:
+    async def _ahandle_reasoning_stream(
+        self, run_response: RunResponse, run_messages: RunMessages
+    ) -> AsyncIterator[RunResponseEvent]:
         if self.reasoning or self.reasoning_model is not None:
             reason_generator = self.areason(run_response=run_response, run_messages=run_messages)
             async for item in reason_generator:
@@ -4821,9 +4898,7 @@ class Agent:
     def reason(self, run_response: RunResponse, run_messages: RunMessages) -> Iterator[RunResponseEvent]:
         # Yield a reasoning started event
         if self.stream_intermediate_steps:
-            yield self._handle_event(
-                create_reasoning_started_event(from_run_response=run_response), run_response
-            )
+            yield self._handle_event(create_reasoning_started_event(from_run_response=run_response), run_response)
 
         use_default_reasoning = False
 
@@ -4984,7 +5059,9 @@ class Agent:
                     # Yield reasoning steps
                     if self.stream_intermediate_steps:
                         for reasoning_step in reasoning_steps:
-                            updated_reasoning_content = self._format_reasoning_step_content(run_response=run_response, reasoning_step=reasoning_step)
+                            updated_reasoning_content = self._format_reasoning_step_content(
+                                run_response=run_response, reasoning_step=reasoning_step
+                            )
 
                             yield self._handle_event(
                                 create_reasoning_step_event(
@@ -5006,7 +5083,8 @@ class Agent:
                     # Add reasoning step to the Agent's run_response
                     self.update_run_response_with_reasoning(
                         run_response=run_response,
-                        reasoning_steps=reasoning_steps, reasoning_agent_messages=reasoning_agent_response.messages
+                        reasoning_steps=reasoning_steps,
+                        reasoning_agent_messages=reasoning_agent_response.messages,
                     )
                     # Get the next action
                     next_action = get_next_action(reasoning_steps[-1])
@@ -5041,9 +5119,7 @@ class Agent:
     async def areason(self, run_response: RunResponse, run_messages: RunMessages) -> Any:
         # Yield a reasoning started event
         if self.stream_intermediate_steps:
-            yield self._handle_event(
-                create_reasoning_started_event(from_run_response=run_response), run_response
-            )
+            yield self._handle_event(create_reasoning_started_event(from_run_response=run_response), run_response)
 
         use_default_reasoning = False
 
@@ -5202,7 +5278,9 @@ class Agent:
                     # Yield reasoning steps
                     if self.stream_intermediate_steps:
                         for reasoning_step in reasoning_steps:
-                            updated_reasoning_content = self._format_reasoning_step_content(run_response=run_response, reasoning_step=reasoning_step)
+                            updated_reasoning_content = self._format_reasoning_step_content(
+                                run_response=run_response, reasoning_step=reasoning_step
+                            )
 
                             # Yield the response with the updated reasoning_content
                             yield self._handle_event(
@@ -5225,7 +5303,8 @@ class Agent:
                     # Add reasoning step to the Agent's run_response
                     self.update_run_response_with_reasoning(
                         run_response=run_response,
-                        reasoning_steps=reasoning_steps, reasoning_agent_messages=reasoning_agent_response.messages
+                        reasoning_steps=reasoning_steps,
+                        reasoning_agent_messages=reasoning_agent_response.messages,
                     )
 
                     # Get the next action
@@ -5527,6 +5606,17 @@ class Agent:
 
         return get_tool_call_history
 
+    def update_session_state_tool(session_state: Dict[str, Any], updates: Dict[str, Any]) -> str:
+        """
+        Update the shared session state.
+
+        Args:
+            updates (dict): The updates to apply to the shared session state. Should be a dictionary of key-value pairs.
+        """
+        for key, value in updates.items():
+            session_state[key] = value
+        return f"Updated session state: {session_state}"
+
     def search_knowledge_base_function(
         self, run_response: RunResponse, knowledge_filters: Optional[Dict[str, Any]] = None, async_mode: bool = False
     ) -> Function:
@@ -5615,7 +5705,7 @@ class Agent:
             Returns:
                 str: A string containing the response from the knowledge base.
             """
-            search_filters = self._get_agentic_or_user_search_filters(filters, knowledge_filters)
+            search_filters = get_agentic_or_user_search_filters(filters, knowledge_filters)
 
             # Get the relevant documents from the knowledge base, passing filters
             retrieval_timer = Timer()
@@ -5650,7 +5740,7 @@ class Agent:
             Returns:
                 str: A string containing the response from the knowledge base.
             """
-            search_filters = self._get_agentic_or_user_search_filters(filters, knowledge_filters)
+            search_filters = get_agentic_or_user_search_filters(filters, knowledge_filters)
 
             retrieval_timer = Timer()
             retrieval_timer.start()
@@ -5677,31 +5767,6 @@ class Agent:
             search_knowledge_base_function = search_knowledge_base  # type: ignore
 
         return Function.from_callable(search_knowledge_base_function, name="search_knowledge_base_with_agentic_filters")
-
-    def _get_agentic_or_user_search_filters(
-        self, filters: Optional[Dict[str, Any]], effective_filters: Optional[Dict[str, Any]]
-    ) -> Dict[str, Any]:
-        """Helper function to determine the final filters to use for the search.
-
-        Args:
-            filters: Filters passed by the agent.
-            effective_filters: Filters passed by user.
-
-        Returns:
-            Dict[str, Any]: The final filters to use for the search.
-        """
-        search_filters = {}
-
-        # If agentic filters exist and manual filters (passed by user) do not, use agentic filters
-        if filters and not effective_filters:
-            search_filters = filters
-
-        # If both agentic filters exist and manual filters (passed by user) exist, use manual filters (give priority to user and override)
-        if filters and effective_filters:
-            search_filters = effective_filters
-
-        log_info(f"Filters used by Agent: {search_filters}")
-        return search_filters
 
     def add_to_knowledge(self, query: str, result: str) -> str:
         """Use this function to add information to the knowledge base for future use.
@@ -6653,7 +6718,7 @@ class Agent:
             )
 
             # Add the step to the run response
-            self._add_reasoning_step_to_metadata(run_response=run_response, reasoning_step=reasoning_step)
+            add_reasoning_step_to_metadata(run_response=run_response, reasoning_step=reasoning_step)
 
             formatted_content = f"## {title}\n{thought}\n"
             if action:
@@ -6662,7 +6727,7 @@ class Agent:
                 formatted_content += f"Confidence: {confidence}\n"
             formatted_content += "\n"
 
-            self._append_to_reasoning_content(run_response=run_response, content=formatted_content)
+            append_to_reasoning_content(run_response=run_response, content=formatted_content)
             return reasoning_step
 
         # Case 2: ReasoningTools.analyze (has title, result, analysis, optional next_action and confidence)
@@ -6690,7 +6755,7 @@ class Agent:
             )
 
             # Add the step to the run response
-            self._add_reasoning_step_to_metadata(run_response=run_response, reasoning_step=reasoning_step)
+            add_reasoning_step_to_metadata(run_response=run_response, reasoning_step=reasoning_step)
 
             formatted_content = f"## {title}\n"
             if result:
@@ -6703,7 +6768,7 @@ class Agent:
                 formatted_content += f"Confidence: {confidence}\n"
             formatted_content += "\n"
 
-            self._append_to_reasoning_content(run_response=run_response, content=formatted_content)
+            append_to_reasoning_content(run_response=run_response, content=formatted_content)
             return reasoning_step
 
         # Case 3: ThinkingTools.think (simple format, just has 'thought')
@@ -6715,55 +6780,11 @@ class Agent:
                 confidence=None,
             )
             formatted_content = f"## Thinking\n{thought}\n\n"
-            self._add_reasoning_step_to_metadata(run_response=run_response, reasoning_step=reasoning_step)
-            self._append_to_reasoning_content(run_response=run_response, content=formatted_content)
+            add_reasoning_step_to_metadata(run_response=run_response, reasoning_step=reasoning_step)
+            append_to_reasoning_content(run_response=run_response, content=formatted_content)
             return reasoning_step
 
         return None
-
-    def _append_to_reasoning_content(self, run_response: RunResponse, content: str) -> None:
-        """Helper to append content to the reasoning_content field."""
-        if not hasattr(run_response, "reasoning_content") or not run_response.reasoning_content:  # type: ignore
-            run_response.reasoning_content = content  # type: ignore
-        else:
-            run_response.reasoning_content += content  # type: ignore
-
-    def _add_reasoning_step_to_metadata(self, run_response: RunResponse, reasoning_step: ReasoningStep) -> None:
-        if run_response.metadata is None:
-            from agno.run.response import RunResponseMetaData
-
-            run_response.metadata = RunResponseMetaData()
-
-        if run_response.metadata.reasoning_steps is None:
-            run_response.metadata.reasoning_steps = []
-
-        run_response.metadata.reasoning_steps.append(reasoning_step)
-
-    def _add_reasoning_metrics_to_metadata(self, run_response: RunResponse, reasoning_time_taken: float) -> None:
-        try:
-            if run_response.metadata is None:
-                from agno.run.response import RunResponseMetaData
-
-                run_response.metadata = RunResponseMetaData()
-
-                # Initialize reasoning_messages if it doesn't exist
-                if run_response.metadata.reasoning_messages is None:
-                    run_response.metadata.reasoning_messages = []
-
-                metrics_message = Message(
-                    role="assistant",
-                    content=run_response.reasoning_content,
-                    metrics=Metrics(time=reasoning_time_taken),
-                )
-
-                # Add the metrics message to the reasoning_messages
-                run_response.metadata.reasoning_messages.append(metrics_message)
-
-        except Exception as e:
-            # Log the error but don't crash
-            from agno.utils.log import log_error
-
-            log_error(f"Failed to add reasoning metrics to metadata: {str(e)}")
 
     def _get_effective_filters(self, knowledge_filters: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
         """

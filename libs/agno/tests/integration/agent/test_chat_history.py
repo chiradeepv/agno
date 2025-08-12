@@ -1,8 +1,8 @@
 import pytest
 
 from agno.agent.agent import Agent
-from agno.models.openai.chat import OpenAIChat
 from agno.db.base import SessionType
+from agno.models.openai.chat import OpenAIChat
 
 
 @pytest.fixture
@@ -30,7 +30,7 @@ def test_agent_runs_in_memory(chat_agent):
     assert response is not None
     assert response.content is not None
     assert response.run_id is not None
-    
+
     session_from_db = chat_agent.get_session(session_id=session_id)
     assert session_from_db is not None
     assert len(session_from_db.runs) == 1

@@ -289,7 +289,7 @@ def create_team_tool_call_started_event(
     return TeamToolCallStartedEvent(
         session_id=from_run_response.session_id,
         team_id=from_run_response.team_id,  # type: ignore
-        team_name=from_run_response.team_name,  # type: ignore  
+        team_name=from_run_response.team_name,  # type: ignore
         run_id=from_run_response.run_id,
         tool=tool,
     )

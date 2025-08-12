@@ -75,11 +75,7 @@ def test_reasoning_true_streaming(shared_db):
     _ = list(agent.run("What is the value of 5! (factorial)?", stream=True, stream_intermediate_steps=True))
     run_response = agent.get_last_run_response()
     # Print the reasoning_content when received
-    if (
-        run_response
-        and hasattr(run_response, "reasoning_content")
-        and run_response.reasoning_content
-    ):
+    if run_response and hasattr(run_response, "reasoning_content") and run_response.reasoning_content:
         print("\n=== Default reasoning model (streaming) reasoning_content ===")
         print(run_response.reasoning_content)
         print("====================================================\n")
@@ -139,11 +135,7 @@ def test_reasoning_model_streaming(shared_db):
     _ = list(agent.run("What is the value of 5! (factorial)?", stream=True, stream_intermediate_steps=True))
     run_response = agent.get_last_run_response()
     # Print the reasoning_content when received
-    if (
-        run_response
-        and hasattr(run_response, "reasoning_content")
-        and run_response.reasoning_content
-    ):
+    if run_response and hasattr(run_response, "reasoning_content") and run_response.reasoning_content:
         print("\n=== Custom reasoning model (streaming) reasoning_content ===")
         print(run_response.reasoning_content)
         print("=====================================================\n")

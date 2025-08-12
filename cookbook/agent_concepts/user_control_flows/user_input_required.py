@@ -32,7 +32,9 @@ agent = Agent(
     markdown=True,
 )
 
-run_response = agent.run("Send an email with the subject 'Hello' and the body 'Hello, world!'")
+run_response = agent.run(
+    "Send an email with the subject 'Hello' and the body 'Hello, world!'"
+)
 if run_response.is_paused:
     for tool in run_response.tools_requiring_user_input:
         input_schema: List[UserInputField] = tool.user_input_schema

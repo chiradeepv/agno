@@ -308,9 +308,7 @@ def main():
                             response += _resp_chunk.content
                             resp_container.markdown(response)
                     run_response = agentic_rag_agent.get_last_run_response()
-                    add_message(
-                        "assistant", response, run_response.tools
-                    )
+                    add_message("assistant", response, run_response.tools)
                 except Exception as e:
                     error_message = f"Sorry, I encountered an error: {str(e)}"
                     add_message("assistant", error_message)

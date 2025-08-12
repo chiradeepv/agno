@@ -320,8 +320,7 @@ class Workflow:
             return
         # -*- Delete session
         self.db.delete_session(session_id=session_id)
-        
-    
+
     def get_run_response(self, run_id: str, session_id: Optional[str] = None) -> Optional[RunResponse]:
         """Get a RunResponse from the database."""
         if self._agent_session is not None:
@@ -343,7 +342,11 @@ class Workflow:
 
     def get_last_run_response(self, session_id: Optional[str] = None) -> Optional[RunResponse]:
         """Get the last run response from the database."""
-        if self._agent_session is not None and self._agent_session.runs is not None and len(self._agent_session.runs) > 0:
+        if (
+            self._agent_session is not None
+            and self._agent_session.runs is not None
+            and len(self._agent_session.runs) > 0
+        ):
             run_response = self._agent_session.runs[-1]
             if run_response is not None:
                 return run_response
@@ -370,20 +373,21 @@ class Workflow:
             AgentSession: The AgentSession loaded from the database or created if it does not exist.
         """
         from agno.db.base import SessionType
-        
+
         if not session_id and not self.session_id:
             raise Exception("No session_id provided")
 
         session_id_to_load = session_id or self.session_id
-        
+
         # Try to load from database
         if self.db is not None:
-            agent_session = cast(AgentSession, self.read_session(session_id=session_id_to_load, session_type=SessionType.AGENT))
+            agent_session = cast(
+                AgentSession, self.read_session(session_id=session_id_to_load, session_type=SessionType.AGENT)
+            )
             return agent_session
 
         log_warning(f"AgentSession {session_id_to_load} not found in db")
         return None
-
 
     def _handle_event(
         self,

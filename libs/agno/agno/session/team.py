@@ -33,7 +33,7 @@ class TeamSession:
     # List of all runs in the session
     runs: Optional[list[Union[TeamRunResponse, RunResponse]]] = None
     # Summary of the session
-    summary: Optional[Dict[str, Any]] = None
+    summary: Optional[SessionSummary] = None
 
     # The unix timestamp when this session was created
     created_at: Optional[int] = None
@@ -44,7 +44,7 @@ class TeamSession:
         session_dict = asdict(self)
 
         session_dict["runs"] = [run.to_dict() for run in self.runs] if self.runs else None
-        session_dict["summary"] = self.summary.to_dict() if isinstance(self.summary, SessionSummary) else self.summary
+        session_dict["summary"] = self.summary.to_dict() if self.summary else None
 
         return session_dict
 
@@ -86,7 +86,7 @@ class TeamSession:
             summary=data.get("summary"),
         )
 
-    def get_run(self, run_id: str) -> Optional[RunResponse]:
+    def get_run(self, run_id: str) -> Optional[TeamRunResponse]:
         for run in self.runs:
             if run.run_id == run_id:
                 return run
@@ -124,7 +124,7 @@ class TeamSession:
     ) -> List[Message]:
         """Returns the messages from the last_n runs, excluding previously tagged history messages.
         Args:
-            session_id: The session id to get the messages from.
+
             agent_id: The id of the agent to get the messages from.
             team_id: The id of the team to get the messages from.
             last_n: The number of runs to return from the end of the conversation. Defaults to all runs.
@@ -180,7 +180,7 @@ class TeamSession:
         log_debug(f"Getting messages from previous runs: {len(messages_from_history)}")
         return messages_from_history
 
-    def get_tool_calls(self, session_id: str, num_calls: Optional[int] = None) -> List[Dict[str, Any]]:
+    def get_tool_calls(self, num_calls: Optional[int] = None) -> List[Dict[str, Any]]:
         """Returns a list of tool calls from the messages"""
 
         tool_calls = []

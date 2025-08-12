@@ -39,7 +39,7 @@ def test_team_image_input(shared_db, shared_db):
     )
 
 
-def test_team_image_input_no_prompt(shared_db, shared_db):
+def test_team_image_input_no_prompt(shared_db):
     image_analyst = Agent(
         name="Image Analyst",
         role="Analyze images and provide insights.",

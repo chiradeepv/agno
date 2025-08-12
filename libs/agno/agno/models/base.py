@@ -373,7 +373,7 @@ class Model(ABC):
                         # The session state is updated by the function call
                         if function_call_response.updated_session_state is not None:
                             model_response.updated_session_state = function_call_response.updated_session_state
-                            
+
                         if (
                             function_call_response.event
                             in [
@@ -488,7 +488,7 @@ class Model(ABC):
                         # The session state is updated by the function call
                         if function_call_response.updated_session_state is not None:
                             model_response.updated_session_state = function_call_response.updated_session_state
-                        
+
                         if (
                             function_call_response.event
                             in [

@@ -97,7 +97,7 @@ class AgentSession:
 
         if not self.runs:
             self.runs = []
-            
+
         for i, existing_run in enumerate(self.runs):
             if existing_run.run_id == run.run_id:
                 self.runs[i] = run
@@ -106,7 +106,7 @@ class AgentSession:
             self.runs.append(run)
 
         log_debug("Added RunResponse to Agent Session")
-        
+
     def get_run(self, run_id: str) -> Optional[RunResponse]:
         for run in self.runs:
             if run.run_id == run_id:

@@ -79,7 +79,7 @@ def route_team(shared_db, memory):
 
 
 @pytest.fixture
-def route_team_with_members(shared_db, shared_db, memory):
+def route_team_with_members(shared_db, memory):
     """Create a route team with storage and memory for testing."""
 
     def get_weather(city: str) -> str:
@@ -305,7 +305,7 @@ async def test_multi_user_multi_session_route_team(route_team, shared_db, memory
 
 
 @pytest.mark.asyncio
-async def test_correct_sessions_in_db(route_team, shared_db, shared_db):
+async def test_correct_sessions_in_db(route_team, shared_db):
     """Test multi-user multi-session route team with storage and memory."""
     # Define user and session IDs
     user_id = "user_1@example.com"

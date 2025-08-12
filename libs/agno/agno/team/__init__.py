@@ -15,11 +15,10 @@ from agno.run.team import (
     ToolCallCompletedEvent,
     ToolCallStartedEvent,
 )
-from agno.team.team import RunResponse, Team
+from agno.team.team import Team
 
 __all__ = [
     "Team",
-    "RunResponse",
     "TeamRunResponse",
     "TeamRunResponseEvent",
     "TeamRunEvent",

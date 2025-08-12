@@ -94,7 +94,6 @@ def test_gemini_with_openai_parser_model():
 
 
 def test_parser_model_stream(shared_db):
-    
     park_agent = Agent(
         model=OpenAIChat(id="gpt-4o"),  # Main model to generate the content
         description="You are an expert on national parks and provide concise guides.",
@@ -107,7 +106,7 @@ def test_parser_model_stream(shared_db):
 
     for event in response:
         pass
-    
+
     run_response = park_agent.get_last_run_response()
 
     assert run_response.content is not None

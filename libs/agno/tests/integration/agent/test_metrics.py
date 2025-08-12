@@ -33,7 +33,7 @@ def test_session_metrics(shared_db):
     )
 
     response = agent.run("Hi, my name is John")
-    
+
     total_input_tokens = response.metrics.input_tokens
     total_output_tokens = response.metrics.output_tokens
     total_tokens = response.metrics.total_tokens
@@ -42,7 +42,7 @@ def test_session_metrics(shared_db):
     assert response.metrics.output_tokens > 0
     assert response.metrics.total_tokens > 0
     assert response.metrics.total_tokens == response.metrics.input_tokens + response.metrics.output_tokens
-    
+
     session_from_db = agent.db.get_session(session_id=agent.session_id, session_type=SessionType.AGENT)
     assert session_from_db.session_data["session_metrics"]["input_tokens"] == total_input_tokens
     assert session_from_db.session_data["session_metrics"]["output_tokens"] == total_output_tokens
@@ -77,7 +77,7 @@ def test_session_metrics_with_add_history(shared_db):
     )
 
     response = agent.run("Hi, my name is John")
-    
+
     total_input_tokens = response.metrics.input_tokens
     total_output_tokens = response.metrics.output_tokens
     total_tokens = response.metrics.total_tokens
@@ -86,7 +86,7 @@ def test_session_metrics_with_add_history(shared_db):
     assert response.metrics.output_tokens > 0
     assert response.metrics.total_tokens > 0
     assert response.metrics.total_tokens == response.metrics.input_tokens + response.metrics.output_tokens
-    
+
     session_from_db = agent.db.get_session(session_id=agent.session_id, session_type=SessionType.AGENT)
     assert session_from_db.session_data["session_metrics"]["input_tokens"] == total_input_tokens
     assert session_from_db.session_data["session_metrics"]["output_tokens"] == total_output_tokens

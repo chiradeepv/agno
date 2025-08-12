@@ -46,7 +46,6 @@ def shared_db(temp_storage_db_file):
     return db
 
 
-
 @pytest.fixture
 def mock_engine():
     """Create a mock SQLAlchemy engine"""

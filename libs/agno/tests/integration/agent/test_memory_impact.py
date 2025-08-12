@@ -3,8 +3,9 @@ import tracemalloc
 from typing import List, Tuple
 
 from agno.agent.agent import Agent
-from agno.models.openai.chat import OpenAIChat
 from agno.db.base import SessionType
+from agno.models.openai.chat import OpenAIChat
+
 
 class MemoryMonitor:
     """Utility class to monitor memory usage during agent operations using tracemalloc."""

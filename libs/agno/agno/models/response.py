@@ -111,7 +111,7 @@ class ModelResponse:
     created_at: int = int(time())
 
     extra: Optional[Dict[str, Any]] = None
-    
+
     updated_session_state: Optional[Dict[str, Any]] = None
 
 
