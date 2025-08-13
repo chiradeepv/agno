@@ -168,6 +168,7 @@ class AgentResponse(BaseModel):
                 ).model_dump()
 
         reasoning_info = {
+            "reasoning": agent.reasoning,
             "reasoning_agent_id": agent.reasoning_agent.agent_id if agent.reasoning_agent else None,
             "reasoning_min_steps": agent.reasoning_min_steps,
             "reasoning_max_steps": agent.reasoning_max_steps,
@@ -421,6 +422,7 @@ class TeamResponse(BaseModel):
         return TeamResponse(
             team_id=team.team_id,
             name=team.name,
+            mode=team.mode,
             model=ModelResponse(
                 name=model_name,
                 model=model_id,
