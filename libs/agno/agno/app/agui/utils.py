@@ -185,7 +185,6 @@ def _create_events_from_chunk(
     elif chunk.event == RunEvent.tool_call_started:
         if chunk.tool is not None:  # type: ignore
             tool_call = chunk.tool  # type: ignore
-            print(tool_call)
             start_event = ToolCallStartEvent(
                 type=EventType.TOOL_CALL_START,
                 tool_call_id=tool_call.tool_call_id,  # type: ignore
@@ -193,8 +192,6 @@ def _create_events_from_chunk(
                 parent_message_id=message_id,
             )
             events_to_emit.append(start_event)
-            print("toolcallstart: events_to_emit", events_to_emit)
-            print("toolcallstart: event_buffer", event_buffer)
 
             args_event = ToolCallArgsEvent(
                 type=EventType.TOOL_CALL_ARGS,
@@ -202,8 +199,6 @@ def _create_events_from_chunk(
                 delta=json.dumps(tool_call.tool_args),
             )
             events_to_emit.append(args_event)
-            print("toolcallargs: events_to_emit", events_to_emit)
-            print("toolcallargs: event_buffer", event_buffer)
 
     # Handle tool call completion
     elif chunk.event == RunEvent.tool_call_completed:
@@ -215,8 +210,6 @@ def _create_events_from_chunk(
                     tool_call_id=tool_call.tool_call_id,  # type: ignore
                 )
                 events_to_emit.append(end_event)
-                print("toolcallend: events_to_emit", events_to_emit)
-                print("toolcallend: event_buffer", event_buffer)
 
                 if tool_call.result is not None:
                     result_event = ToolCallResultEvent(
@@ -227,8 +220,6 @@ def _create_events_from_chunk(
                         message_id=str(uuid.uuid4()),
                     )
                     events_to_emit.append(result_event)
-                    print("toolcallresult: events_to_emit", events_to_emit)
-                    print("toolcallresult: event_buffer", event_buffer)
 
     # Handle reasoning
     elif chunk.event == RunEvent.reasoning_started:
