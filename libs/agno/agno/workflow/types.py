@@ -319,45 +319,25 @@ class StepMetrics:
     step_name: str
     executor_type: str  # "agent", "team", etc.
     executor_name: str
-
-    # For regular steps: our generic metrics data
     metrics: Optional[Metrics] = None
 
-    # For parallel steps: nested step metrics
-    parallel_steps: Optional[Dict[str, "StepMetrics"]] = None
-
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary - only include relevant fields"""
-        result = {
+        """Convert to dictionary"""
+        return {
             "step_name": self.step_name,
             "executor_type": self.executor_type,
             "executor_name": self.executor_name,
+            "metrics": self.metrics.to_dict() if hasattr(self.metrics, "to_dict") else self.metrics,
         }
-
-        # Only include the relevant field based on executor type
-        if self.executor_type == "parallel" and self.parallel_steps:
-            result["parallel_steps"] = {name: step.to_dict() for name, step in self.parallel_steps.items()}  # type: ignore[assignment]
-        elif self.executor_type != "parallel":
-            # For non-parallel steps, include metrics (even if None)
-            result["metrics"] = self.metrics.to_dict() if hasattr(self.metrics, "to_dict") else self.metrics  # type: ignore[assignment]
-
-        return result
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "StepMetrics":
         """Create StepMetrics from dictionary"""
-
-        # Parse nested parallel steps if they exist
-        parallel_steps = None
-        if "parallel_steps" in data and data["parallel_steps"] is not None:
-            parallel_steps = {name: cls.from_dict(step_data) for name, step_data in data["parallel_steps"].items()}
-
         return cls(
             step_name=data["step_name"],
             executor_type=data["executor_type"],
             executor_name=data["executor_name"],
-            metrics=data.get("metrics") if data.get("executor_type") != "parallel" else None,
-            parallel_steps=parallel_steps,
+            metrics=data.get("metrics"),
         )
 
 

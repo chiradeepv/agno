@@ -462,50 +462,27 @@ class Workflow:
 
         def process_step_output(step_output: StepOutput):
             """Process a single step output for metrics"""
-            # Add step-specific metrics
-            if step_output.step_name and step_output.metrics:
-                if step_output.step_type == "Parallel" and step_output.steps:
-                    # This is a parallel step - create nested step metrics for each sub-step
-                    parallel_step_metrics = {}
-                    for sub_step_output in step_output.steps:
-                        if sub_step_output.metrics and sub_step_output.step_name:
-                            parallel_step_metrics[sub_step_output.step_name] = StepMetrics(
-                                step_name=sub_step_output.step_name,
-                                executor_type=sub_step_output.executor_type or "unknown",
-                                executor_name=sub_step_output.executor_name or "unknown",
-                                metrics=sub_step_output.metrics,
-                                parallel_steps=None,
-                            )
 
-                    # Create a StepMetrics for the parallel container
-                    step_metrics = StepMetrics(
-                        step_name=step_output.step_name,
-                        executor_type="parallel",
-                        executor_name=step_output.step_name or "Parallel",
-                        metrics=step_output.metrics,
-                        parallel_steps=parallel_step_metrics if parallel_step_metrics else None,
-                    )
-                else:
-                    # Regular step
-                    step_metrics = StepMetrics(
-                        step_name=step_output.step_name,
-                        executor_type=step_output.executor_type or "unknown",
-                        executor_name=step_output.executor_name or "unknown",
-                        metrics=step_output.metrics,
-                        parallel_steps=None,
-                    )
+            # If this step has nested steps, process them recursively
+            if hasattr(step_output, "steps") and step_output.steps:
+                for nested_step in step_output.steps:
+                    process_step_output(nested_step)
 
+            # Only collect metrics from steps that actually have metrics (actual agents/teams)
+            if (
+                step_output.step_name and step_output.metrics and step_output.executor_type in ["agent", "team"]
+            ):  # Only include actual executors
+                step_metrics = StepMetrics(
+                    step_name=step_output.step_name,
+                    executor_type=step_output.executor_type or "unknown",
+                    executor_name=step_output.executor_name or "unknown",
+                    metrics=step_output.metrics,
+                )
                 steps_dict[step_output.step_name] = step_metrics
 
         # Process all step results
         for step_result in step_results:
-            if isinstance(step_result, list):
-                # Handle List[StepOutput] from workflow components
-                for sub_step_output in step_result:
-                    process_step_output(sub_step_output)
-            else:
-                # Handle single StepOutput
-                process_step_output(step_result)
+            process_step_output(step_result)
 
         return WorkflowMetrics(
             steps=steps_dict,
