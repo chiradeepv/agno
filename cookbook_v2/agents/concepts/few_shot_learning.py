@@ -1,6 +1,8 @@
 """
 This example demonstrates how to use additional_input_messages with an Agent
 to teach proper response patterns through few-shot learning.
+
+Shows all supported types: str, Dict, BaseModel, Message
 """
 
 from agno.agent import Agent
