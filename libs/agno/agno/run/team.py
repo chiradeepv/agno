@@ -250,6 +250,8 @@ class TeamRunResponse:
     team_session_id: Optional[str] = None
     parent_run_id: Optional[str] = None
 
+    workflow_step_id: Optional[str] = None
+
     tools: Optional[List[ToolExecution]] = None
     formatted_tool_calls: Optional[List[str]] = None
 

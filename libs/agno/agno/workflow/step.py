@@ -789,12 +789,15 @@ class Step:
         if self._executor_type in ["agent", "team"]:
             # propogate the workflow run id as parent run id to the executor response
             self.active_executor.run_response.parent_run_id = workflow_run_response.run_id
+            self.active_executor.run_response.workflow_step_id = self.step_id
 
             # Get the raw response from the step's active executor
             raw_response = self.active_executor.run_response
             if raw_response and isinstance(raw_response, (RunResponse, TeamRunResponse)):
                 if workflow_run_response.step_executor_runs is None:
                     workflow_run_response.step_executor_runs = []
+
+                raw_response.workflow_step_id = self.step_id
                 # Add the primary executor run
                 workflow_run_response.step_executor_runs.append(raw_response)
 
