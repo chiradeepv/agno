@@ -1079,15 +1079,6 @@ class Knowledge:
 
     # --- API Only Methods ---
 
-    async def process_content(
-        self,
-        content: Content,
-    ) -> None:
-        # Validation:At least one of the parameters must be provided
-        if not content.id:
-            content.id = str(uuid4())
-        await self._load_content(content, upsert=False, skip_if_exists=True)
-
     def patch_content(self, content: Content) -> Optional[Dict[str, Any]]:
         return self._update_content(content)
 
