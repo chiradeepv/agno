@@ -557,7 +557,7 @@ class Team:
 
         if isinstance(member, Agent):
             member.team_id = self.id
-            member.set_id()
+            member._set_id()
         elif isinstance(member, Team):
             if member.id is None:
                 member.id = str(uuid4())
