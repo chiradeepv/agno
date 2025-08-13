@@ -311,6 +311,7 @@ class Team:
         mode: Literal["route", "coordinate", "collaborate"] = "coordinate",
         model: Optional[Model] = None,
         name: Optional[str] = None,
+        role: Optional[str] = None,
         id: Optional[str] = None,
         user_id: Optional[str] = None,
         session_id: Optional[str] = None,
@@ -391,6 +392,7 @@ class Team:
         self.user_id = user_id
         self.session_id = session_id
         self.session_name = session_name
+        self.role = role
         self.session_state = session_state
         self.team_session_state = team_session_state
         self.workflow_session_state = workflow_session_state
@@ -5192,6 +5194,9 @@ class Team:
 
         if self.description is not None:
             system_message_content += f"<description>\n{self.description}\n</description>\n\n"
+
+        if self.role is not None:
+            system_message_content += f"\n<your_role>\n{self.role}\n</your_role>\n\n"
 
         # 3.3.5 Then add instructions for the Agent
         if len(instructions) > 0:

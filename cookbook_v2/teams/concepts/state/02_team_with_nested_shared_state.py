@@ -1,8 +1,19 @@
 """
-This example demonstrates nested shared state with multiple team layers.
+This example demonstrates the nested Team functionality in a hierarchical team structure.
+Each team and agent has a clearly defined role that guides their behavior and specialization:
 
-The example shows how state can be shared across nested teams and how different
-teams can coordinate through shared state management.
+Team Hierarchy & Roles:
+├── Shopping List Team (Orchestrator)
+│   Role: "Orchestrate comprehensive shopping list management and meal planning"
+│   ├── Shopping Management Team (Operations Specialist)
+│   │   Role: "Execute precise shopping list operations through delegation"
+│   │   └── Shopping List Agent
+│   │       Role: "Maintain and modify the shopping list with precision and accuracy"
+│   └── Meal Planning Team (Culinary Expert)
+│       Role: "Transform shopping list ingredients into creative meal suggestions"
+│       └── Recipe Suggester Agent
+│           Role: "Create innovative and practical recipe suggestions"
+
 """
 
 from agno.agent.agent import Agent
@@ -65,7 +76,6 @@ def add_chore(team: Team, chore: str, priority: str = "medium") -> str:
 shopping_list_agent = Agent(
     name="Shopping List Agent",
     role="Manage the shopping list",
-    agent_id="shopping_list_manager",
     model=OpenAIChat(id="gpt-4o-mini"),
     tools=[add_item, remove_item],
     instructions=[
@@ -77,7 +87,6 @@ shopping_list_agent = Agent(
 # Recipe suggestion agent
 recipe_agent = Agent(
     name="Recipe Suggester",
-    agent_id="recipe_suggester",
     role="Suggest recipes based on available ingredients",
     model=OpenAIChat(id="gpt-4o-mini"),
     tools=[get_ingredients],
@@ -91,7 +100,7 @@ recipe_agent = Agent(
 # Shopping management team (nested layer)
 shopping_mgmt_team = Team(
     name="Shopping Management Team",
-    team_id="shopping_management",
+    role="Execute shopping list operations",
     mode="coordinate",
     model=OpenAIChat(id="gpt-4o-mini"),
     members=[shopping_list_agent],
@@ -103,7 +112,7 @@ shopping_mgmt_team = Team(
 # Meal planning team (nested layer)
 meal_planning_team = Team(
     name="Meal Planning Team",
-    team_id="meal_planning",
+    role="Plan meals based on shopping list items",
     mode="coordinate",
     model=OpenAIChat(id="gpt-4o-mini"),
     members=[recipe_agent],
@@ -115,34 +124,85 @@ meal_planning_team = Team(
 # Main shopping team with nested teams
 shopping_team = Team(
     name="Shopping List Team",
+    role="Orchestrate shopping list management and meal planning",
     mode="coordinate",
     model=OpenAIChat(id="gpt-4o-mini"),
     team_session_state={"shopping_list": []},  # Shared shopping list
     session_state={"chores": []},  # Team-specific state for chores
     tools=[list_items, add_chore],
-    team_id="shopping_list_team",
     members=[
         shopping_mgmt_team,
         meal_planning_team,
     ],
     markdown=True,
     instructions=[
-        "You manage a shopping list and help plan meals.",
-        "For shopping list changes, forward to Shopping Management Team.",
-        "For recipe requests, forward to Meal Planning Team.",
-        "Use add_chore to log completed tasks.",
+        "You are the orchestration layer for a comprehensive shopping and meal planning ecosystem",
+        "If you need to add or remove items from the shopping list, forward the full request to the Shopping Management Team",
+        "IMPORTANT: If the user asks about recipes or what they can make with ingredients, IMMEDIATELY forward the EXACT request to the meal_planning_team with NO additional questions",
+        "Example: When user asks 'What can I make with these ingredients?', you should simply forward this exact request to meal_planning_team without asking for more information",
+        "If you need to list the items in the shopping list, use the list_items tool",
+        "If the user got something from the shopping list, it means it can be removed from the shopping list",
+        "After each completed task, use the add_chore tool to log exactly what was done with high priority",
+        "Provide a seamless experience by leveraging your specialized teams for their expertise",
     ],
     show_members_responses=True,
 )
 
-# Example usage demonstrating nested shared state
-shopping_team.print_response("Add milk, eggs, and bread to the shopping list", stream=True)
-print(f"Shopping list state: {shopping_team.team_session_state}")
+# =============================================================================
+# DEMONSTRATION
+# =============================================================================
 
+# Example 1: Adding items (demonstrates role-based delegation)
+print("Example 1: Adding Items to Shopping List")
+print("-" * 50)
+shopping_team.print_response(
+    "Add milk, eggs, and bread to the shopping list", stream=True
+)
+print(f"Session state: {shopping_team.team_session_state}")
+print()
+
+# Example 2: Item consumption and removal
+print("Example 2: Item Consumption & Removal")
+print("-" * 50)
+shopping_team.print_response("I got bread from the store", stream=True)
+print(f"Session state: {shopping_team.team_session_state}")
+print()
+
+# Example 3: Adding more ingredients
+print("Example 3: Adding Fresh Ingredients")
+print("-" * 50)
+shopping_team.print_response("I need apples and oranges for my fruit salad", stream=True)
+print(f"Session state: {shopping_team.team_session_state}")
+print()
+
+# Example 4: Listing current items
+print("Example 4: Viewing Current Shopping List")
+print("-" * 50)
+shopping_team.print_response("What's on my shopping list right now?", stream=True)
+print(f"Session state: {shopping_team.team_session_state}")
+print()
+
+# Example 5: Recipe suggestions (demonstrates culinary expertise role)
+print("Example 5: Recipe Suggestions from Culinary Team")
+print("-" * 50)
 shopping_team.print_response("What can I make with these ingredients?", stream=True)
-print(f"Shopping list state: {shopping_team.team_session_state}")
+print(f"Session state: {shopping_team.team_session_state}")
+print()
 
-shopping_team.print_response("I got the milk", stream=True)
-print(f"Shopping list state: {shopping_team.team_session_state}")
+# Example 6: Complete list management
+print("Example 6: Complete List Reset & Restart")
+print("-" * 50)
+shopping_team.print_response(
+    "Clear everything from my list and start over with just bananas and yogurt",
+    stream=True,
+)
+print(f"Shared Session state: {shopping_team.team_session_state}")
+print()
 
-print(f"Team chores state: {shopping_team.session_state}")
+# Example 7: Quick recipe check with new ingredients
+print("Example 7: Quick Recipe Check with New Ingredients")
+print("-" * 50)
+shopping_team.print_response("What healthy breakfast can I make now?", stream=True)
+print()
+
+print(f"Team Session State: {shopping_team.team_session_state}")
