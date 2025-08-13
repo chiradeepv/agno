@@ -96,8 +96,63 @@ class AgentResponse(BaseModel):
 
     @classmethod
     def from_agent(cls, agent: Agent, memory_app: Optional[MemoryApp] = None) -> "AgentResponse":
-        def filter_none(d: Dict[str, Any]) -> Dict[str, Any]:
-            return {k: v for k, v in d.items() if v is not None}
+        def filter_meaningful_config(d: Dict[str, Any], defaults: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+            """Filter out fields that match their default values, keeping only meaningful user configurations"""
+            filtered = {}
+            for key, value in d.items():
+                if value is None:
+                    continue
+                # Skip if value matches the default exactly
+                if key in defaults and value == defaults[key]:
+                    continue
+                # Keep non-default values
+                filtered[key] = value
+            return filtered if filtered else None
+
+        # Define default values for filtering
+        agent_defaults = {
+            # Sessions defaults
+            "add_history_to_context": False,
+            "num_history_runs": 3,
+            "enable_session_summaries": False,
+            "search_session_history": False,
+            "cache_session": True,
+            # Knowledge defaults
+            "add_references": False,
+            "references_format": "json",
+            "enable_agentic_knowledge_filters": False,
+            # Memory defaults
+            "enable_agentic_memory": False,
+            "enable_user_memories": False,
+            # Reasoning defaults
+            "reasoning": False,
+            "reasoning_min_steps": 1,
+            "reasoning_max_steps": 10,
+            # Default tools defaults
+            "read_chat_history": False,
+            "search_knowledge": True,
+            "update_knowledge": False,
+            "read_tool_call_history": False,
+            # System message defaults
+            "system_message_role": "system",
+            "build_context": True,
+            "markdown": False,
+            "add_name_to_context": False,
+            "add_datetime_to_context": False,
+            "add_location_to_context": False,
+            "add_state_in_messages": False,
+            # Extra messages defaults
+            "user_message_role": "user",
+            "build_user_context": True,
+            # Response settings defaults
+            "retries": 0,
+            "delay_between_retries": 1,
+            "exponential_backoff": False,
+            "parse_response": True,
+            "use_json_mode": False,
+            # Streaming defaults
+            "stream_intermediate_steps": False,
+        }
 
         agent_tools = agent.get_tools(session_id=str(uuid4()), async_mode=True)
         formatted_tools = format_tools(agent_tools) if agent_tools else None
@@ -243,16 +298,16 @@ class AgentResponse(BaseModel):
                 model=model_id,
                 provider=model_provider,
             ),
-            tools=filter_none(tools_info),
-            sessions=filter_none(sessions_info),
-            knowledge=filter_none(knowledge_info),
-            memory=filter_none(memory_info) if memory_info else None,
-            reasoning=filter_none(reasoning_info),
-            default_tools=filter_none(default_tools_info),
-            system_message=filter_none(system_message_info),
-            extra_messages=filter_none(extra_messages_info),
-            response_settings=filter_none(response_settings_info),
-            streaming=filter_none(streaming_info),
+            tools=filter_meaningful_config(tools_info, {}),
+            sessions=filter_meaningful_config(sessions_info, agent_defaults),
+            knowledge=filter_meaningful_config(knowledge_info, agent_defaults),
+            memory=filter_meaningful_config(memory_info, agent_defaults) if memory_info else None,
+            reasoning=filter_meaningful_config(reasoning_info, agent_defaults),
+            default_tools=filter_meaningful_config(default_tools_info, agent_defaults),
+            system_message=filter_meaningful_config(system_message_info, agent_defaults),
+            extra_messages=filter_meaningful_config(extra_messages_info, agent_defaults),
+            response_settings=filter_meaningful_config(response_settings_info, agent_defaults),
+            streaming=filter_meaningful_config(streaming_info, agent_defaults),
         )
 
 
@@ -275,8 +330,55 @@ class TeamResponse(BaseModel):
 
     @classmethod
     def from_team(cls, team: Team, memory_app: Optional[MemoryApp] = None) -> "TeamResponse":
-        def filter_none(d: Dict[str, Any]) -> Dict[str, Any]:
-            return {k: v for k, v in d.items() if v is not None}
+        def filter_meaningful_config(d: Dict[str, Any], defaults: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+            """Filter out fields that match their default values, keeping only meaningful user configurations"""
+            filtered = {}
+            for key, value in d.items():
+                if value is None:
+                    continue
+                # Skip if value matches the default exactly
+                if key in defaults and value == defaults[key]:
+                    continue
+                # Keep non-default values
+                filtered[key] = value
+            return filtered if filtered else None
+
+        # Define default values for filtering (similar to agent defaults)
+        team_defaults = {
+            # Sessions defaults
+            "add_history_to_context": False,
+            "num_history_runs": 3,
+            "enable_session_summaries": False,
+            "cache_session": True,
+            # Knowledge defaults
+            "add_references": False,
+            "references_format": "json",
+            "enable_agentic_knowledge_filters": False,
+            # Memory defaults
+            "enable_agentic_memory": False,
+            "enable_user_memories": False,
+            # Reasoning defaults
+            "reasoning": False,
+            "reasoning_min_steps": 1,
+            "reasoning_max_steps": 10,
+            # Default tools defaults
+            "search_knowledge": True,
+            "read_team_history": False,
+            "get_member_information_tool": False,
+            # System message defaults
+            "system_message_role": "system",
+            "markdown": False,
+            "add_datetime_to_context": False,
+            "add_location_to_context": False,
+            "add_member_tools_to_system_message": False,
+            "add_state_in_messages": False,
+            # Response settings defaults
+            "parse_response": True,
+            "use_json_mode": False,
+            # Streaming defaults
+            "stream_intermediate_steps": False,
+            "stream_member_events": False,
+        }
 
         if team.model is None:
             raise ValueError("Team model is required")
@@ -412,15 +514,15 @@ class TeamResponse(BaseModel):
                 model=model_id,
                 provider=model_provider,
             ),
-            tools=filter_none(tools_info),
-            sessions=filter_none(sessions_info),
-            knowledge=filter_none(knowledge_info),
-            memory=filter_none(memory_info) if memory_info else None,
-            reasoning=filter_none(reasoning_info),
-            default_tools=filter_none(default_tools_info),
-            system_message=filter_none(system_message_info),
-            response_settings=filter_none(response_settings_info),
-            streaming=filter_none(streaming_info),
+            tools=filter_meaningful_config(tools_info, {}),
+            sessions=filter_meaningful_config(sessions_info, team_defaults),
+            knowledge=filter_meaningful_config(knowledge_info, team_defaults),
+            memory=filter_meaningful_config(memory_info, team_defaults) if memory_info else None,
+            reasoning=filter_meaningful_config(reasoning_info, team_defaults),
+            default_tools=filter_meaningful_config(default_tools_info, team_defaults),
+            system_message=filter_meaningful_config(system_message_info, team_defaults),
+            response_settings=filter_meaningful_config(response_settings_info, team_defaults),
+            streaming=filter_meaningful_config(streaming_info, team_defaults),
             members=[  # type: ignore
                 AgentResponse.from_agent(member, memory_app)
                 if isinstance(member, Agent)
