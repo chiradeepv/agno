@@ -166,7 +166,7 @@ def test_structured_outputs_deprecated():
 def test_history():
     agent = Agent(
         model=AIMLApi(id="gpt-4o-mini"),
-        storage=SqliteStorage(table_name="agent_sessions", db_file="tmp/shared_db.db"),
+        storage=SqliteStorage(table_name="agent_sessions", db_file="tmp/agent_db.db"),
         add_history_to_context=True,
         telemetry=False,
     )
