@@ -342,16 +342,13 @@ def test_nested_steps(workflow_storage):
 
     response = workflow.run(message="test")
 
-    # The outer step receives the inner_steps container content, not the actual nested content
-    # This is the current behavior - the outer step gets "Steps inner_steps completed with 2 results"
-    # instead of "inner2_inner1"
     outer_steps_container = response.step_results[0]
     outer_step_result = outer_steps_container.steps[1]  # The outer step
 
-    # Current behavior: outer step receives Steps container content
-    assert "outer_Steps inner_steps completed with 2 results" in outer_step_result.content
+    # New behavior: outer step receives deepest content from inner_steps ("inner2_inner1")
+    assert outer_step_result.content == "outer_inner2_inner1"
 
-    # The actual nested content should be found in the inner steps
+    # Inner steps still contain their nested outputs
     assert find_content_in_steps(outer_steps_container.steps[0], "inner2_inner1")
 
 
@@ -375,10 +372,10 @@ def test_steps_with_other_workflow_steps(workflow_storage):
 
     assert len(response.step_results) == 3
 
-    # The final step receives the grouped_steps container content, not the actual nested content
+    # New behavior: final step receives deepest content from grouped_steps
     final_step_result = response.step_results[2]
-    assert "final_Steps grouped_steps completed with 2 results" in final_step_result.content
+    assert final_step_result.content == "final_grouped2_grouped1_individual_output"
 
-    # The actual grouped content should be found in the grouped_steps container
+    # Grouped container still carries nested results
     grouped_steps_container = response.step_results[1]
     assert find_content_in_steps(grouped_steps_container, "grouped2_grouped1_individual_output")
