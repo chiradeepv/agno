@@ -251,7 +251,6 @@ class RunResponse:
     session_id: Optional[str] = None
     team_session_id: Optional[str] = None
     parent_run_id: Optional[str] = None
-    workflow_step_id: Optional[str] = None
     workflow_id: Optional[str] = None
     user_id: Optional[str] = None
     tools: Optional[List[ToolExecution]] = None
@@ -267,6 +266,11 @@ class RunResponse:
     events: Optional[List[RunResponseEvent]] = None
 
     status: RunStatus = RunStatus.running
+
+    # === FOREIGN KEY RELATIONSHIPS ===
+    # These fields establish relationships to parent workflow/step structures
+    # and should be treated as foreign keys for data integrity
+    workflow_step_id: Optional[str] = None   # FK: Points to StepOutput.step_id
 
     @property
     def is_paused(self):
