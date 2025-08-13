@@ -417,8 +417,9 @@ class OpenAIResponses(Model):
                     formatted_messages.append(
                         {
                             "type": "function_call",
-                            "id": tool_call["id"],
-                            "call_id": tool_call["call_id"],
+                            # Normalize: prefer call_id; fall back to id if needed
+                            "id": tool_call.get("call_id", tool_call.get("id")),
+                            "call_id": tool_call.get("call_id", tool_call.get("id")),
                             "name": tool_call["function"]["name"],
                             "arguments": tool_call["function"]["arguments"],
                             "status": "completed",
@@ -718,7 +719,9 @@ class OpenAIResponses(Model):
                     model_response.tool_calls = []
                 model_response.tool_calls.append(
                     {
-                        "id": output.id,
+                        # Normalize: use call_id as the canonical identifier expected
+                        # by Responses API for function_call_output
+                        "id": output.call_id,
                         "call_id": output.call_id,
                         "type": "function",
                         "function": {
@@ -809,7 +812,8 @@ class OpenAIResponses(Model):
             item = stream_event.item
             if item.type == "function_call":
                 tool_use = {
-                    "id": item.id,
+                    # Use call_id as canonical identifier expected by Responses API
+                    "id": getattr(item, "call_id", None) or getattr(item, "id", None),
                     "call_id": item.call_id,
                     "type": "function",
                     "function": {
