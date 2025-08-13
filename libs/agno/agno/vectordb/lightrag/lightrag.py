@@ -85,7 +85,7 @@ class LightRag(VectorDb):
 
     def search(self, query: str, limit: int = 5, filters: Optional[Dict[str, Any]] = None) -> List[Document]:
         print("Hitting search")
-        return asyncio.run(self.async_search(query, max_results=limit, filters=filters))
+        return asyncio.run(self.async_search(query, limit=limit, filters=filters))
 
     async def async_search(
         self, query: str, limit: Optional[int] = None, filters: Optional[Dict[str, Any]] = None
@@ -106,10 +106,10 @@ class LightRag(VectorDb):
 
         except httpx.RequestError as e:
             log_error(f"HTTP Request Error: {type(e).__name__}: {str(e)}")
-            return None
+            return []
         except httpx.HTTPStatusError as e:
             log_error(f"HTTP Status Error: {e.response.status_code} - {e.response.text}")
-            return None
+            return []
         except Exception as e:
             log_error(f"Unexpected error during LightRAG server search: {type(e).__name__}: {str(e)}")
             import traceback

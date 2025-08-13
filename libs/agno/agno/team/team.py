@@ -9,6 +9,7 @@ from typing import (
     Any,
     AsyncIterator,
     Callable,
+    Coroutine,
     Dict,
     Iterator,
     List,
@@ -1083,6 +1084,7 @@ class Team:
         6. Parse any structured outputs
         7. Log the team run
         """
+        self.model = cast(Model, self.model)
         # Resolving here for async requirement
         if self.dependencies is not None:
             await self._aresolve_run_dependencies()
@@ -1148,7 +1150,7 @@ class Team:
         stream_intermediate_steps: bool = False,
         workflow_context: Optional[Dict] = None,
         yield_run_response: bool = False,
-    ) -> AsyncIterator[Union[TeamRunResponseEvent, RunResponseEvent]]:
+    ) -> AsyncIterator[Union[TeamRunResponseEvent, RunResponseEvent, TeamRunResponse]]:
         """Run the Team and return the response.
 
         Steps:
@@ -1357,13 +1359,13 @@ class Team:
         run_response.model_provider = self.model.provider if self.model is not None else None
 
         # Initialize the team run context
-        team_run_context = {}
+        team_run_context: Dict[str, Any] = {}
 
         self.determine_tools_for_model(
             model=self.model,
             run_response=run_response,
             team_run_context=team_run_context,
-            session=team_session,
+            session=team_session,  # type: ignore
             session_state=session_state,
             user_id=user_id,
             async_mode=True,
@@ -1390,7 +1392,7 @@ class Team:
                 if self.mode == "route":
                     # In route mode the model shouldn't get images/audio/video
                     run_messages: RunMessages = self.get_run_messages(
-                        session=team_session,
+                        session=team_session,  # type: ignore
                         run_response=run_response,
                         user_id=user_id,
                         message=message,
@@ -1404,7 +1406,7 @@ class Team:
                     )
                 else:
                     run_messages = self.get_run_messages(
-                        session=team_session,
+                        session=team_session,  # type: ignore
                         run_response=run_response,
                         user_id=user_id,
                         message=message,
@@ -1421,7 +1423,7 @@ class Team:
                     response_iterator = self._arun_stream(
                         run_response=run_response,
                         run_messages=run_messages,
-                        session=team_session,
+                        session=team_session,  # type: ignore
                         user_id=user_id,
                         response_format=response_format,
                         stream_intermediate_steps=stream_intermediate_steps,
@@ -1430,10 +1432,10 @@ class Team:
                     )
                     return response_iterator
                 else:
-                    return self._arun(
+                    return self._arun(  # type: ignore
                         run_response=run_response,
                         run_messages=run_messages,
-                        session=team_session,
+                        session=team_session,  # type: ignore
                         user_id=user_id,
                         response_format=response_format,
                     )
@@ -1831,7 +1833,7 @@ class Team:
 
             # If the model response is a tool_call_completed, update the existing tool call in the run_response
             elif model_response_event.event == ModelResponseEvent.tool_call_completed.value:
-                if model_response_event.updated_session_state is not None:
+                if model_response_event.updated_session_state is not None and session.session_data is not None:
                     merge_dictionaries(
                         session.session_data["session_state"], model_response_event.updated_session_state
                     )
@@ -1968,7 +1970,7 @@ class Team:
                 log_debug("Creating session summary.")
                 futures.append(
                     executor.submit(
-                        self.session_summary_manager.create_session_summary,
+                        self.session_summary_manager.create_session_summary,  # type: ignore
                         session=session,
                     )
                 )
@@ -1999,7 +2001,7 @@ class Team:
         session: TeamSession,
         user_id: Optional[str] = None,
     ) -> AsyncIterator[TeamRunResponseEvent]:
-        tasks = []
+        tasks: List[Coroutine] = []
 
         user_message_str = (
             run_messages.user_message.get_content_string() if run_messages.user_message is not None else None
@@ -6814,7 +6816,7 @@ class Team:
                 log_warning(f"No run responses found in AgentSession {session_id}")
                 return None
 
-    def read_or_create_session(self, session_id: str, user_id: Optional[str] = None) -> Optional[TeamSession]:
+    def read_or_create_session(self, session_id: str, user_id: Optional[str] = None) -> TeamSession:
         """Load the TeamSession from storage
 
         Returns:
@@ -6895,7 +6897,7 @@ class Team:
             self._upsert_session(session=session)
             log_debug(f"Created or updated TeamSession record: {session.session_id}")
 
-    def update_session_state(self, session: TeamSession, session_state: Dict[str, Any]):
+    def update_session_state(self, session: TeamSession, session_state: Dict[str, Any]) -> Dict[str, Any]:
         """Load the existing Agent from an AgentSession (from the database)"""
 
         from agno.utils.merge_dict import merge_dictionaries

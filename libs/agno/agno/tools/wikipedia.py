@@ -34,7 +34,7 @@ class WikipediaTools(Toolkit):
 
         log_debug(f"Adding to knowledge: {topic}")
         self.knowledge.add_content(
-            topic=topic,
+            topics=[topic],
             reader=WikipediaReader(),
         )
         log_debug(f"Searching knowledge: {topic}")

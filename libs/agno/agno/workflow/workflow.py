@@ -364,12 +364,12 @@ class Workflow:
             raise Exception("Session name is not set")
 
         # -*- Rename session
-        session.session_data["session_name"] = session_name
+        session.session_data["session_name"] = session_name  # type: ignore
 
         # -*- Save to storage
         self.save_session(session=session)  # type: ignore
 
-        return session
+        return session  # type: ignore
 
     def delete_session(self, session_id: str):
         """Delete the current session and save to storage"""
@@ -395,7 +395,7 @@ class Workflow:
                     return run_response
                 else:
                     log_warning(f"RunResponse {run_id} not found in AgentSession {session_id}")
-                    return None
+        return None
 
     def get_last_run_response(self, session_id: Optional[str] = None) -> Optional[WorkflowRunResponse]:
         """Get the last run response from the database."""
@@ -471,7 +471,7 @@ class Workflow:
         session_id_to_load = session_id or self.session_id
 
         # Try to load from database
-        if self.db is not None:
+        if self.db is not None and session_id_to_load is not None:
             workflow_session = cast(WorkflowSession, self._read_session(session_id=session_id_to_load))
             return workflow_session
 
@@ -484,7 +484,7 @@ class Workflow:
         Returns:
             Optional[WorkflowSession]: The saved WorkflowSession or None if not saved.
         """
-        if self.db is not None:
+        if self.db is not None and session.session_data is not None:
             session.session_data["session_state"].pop("current_session_id", None)
             session.session_data["session_state"].pop("current_user_id", None)
             session.session_data["session_state"].pop("workflow_id", None)

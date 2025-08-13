@@ -186,6 +186,7 @@ class TeamResponse(BaseModel):
             session=TeamSession(session_id=str(uuid4()), session_data={}),
             run_response=TeamRunResponse(run_id=str(uuid4())),
             async_mode=True,
+            session_state={},
             team_run_context={},
         )
         team_tools = list(team._functions_for_model.values()) if team._functions_for_model else []
