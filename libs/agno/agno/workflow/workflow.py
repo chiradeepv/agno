@@ -742,7 +742,6 @@ class Workflow:
                         workflow_run_response=workflow_run_response,
                         step_index=i,
                         store_executor_responses=self.store_executor_responses,
-                        parent_step_id=workflow_run_response.run_id,
                     ):
                         # Handle events
                         if isinstance(event, StepOutput):
@@ -1114,7 +1113,6 @@ class Workflow:
                         workflow_run_response=workflow_run_response,
                         step_index=i,
                         store_executor_responses=self.store_executor_responses,
-                        parent_step_id=workflow_run_response.run_id,
                     ):
                         if isinstance(event, StepOutput):
                             step_output = event
