@@ -421,7 +421,9 @@ async def async_stream_agno_response_as_agui_events(
     message_started = False
     event_buffer = EventBuffer()
 
+    last_chunk = None
     async for chunk in response_stream:
+        last_chunk = chunk
         # Handle error events - process content first, then trigger completion
         if chunk.event == RunEvent.run_error:
             # Process error content as a text message
@@ -464,3 +466,23 @@ async def async_stream_agno_response_as_agui_events(
                 events_to_emit = _emit_event_logic(event_buffer=event_buffer, event=event)
                 for emit_event in events_to_emit:
                     yield emit_event
+
+    # Handle natural stream end - emit completion events if no explicit completion was received
+    if last_chunk and last_chunk.event not in [
+        RunEvent.run_completed,
+        TeamRunEvent.run_completed,
+        RunEvent.run_paused,
+        RunEvent.run_error,
+    ]:
+        # Create a synthetic completion event
+        synthetic_completion = RunResponseContentEvent()
+        synthetic_completion.event = RunEvent.run_completed
+        synthetic_completion.content = ""
+        
+        completion_events = _create_completion_events(
+            synthetic_completion, event_buffer, message_started, message_id, thread_id, run_id
+        )
+        for event in completion_events:
+            events_to_emit = _emit_event_logic(event_buffer=event_buffer, event=event)
+            for emit_event in events_to_emit:
+                yield emit_event

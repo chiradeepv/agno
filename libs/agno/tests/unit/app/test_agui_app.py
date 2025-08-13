@@ -256,7 +256,7 @@ async def test_stream_with_multiple_concurrent_tool_calls():
         tool_call_1.tool_call_id = "call_Z2aSMKNTCoFuCIFaP8Eemgza"
         tool_call_1.tool_name = "get_current_stock_price"
         tool_call_1.tool_args = {"symbol": "TSLA"}
-        
+
         tool_start_1 = ToolCallStartedEvent()
         tool_start_1.event = RunEvent.tool_call_started
         tool_start_1.content = ""
@@ -268,7 +268,7 @@ async def test_stream_with_multiple_concurrent_tool_calls():
         tool_call_2.tool_call_id = "call_eD7OqR4WEstxXoNhjUeNhzIo"
         tool_call_2.tool_name = "get_current_stock_price"
         tool_call_2.tool_args = {"symbol": "AAPL"}
-        
+
         tool_start_2 = ToolCallStartedEvent()
         tool_start_2.event = RunEvent.tool_call_started
         tool_start_2.content = ""
@@ -280,7 +280,7 @@ async def test_stream_with_multiple_concurrent_tool_calls():
         tool_call_3.tool_call_id = "call_ZjpwHTxqOj4pEMZRbr1eu3dJ"
         tool_call_3.tool_name = "get_current_stock_price"
         tool_call_3.tool_args = {"symbol": "MSFT"}
-        
+
         tool_start_3 = ToolCallStartedEvent()
         tool_start_3.event = RunEvent.tool_call_started
         tool_start_3.content = ""
@@ -330,44 +330,49 @@ async def test_stream_with_multiple_concurrent_tool_calls():
         yield completed_response
 
     events = []
-    async for event in async_stream_agno_response_as_agui_events(mock_stream_with_multiple_tool_calls(), "thread_1", "run_1"):
+    async for event in async_stream_agno_response_as_agui_events(
+        mock_stream_with_multiple_tool_calls(), "thread_1", "run_1"
+    ):
         events.append(event)
 
     # Verify all expected event types are present
     event_types = [event.type for event in events]
-    
+
     # Text message events
     assert EventType.TEXT_MESSAGE_START in event_types
     assert EventType.TEXT_MESSAGE_CONTENT in event_types
     assert EventType.TEXT_MESSAGE_END in event_types
-    
+
     # Tool call events for all three tool calls
     assert EventType.TOOL_CALL_START in event_types
     assert EventType.TOOL_CALL_ARGS in event_types
     assert EventType.TOOL_CALL_END in event_types
     assert EventType.TOOL_CALL_RESULT in event_types
-    
+
     # Run completion
     assert EventType.RUN_FINISHED in event_types
 
     # Verify tool call ordering - events should be properly interleaved due to blocking behavior
     tool_start_indices = [i for i, event_type in enumerate(event_types) if event_type == EventType.TOOL_CALL_START]
     tool_end_indices = [i for i, event_type in enumerate(event_types) if event_type == EventType.TOOL_CALL_END]
-    
+
     assert len(tool_start_indices) == 3  # Three tool calls started
-    assert len(tool_end_indices) == 3    # Three tool calls ended
-    
+    assert len(tool_end_indices) == 3  # Three tool calls ended
+
     # With blocking behavior, tool calls should be properly ordered:
     # Each tool call should start before it ends
     for start_idx in tool_start_indices:
         # Find the corresponding end event for this tool call
         start_event = events[start_idx]
-        if hasattr(start_event, 'tool_call_id'):
+        if hasattr(start_event, "tool_call_id"):
             tool_call_id = start_event.tool_call_id
             # Find the end event for this specific tool call
             end_indices_for_this_tool = [
-                i for i, event in enumerate(events) 
-                if event.type == EventType.TOOL_CALL_END and hasattr(event, 'tool_call_id') and event.tool_call_id == tool_call_id
+                i
+                for i, event in enumerate(events)
+                if event.type == EventType.TOOL_CALL_END
+                and hasattr(event, "tool_call_id")
+                and event.tool_call_id == tool_call_id
             ]
             if end_indices_for_this_tool:
                 end_idx = end_indices_for_this_tool[0]
@@ -376,45 +381,41 @@ async def test_stream_with_multiple_concurrent_tool_calls():
     # Verify specific tool call IDs are present
     tool_call_ids = []
     for event in events:
-        if hasattr(event, 'tool_call_id'):
+        if hasattr(event, "tool_call_id"):
             tool_call_ids.append(event.tool_call_id)
-    
+
     expected_tool_call_ids = [
         "call_Z2aSMKNTCoFuCIFaP8Eemgza",  # TSLA
         "call_eD7OqR4WEstxXoNhjUeNhzIo",  # AAPL
-        "call_ZjpwHTxqOj4pEMZRbr1eu3dJ"   # MSFT
+        "call_ZjpwHTxqOj4pEMZRbr1eu3dJ",  # MSFT
     ]
-    
+
     for expected_id in expected_tool_call_ids:
         assert expected_id in tool_call_ids
 
     # Verify tool call arguments
     tool_call_args = []
     for event in events:
-        if hasattr(event, 'delta') and event.type == EventType.TOOL_CALL_ARGS:
+        if hasattr(event, "delta") and event.type == EventType.TOOL_CALL_ARGS:
             tool_call_args.append(event.delta)
-    
-    expected_args = [
-        '{"symbol": "TSLA"}',
-        '{"symbol": "AAPL"}',
-        '{"symbol": "MSFT"}'
-    ]
-    
+
+    expected_args = ['{"symbol": "TSLA"}', '{"symbol": "AAPL"}', '{"symbol": "MSFT"}']
+
     for expected_arg in expected_args:
         assert expected_arg in tool_call_args
 
     # Verify tool call results
     tool_call_results = []
     for event in events:
-        if hasattr(event, 'content') and event.type == EventType.TOOL_CALL_RESULT:
+        if hasattr(event, "content") and event.type == EventType.TOOL_CALL_RESULT:
             tool_call_results.append(event.content)
-    
+
     expected_results = [
         "{'price': 250.5, 'symbol': 'TSLA'}",
         "{'price': 175.25, 'symbol': 'AAPL'}",
-        "{'price': 320.75, 'symbol': 'MSFT'}"
+        "{'price': 320.75, 'symbol': 'MSFT'}",
     ]
-    
+
     for expected_result in expected_results:
         assert expected_result in tool_call_results
 
@@ -422,7 +423,7 @@ async def test_stream_with_multiple_concurrent_tool_calls():
 @pytest.mark.asyncio
 async def test_stream_with_reasoning_and_tool_calls():
     """Test AGUI event stream with reasoning steps and tool calls"""
-    from agno.run.response import RunEvent, ReasoningStartedEvent, ReasoningCompletedEvent
+    from agno.run.response import ReasoningCompletedEvent, ReasoningStartedEvent, RunEvent
 
     async def mock_stream_with_reasoning():
         # Start reasoning
@@ -448,7 +449,7 @@ async def test_stream_with_reasoning_and_tool_calls():
         tool_call.tool_call_id = "call_abc123"
         tool_call.tool_name = "search_web"
         tool_call.tool_args = {"query": "latest news"}
-        
+
         tool_start = ToolCallStartedEvent()
         tool_start.event = RunEvent.tool_call_started
         tool_start.content = ""
@@ -483,18 +484,18 @@ async def test_stream_with_reasoning_and_tool_calls():
     event_types = [event.type for event in events]
     assert EventType.STEP_STARTED in event_types
     assert EventType.STEP_FINISHED in event_types
-    
+
     # Verify tool call events
     assert EventType.TOOL_CALL_START in event_types
     assert EventType.TOOL_CALL_ARGS in event_types
     assert EventType.TOOL_CALL_END in event_types
     assert EventType.TOOL_CALL_RESULT in event_types
-    
+
     # Verify text message events
     assert EventType.TEXT_MESSAGE_START in event_types
     assert EventType.TEXT_MESSAGE_CONTENT in event_types
     assert EventType.TEXT_MESSAGE_END in event_types
-    
+
     # Verify run completion
     assert EventType.RUN_FINISHED in event_types
 
@@ -534,7 +535,9 @@ async def test_stream_with_error_handling():
     assert EventType.RUN_FINISHED in event_types
 
     # Verify error content was processed
-    text_contents = [event.delta for event in events if hasattr(event, 'delta') and event.type == EventType.TEXT_MESSAGE_CONTENT]
+    text_contents = [
+        event.delta for event in events if hasattr(event, "delta") and event.type == EventType.TEXT_MESSAGE_CONTENT
+    ]
     assert "Starting process..." in text_contents
 
 
@@ -569,5 +572,7 @@ async def test_stream_with_paused_run():
     assert EventType.RUN_FINISHED in event_types
 
     # Verify the pause content was processed
-    text_contents = [event.delta for event in events if hasattr(event, 'delta') and event.type == EventType.TEXT_MESSAGE_CONTENT]
+    text_contents = [
+        event.delta for event in events if hasattr(event, "delta") and event.type == EventType.TEXT_MESSAGE_CONTENT
+    ]
     assert "I need to pause for user input" in text_contents
