@@ -44,7 +44,7 @@ pprint(memories)
 
 
 # Use default memory manager
-memory = MemoryManager(model=OpenAIChat(id="gpt-4o-mini"), db=db)
+memory = MemoryManager(model=OpenAIChat(id="gpt-4o-mini"), db=db,user_memory_table="user_memories" )
 jane_doe_id = "jane_doe@example.com"
 
 # Send a history of messages and add memories

@@ -6197,7 +6197,7 @@ class Agent:
 
     def print_response(
         self,
-        message: Optional[Union[List, Dict, str, Message, BaseModel]] = None,
+        input: Optional[Union[List, Dict, str, Message, BaseModel]] = None,
         *,
         session_id: Optional[str] = None,
         session_state: Optional[Dict[str, Any]] = None,
@@ -6252,10 +6252,10 @@ class Agent:
                 # Panels to be rendered
                 panels = [status]
                 # First render the message panel if the message is not None
-                if message and show_message:
+                if input and show_message:
                     render = True
                     # Convert message to a panel
-                    message_content = get_text_from_message(message)
+                    message_content = get_text_from_message(input)
                     message_panel = create_panel(
                         content=Text(message_content, style="green"),
                         title="Message",
@@ -6319,10 +6319,10 @@ class Agent:
                         response_content_batch = Markdown(escaped_content)
                     panels = [status]
 
-                    if message and show_message:
+                    if input and show_message:
                         render = True
                         # Convert message to a panel
-                        message_content = get_text_from_message(message)
+                        message_content = get_text_from_message(input)
                         message_panel = create_panel(
                             content=Text(message_content, style="green"),
                             title="Message",
@@ -6469,9 +6469,9 @@ class Agent:
                 # Panels to be rendered
                 panels = [status]
                 # First render the message panel if the message is not None
-                if message and show_message:
+                if input and show_message:
                     # Convert message to a panel
-                    message_content = get_text_from_message(message)
+                    message_content = get_text_from_message(input)
                     message_panel = create_panel(
                         content=Text(message_content, style="green"),
                         title="Message",
@@ -6640,7 +6640,7 @@ class Agent:
 
     async def aprint_response(
         self,
-        message: Optional[Union[List, Dict, str, Message, BaseModel]] = None,
+        input: Optional[Union[List, Dict, str, Message, BaseModel]] = None,
         *,
         session_id: Optional[str] = None,
         session_state: Optional[Dict[str, Any]] = None,
@@ -6695,10 +6695,10 @@ class Agent:
                 # Panels to be rendered
                 panels = [status]
                 # First render the message panel if the message is not None
-                if message and show_message:
+                if input and show_message:
                     render = True
                     # Convert message to a panel
-                    message_content = get_text_from_message(message)
+                    message_content = get_text_from_message(input)
                     message_panel = create_panel(
                         content=Text(message_content, style="green"),
                         title="Message",
@@ -6765,10 +6765,10 @@ class Agent:
 
                     panels = [status]
 
-                    if message and show_message:
+                    if input and show_message:
                         render = True
                         # Convert message to a panel
-                        message_content = get_text_from_message(message)
+                        message_content = get_text_from_message(input)
                         message_panel = create_panel(
                             content=Text(message_content, style="green"),
                             title="Message",
@@ -6915,9 +6915,9 @@ class Agent:
                 # Panels to be rendered
                 panels = [status]
                 # First render the message panel if the message is not None
-                if message and show_message:
+                if input and show_message:
                     # Convert message to a panel
-                    message_content = get_text_from_message(message)
+                    message_content = get_text_from_message(input)
                     message_panel = create_panel(
                         content=Text(message_content, style="green"),
                         title="Message",

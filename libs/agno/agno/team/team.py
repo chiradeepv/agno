@@ -2307,7 +2307,7 @@ class Team:
 
     def print_response(
         self,
-        message: Optional[Union[List, Dict, str, Message, BaseModel]] = None,
+        input: Optional[Union[List, Dict, str, Message, BaseModel]] = None,
         *,
         stream: bool = False,
         stream_intermediate_steps: bool = False,
@@ -2421,9 +2421,9 @@ class Team:
             # Panels to be rendered
             panels = [status]
             # First render the message panel if the message is not None
-            if message and show_message:
+            if input and show_message:
                 # Convert message to a panel
-                message_content = get_text_from_message(message)
+                message_content = get_text_from_message(input)
                 message_panel = create_panel(
                     content=Text(message_content, style="green"),
                     title="Message",
@@ -2726,10 +2726,10 @@ class Team:
             # Panels to be rendered
             panels = [status]
             # First render the message panel if the message is not None
-            if message and show_message:
+            if input and show_message:
                 render = True
                 # Convert message to a panel
-                message_content = get_text_from_message(message)
+                message_content = get_text_from_message(input)
                 message_panel = create_panel(
                     content=Text(message_content, style="green"),
                     title="Message",
@@ -2834,10 +2834,10 @@ class Team:
                 # Create new panels for each chunk
                 panels = []
 
-                if message and show_message:
+                if input and show_message:
                     render = True
                     # Convert message to a panel
-                    message_content = get_text_from_message(message)
+                    message_content = get_text_from_message(input)
                     message_panel = create_panel(
                         content=Text(message_content, style="green"),
                         title="Message",
@@ -3023,8 +3023,8 @@ class Team:
             final_panels = []
 
             # Start with the message
-            if message and show_message:
-                message_content = get_text_from_message(message)
+            if input and show_message:
+                message_content = get_text_from_message(input)
                 message_panel = create_panel(
                     content=Text(message_content, style="green"),
                     title="Message",
@@ -3190,7 +3190,7 @@ class Team:
 
     async def aprint_response(
         self,
-        message: Optional[Union[List, Dict, str, Message, BaseModel]] = None,
+        input: Optional[Union[List, Dict, str, Message, BaseModel]] = None,
         *,
         stream: bool = False,
         stream_intermediate_steps: bool = False,
@@ -3304,9 +3304,9 @@ class Team:
             # Panels to be rendered
             panels = [status]
             # First render the message panel if the message is not None
-            if message and show_message:
+            if input and show_message:
                 # Convert message to a panel
-                message_content = get_text_from_message(message)
+                message_content = get_text_from_message(input)
                 message_panel = create_panel(
                     content=Text(message_content, style="green"),
                     title="Message",
@@ -3610,10 +3610,10 @@ class Team:
             # Panels to be rendered
             panels = [status]
             # First render the message panel if the message is not None
-            if message and show_message:
+            if input and show_message:
                 render = True
                 # Convert message to a panel
-                message_content = get_text_from_message(message)
+                message_content = get_text_from_message(input)
                 message_panel = create_panel(
                     content=Text(message_content, style="green"),
                     title="Message",
@@ -3712,10 +3712,10 @@ class Team:
                 # Create new panels for each chunk
                 panels = [status]
 
-                if message and show_message:
+                if input and show_message:
                     render = True
                     # Convert message to a panel
-                    message_content = get_text_from_message(message)
+                    message_content = get_text_from_message(input)
                     message_panel = create_panel(
                         content=Text(message_content, style="green"),
                         title="Message",
@@ -3837,8 +3837,8 @@ class Team:
             final_panels = []
 
             # Start with the message
-            if message and show_message:
-                message_content = get_text_from_message(message)
+            if input and show_message:
+                message_content = get_text_from_message(input)
                 message_panel = create_panel(
                     content=Text(message_content, style="green"),
                     title="Message",
