@@ -10,7 +10,7 @@ from agno.models.message import Citations, Message
 from agno.models.metrics import Metrics
 from agno.models.response import ToolExecution
 from agno.run.base import BaseRunOutputEvent, RunOutputMetaData, RunStatus
-from agno.run.response import RunEvent, RunOutput, RunOutputEvent, run_response_event_from_dict
+from agno.run.response import RunEvent, RunOutput, RunOutputEvent, run_output_event_from_dict
 
 
 class TeamRunEvent(str, Enum):
@@ -75,7 +75,7 @@ class BaseTeamRunEvent(BaseRunOutputEvent):
 
 
 @dataclass
-class RunOutputStartedEvent(BaseTeamRunEvent):
+class RunStartedEvent(BaseTeamRunEvent):
     """Event sent when the run starts"""
 
     event: str = TeamRunEvent.run_started.value
@@ -84,7 +84,7 @@ class RunOutputStartedEvent(BaseTeamRunEvent):
 
 
 @dataclass
-class TeamRunContentEvent(BaseTeamRunEvent):
+class RunContentEvent(BaseTeamRunEvent):
     """Main event for each delta of the RunOutput"""
 
     event: str = TeamRunEvent.run_content.value
@@ -98,7 +98,7 @@ class TeamRunContentEvent(BaseTeamRunEvent):
 
 
 @dataclass
-class RunOutputCompletedEvent(BaseTeamRunEvent):
+class RunCompletedEvent(BaseTeamRunEvent):
     event: str = TeamRunEvent.run_completed.value
     content: Optional[Any] = None
     content_type: str = "str"
@@ -114,13 +114,13 @@ class RunOutputCompletedEvent(BaseTeamRunEvent):
 
 
 @dataclass
-class RunOutputErrorEvent(BaseTeamRunEvent):
+class RunErrorEvent(BaseTeamRunEvent):
     event: str = TeamRunEvent.run_error.value
     content: Optional[str] = None
 
 
 @dataclass
-class RunOutputCancelledEvent(BaseTeamRunEvent):
+class RunCancelledEvent(BaseTeamRunEvent):
     event: str = TeamRunEvent.run_cancelled.value
     reason: Optional[str] = None
 
@@ -182,11 +182,11 @@ class ParserModelResponseCompletedEvent(BaseTeamRunEvent):
 
 
 TeamRunOutputEvent = Union[
-    RunOutputStartedEvent,
-    RunOutputContentEvent,
-    RunOutputCompletedEvent,
-    RunOutputErrorEvent,
-    RunOutputCancelledEvent,
+    RunStartedEvent,
+    RunContentEvent,
+    RunCompletedEvent,
+    RunErrorEvent,
+    RunCancelledEvent,
     ReasoningStartedEvent,
     ReasoningStepEvent,
     ReasoningCompletedEvent,
@@ -200,11 +200,11 @@ TeamRunOutputEvent = Union[
 
 # Map event string to dataclass for team events
 TEAM_RUN_EVENT_TYPE_REGISTRY = {
-    TeamRunEvent.run_started.value: RunOutputStartedEvent,
-    TeamRunEvent.run_content.value: RunOutputContentEvent,
-    TeamRunEvent.run_completed.value: RunOutputCompletedEvent,
-    TeamRunEvent.run_error.value: RunOutputErrorEvent,
-    TeamRunEvent.run_cancelled.value: RunOutputCancelledEvent,
+    TeamRunEvent.run_started.value: RunStartedEvent,
+    TeamRunEvent.run_content.value: RunContentEvent,
+    TeamRunEvent.run_completed.value: RunCompletedEvent,
+    TeamRunEvent.run_error.value: RunErrorEvent,
+    TeamRunEvent.run_cancelled.value: RunCancelledEvent,
     TeamRunEvent.reasoning_started.value: ReasoningStartedEvent,
     TeamRunEvent.reasoning_step.value: ReasoningStepEvent,
     TeamRunEvent.reasoning_completed.value: ReasoningCompletedEvent,
@@ -217,10 +217,10 @@ TEAM_RUN_EVENT_TYPE_REGISTRY = {
 }
 
 
-def team_run_response_event_from_dict(data: dict) -> BaseTeamRunEvent:
+def team_run_output_event_from_dict(data: dict) -> BaseTeamRunEvent:
     event_type = data.get("event", "")
     if event_type in {e.value for e in RunEvent}:
-        return run_response_event_from_dict(data)  # type: ignore
+        return run_output_event_from_dict(data)  # type: ignore
     else:
         event_class = TEAM_RUN_EVENT_TYPE_REGISTRY.get(event_type)
     if not event_class:
@@ -357,11 +357,11 @@ class TeamRunOutput:
         for event in events or []:
             if "agent_id" in event:
                 # Use the factory from response.py for agent events
-                from agno.run.response import run_response_event_from_dict
+                from agno.run.response import run_output_event_from_dict
 
-                event = run_response_event_from_dict(event)
+                event = run_output_event_from_dict(event)
             else:
-                event = team_run_response_event_from_dict(event)
+                event = team_run_output_event_from_dict(event)
             final_events.append(event)
         events = final_events
 

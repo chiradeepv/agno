@@ -5,7 +5,7 @@ from agno.models.message import Message
 from agno.models.response import ToolExecution
 from agno.reasoning.step import ReasoningStep
 from agno.run.base import RunOutputMetaData
-from agno.run.response import RunOutput, RunOutputEvent, RunOutputPausedEvent
+from agno.run.response import RunOutput, RunOutputEvent, RunPausedEvent
 from agno.run.team import TeamRunOutput, TeamRunOutputEvent
 
 
@@ -75,7 +75,7 @@ def format_tool_calls(tool_calls: List[ToolExecution]) -> List[str]:
     return formatted_tool_calls
 
 
-def create_paused_run_response_panel(run_response: Union[RunOutputPausedEvent, RunOutput]):
+def create_paused_run_response_panel(run_response: Union[RunPausedEvent, RunOutput]):
     from rich.text import Text
 
     tool_calls_content = Text("Run is paused. ")

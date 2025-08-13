@@ -26,8 +26,8 @@ from agno.media import AudioResponse, ImageArtifact
 from agno.models.message import Citations, Message
 from agno.models.metrics import Metrics
 from agno.models.response import ModelResponse, ModelResponseEvent, ToolExecution
-from agno.run.response import RunOutput, RunOutputContentEvent, RunOutputEvent
-from agno.run.team import RunOutputContentEvent as TeamRunOutputContentEvent
+from agno.run.response import RunContentEvent, RunOutput, RunOutputEvent
+from agno.run.team import RunContentEvent as TeamRunContentEvent
 from agno.run.team import TeamRunOutputEvent
 from agno.tools.function import Function, FunctionCall, FunctionExecutionResult, UserInputField
 from agno.utils.log import log_debug, log_error, log_warning
@@ -1082,7 +1082,7 @@ class Model(ABC):
                     item, tuple(get_args(TeamRunOutputEvent))
                 ):
                     # We only capture content events
-                    if isinstance(item, RunOutputContentEvent) or isinstance(item, TeamRunOutputContentEvent):
+                    if isinstance(item, RunContentEvent) or isinstance(item, TeamRunContentEvent):
                         if item.content is not None and isinstance(item.content, BaseModel):
                             function_call_output += item.content.model_dump_json()
                         else:
@@ -1432,7 +1432,7 @@ class Model(ABC):
                         item, tuple(get_args(TeamRunOutputEvent))
                     ):
                         # We only capture content events
-                        if isinstance(item, RunOutputContentEvent) or isinstance(item, TeamRunOutputContentEvent):
+                        if isinstance(item, RunContentEvent) or isinstance(item, TeamRunContentEvent):
                             if item.content is not None and isinstance(item.content, BaseModel):
                                 function_call_output += item.content.model_dump_json()
                             else:
@@ -1456,7 +1456,7 @@ class Model(ABC):
                         item, tuple(get_args(TeamRunOutputEvent))
                     ):
                         # We only capture content events
-                        if isinstance(item, RunOutputContentEvent) or isinstance(item, TeamRunOutputContentEvent):
+                        if isinstance(item, RunContentEvent) or isinstance(item, TeamRunContentEvent):
                             if item.content is not None and isinstance(item.content, BaseModel):
                                 function_call_output += item.content.model_dump_json()
                             else:

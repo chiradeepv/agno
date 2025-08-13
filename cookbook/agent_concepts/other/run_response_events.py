@@ -2,7 +2,7 @@ from typing import Iterator, List
 
 from agno.agent import (
     Agent,
-    RunOutputContentEvent,
+    RunContentEvent,
     RunOutputEvent,
     ToolCallCompletedEvent,
     ToolCallStartedEvent,
@@ -21,7 +21,7 @@ run_response: Iterator[RunOutputEvent] = agent.run(
 
 response: List[str] = []
 for chunk in run_response:
-    if isinstance(chunk, RunOutputContentEvent):
+    if isinstance(chunk, RunContentEvent):
         response.append(chunk.content)
     elif isinstance(chunk, ToolCallStartedEvent):
         response.append(

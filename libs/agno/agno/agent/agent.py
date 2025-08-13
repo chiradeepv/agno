@@ -43,7 +43,7 @@ from agno.run.response import (
     RunEvent,
     RunOutput,
     RunOutputEvent,
-    RunOutputPausedEvent,
+    RunPausedEvent,
 )
 from agno.run.team import TeamRunOutputEvent
 from agno.session import AgentSession, Session, SessionSummaryManager
@@ -4499,9 +4499,7 @@ class Agent:
             if len(messages_to_add_to_run_response) > 0:
                 log_debug(f"Adding {len(messages_to_add_to_run_response)} extra messages")
                 if self.run_response.metadata is None:
-                    self.run_response.metadata = RunOutputMetaData(
-                        additional_messages=messages_to_add_to_run_response
-                    )
+                    self.run_response.metadata = RunOutputMetaData(additional_messages=messages_to_add_to_run_response)
                 else:
                     if self.run_response.metadata.additional_messages is None:
                         self.run_response.metadata.additional_messages = messages_to_add_to_run_response
@@ -5723,9 +5721,7 @@ class Agent:
         else:
             log_warning("A response model is required to parse the response with a parser model")
 
-    def _parse_response_with_parser_model_stream(
-        self, run_response: RunOutput, stream_intermediate_steps: bool = True
-    ):
+    def _parse_response_with_parser_model_stream(self, run_response: RunOutput, stream_intermediate_steps: bool = True):
         """Parse the model response using the parser model"""
         if self.parser_model is not None:
             if self.response_model is not None:
@@ -5812,9 +5808,7 @@ class Agent:
             else:
                 log_warning("A response model is required to parse the response with a parser model")
 
-    def _handle_event(
-        self, event: RunOutputEvent, run_response: RunOutput, workflow_context: Optional[Dict] = None
-    ):
+    def _handle_event(self, event: RunOutputEvent, run_response: RunOutput, workflow_context: Optional[Dict] = None):
         if workflow_context:
             event.workflow_id = workflow_context.get("workflow_id")
             event.workflow_run_id = workflow_context.get("workflow_run_id")
@@ -6243,7 +6237,7 @@ class Agent:
                 ):
                     if isinstance(resp, tuple(get_args(RunOutputEvent))):
                         if resp.is_paused:
-                            resp = cast(RunOutputPausedEvent, resp)
+                            resp = cast(RunPausedEvent, resp)
                             response_panel = create_paused_run_response_panel(resp)
                             panels.append(response_panel)
                             live_log.update(Group(*panels))

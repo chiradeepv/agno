@@ -60,7 +60,7 @@ class BaseAgentRunEvent(BaseRunOutputEvent):
 
 
 @dataclass
-class RunOutputStartedEvent(BaseAgentRunEvent):
+class RunStartedEvent(BaseAgentRunEvent):
     """Event sent when the run starts"""
 
     event: str = RunEvent.run_started.value
@@ -83,7 +83,7 @@ class RunContentEvent(BaseAgentRunEvent):
 
 
 @dataclass
-class RunOutputCompletedEvent(BaseAgentRunEvent):
+class RunCompletedEvent(BaseAgentRunEvent):
     event: str = RunEvent.run_completed.value
     content: Optional[Any] = None
     content_type: str = "str"
@@ -98,7 +98,7 @@ class RunOutputCompletedEvent(BaseAgentRunEvent):
 
 
 @dataclass
-class RunOutputPausedEvent(BaseAgentRunEvent):
+class RunPausedEvent(BaseAgentRunEvent):
     event: str = RunEvent.run_paused.value
     tools: Optional[List[ToolExecution]] = None
 
@@ -108,18 +108,18 @@ class RunOutputPausedEvent(BaseAgentRunEvent):
 
 
 @dataclass
-class RunOutputContinuedEvent(BaseAgentRunEvent):
+class RunContinuedEvent(BaseAgentRunEvent):
     event: str = RunEvent.run_continued.value
 
 
 @dataclass
-class RunOutputErrorEvent(BaseAgentRunEvent):
+class RunErrorEvent(BaseAgentRunEvent):
     event: str = RunEvent.run_error.value
     content: Optional[str] = None
 
 
 @dataclass
-class RunOutputCancelledEvent(BaseAgentRunEvent):
+class RunCancelledEvent(BaseAgentRunEvent):
     event: str = RunEvent.run_cancelled.value
     reason: Optional[str] = None
 
@@ -225,7 +225,7 @@ RUN_EVENT_TYPE_REGISTRY = {
 }
 
 
-def run_response_event_from_dict(data: dict) -> BaseRunOutputEvent:
+def run_output_event_from_dict(data: dict) -> BaseRunOutputEvent:
     event_type = data.get("event", "")
     cls = RUN_EVENT_TYPE_REGISTRY.get(event_type)
     if not cls:
