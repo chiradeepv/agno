@@ -35,16 +35,16 @@ def get_member_id(member: Union[Agent, "Team"]) -> str:
     """
     from agno.team.team import Team
 
-    if isinstance(member, Agent) and member.agent_id is not None and (not is_valid_uuid(member.agent_id)):
-        url_safe_member_id = url_safe_string(member.agent_id)
-    elif isinstance(member, Team) and member.team_id is not None and (not is_valid_uuid(member.team_id)):
-        url_safe_member_id = url_safe_string(member.team_id)
+    if isinstance(member, Agent) and member.id is not None and (not is_valid_uuid(member.id)):
+        url_safe_member_id = url_safe_string(member.id)
+    elif isinstance(member, Team) and member.id is not None and (not is_valid_uuid(member.id)):
+        url_safe_member_id = url_safe_string(member.id)
     elif member.name is not None:
         url_safe_member_id = url_safe_string(member.name)
-    elif isinstance(member, Agent) and member.agent_id is not None:
-        url_safe_member_id = member.agent_id
-    elif isinstance(member, Team) and member.team_id is not None:
-        url_safe_member_id = member.team_id
+    elif isinstance(member, Agent) and member.id is not None:
+        url_safe_member_id = member.id
+    elif isinstance(member, Team) and member.id is not None:
+        url_safe_member_id = member.id
     else:
         url_safe_member_id = None
     return url_safe_member_id

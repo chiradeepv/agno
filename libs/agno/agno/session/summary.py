@@ -157,7 +157,9 @@ class SessionSummaryManager:
             try:
                 from agno.utils.string import parse_response_model_str
 
-                parsed_summary: SessionSummaryResponse = parse_response_model_str(summary_response.content, SessionSummaryResponse)
+                parsed_summary: SessionSummaryResponse = parse_response_model_str(
+                    summary_response.content, SessionSummaryResponse
+                )
 
                 if parsed_summary is not None:
                     session_summary = SessionSummary(
