@@ -33,7 +33,7 @@ async def run_agent_with_events(prompt: str):
             print(f"TOOL CALL: {run_response_event.tool.tool_name}")
             print(f"TOOL CALL RESULT: {run_response_event.tool.result}")
 
-        if run_response_event.event in [RunEvent.run_response_content]:
+        if run_response_event.event in [RunEvent.run_content]:
             if not content_started:
                 print("\nCONTENT:")
                 content_started = True

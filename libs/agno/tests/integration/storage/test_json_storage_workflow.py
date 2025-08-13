@@ -4,7 +4,7 @@ import pytest
 
 from agno.agent import Agent
 from agno.db.json import JsonStorage
-from agno.run.response import RunResponse
+from agno.run.response import RunOutput
 from agno.session import WorkflowSession
 from agno.workflow import Workflow
 
@@ -33,10 +33,10 @@ class SimpleWorkflow(Workflow):
         description="A test agent for the workflow",
     )
 
-    def run(self, query: str) -> RunResponse:
+    def run(self, query: str) -> RunOutput:
         """Run the workflow with a simple query."""
         response = self.test_agent.run(query)
-        return RunResponse(run_id=self.run_id, content=f"Workflow processed: {response.content}")
+        return RunOutput(run_id=self.run_id, content=f"Workflow processed: {response.content}")
 
 
 @pytest.fixture

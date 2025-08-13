@@ -1,7 +1,7 @@
 import json
 from typing import List
 
-from agno.run.response import RunResponse
+from agno.run.response import RunOutput
 from rich.console import Console
 from rich.json import JSON
 from rich.panel import Panel
@@ -9,7 +9,7 @@ from rich.panel import Panel
 console = Console()
 
 
-def print_chat_history(session_runs: List[RunResponse]):
+def print_chat_history(session_runs: List[RunOutput]):
     # -*- Print history
     messages = []
     for run in session_runs:

@@ -4,7 +4,7 @@ from typing import Any, AsyncIterator, Dict, Iterator, List, Optional, Type, Uni
 
 from pydantic import BaseModel
 
-from agno.agent import RunResponse
+from agno.agent import RunOutput
 from agno.models.base import Model
 from agno.models.message import Message
 from agno.models.metrics import Metrics
@@ -188,7 +188,7 @@ class Ollama(Model):
         response_format: Optional[Union[Dict, Type[BaseModel]]] = None,
         tools: Optional[List[Dict[str, Any]]] = None,
         tool_choice: Optional[Union[str, Dict[str, Any]]] = None,
-        run_response: Optional[RunResponse] = None,
+        run_response: Optional[RunOutput] = None,
     ) -> ModelResponse:
         """
         Send a chat request to the Ollama API.
@@ -218,7 +218,7 @@ class Ollama(Model):
         response_format: Optional[Union[Dict, Type[BaseModel]]] = None,
         tools: Optional[List[Dict[str, Any]]] = None,
         tool_choice: Optional[Union[str, Dict[str, Any]]] = None,
-        run_response: Optional[RunResponse] = None,
+        run_response: Optional[RunOutput] = None,
     ) -> ModelResponse:
         """
         Sends an asynchronous chat request to the Ollama API.
@@ -248,7 +248,7 @@ class Ollama(Model):
         response_format: Optional[Union[Dict, Type[BaseModel]]] = None,
         tools: Optional[List[Dict[str, Any]]] = None,
         tool_choice: Optional[Union[str, Dict[str, Any]]] = None,
-        run_response: Optional[RunResponse] = None,
+        run_response: Optional[RunOutput] = None,
     ) -> Iterator[ModelResponse]:
         """
         Sends a streaming chat request to the Ollama API.
@@ -275,7 +275,7 @@ class Ollama(Model):
         response_format: Optional[Union[Dict, Type[BaseModel]]] = None,
         tools: Optional[List[Dict[str, Any]]] = None,
         tool_choice: Optional[Union[str, Dict[str, Any]]] = None,
-        run_response: Optional[RunResponse] = None,
+        run_response: Optional[RunOutput] = None,
     ) -> AsyncIterator[ModelResponse]:
         """
         Sends an asynchronous streaming chat completion request to the Ollama API.

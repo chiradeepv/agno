@@ -1,6 +1,6 @@
 from typing import Iterator
 
-from agno.agent import Agent, RunResponse
+from agno.agent import Agent, RunOutput
 from agno.models.openai import OpenAIChat
 from agno.tools.yfinance import YFinanceTools
 from rich.pretty import pprint
@@ -11,7 +11,7 @@ agent = Agent(
     markdown=True,
 )
 
-run_stream: Iterator[RunResponse] = agent.run(
+run_stream: Iterator[RunOutput] = agent.run(
     "What is the stock price of NVDA", stream=True, stream_intermediate_steps=True
 )
 for chunk in run_stream:

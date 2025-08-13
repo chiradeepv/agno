@@ -82,13 +82,13 @@ async def run_team_with_events(prompt: str):
             print(f"MEMBER TOOL CALL: {run_response_event.tool.tool_name}")
             print(f"MEMBER TOOL CALL RESULT: {run_response_event.tool.result}")
 
-        if run_response_event.event in [TeamRunEvent.run_response_content]:
+        if run_response_event.event in [TeamRunEvent.run_content]:
             if not content_started:
                 print("TEAM CONTENT:")
                 content_started = True
             print(run_response_event.content, end="")
 
-        if run_response_event.event in [RunEvent.run_response_content]:
+        if run_response_event.event in [RunEvent.run_content]:
             if not member_content_started:
                 print("MEMBER CONTENT:")
                 member_content_started = True

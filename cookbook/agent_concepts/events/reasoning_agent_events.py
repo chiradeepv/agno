@@ -30,7 +30,7 @@ async def run_agent_with_events(prompt: str):
         if run_response_event.event in [RunEvent.reasoning_completed]:
             print(f"\nEVENT: {run_response_event.event}")
 
-        if run_response_event.event in [RunEvent.run_response_content]:
+        if run_response_event.event in [RunEvent.run_content]:
             if not content_started:
                 print("\nCONTENT:")
                 content_started = True

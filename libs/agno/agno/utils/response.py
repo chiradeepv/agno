@@ -4,9 +4,9 @@ from agno.exceptions import RunCancelledException
 from agno.models.message import Message
 from agno.models.response import ToolExecution
 from agno.reasoning.step import ReasoningStep
-from agno.run.base import RunResponseMetaData
-from agno.run.response import RunResponse, RunResponseEvent, RunResponsePausedEvent
-from agno.run.team import TeamRunResponse, TeamRunResponseEvent
+from agno.run.base import RunOutputMetaData
+from agno.run.response import RunOutput, RunOutputEvent, RunOutputPausedEvent
+from agno.run.team import TeamRunOutput, TeamRunOutputEvent
 
 
 def create_panel(content, title, border_style="blue"):
@@ -29,18 +29,18 @@ def escape_markdown_tags(content: str, tags: Set[str]) -> str:
     return escaped_content
 
 
-def check_if_run_cancelled(run_response: Union[RunResponse, RunResponseEvent, TeamRunResponse, TeamRunResponseEvent]):
+def check_if_run_cancelled(run_response: Union[RunOutput, RunOutputEvent, TeamRunOutput, TeamRunOutputEvent]):
     if run_response.is_cancelled:
         raise RunCancelledException()
 
 
 def update_run_response_with_reasoning(
-    run_response: Union[RunResponse, TeamRunResponse],
+    run_response: Union[RunOutput, TeamRunOutput],
     reasoning_steps: List[ReasoningStep],
     reasoning_agent_messages: List[Message],
 ) -> None:
     if run_response.metadata is None:
-        run_response.metadata = RunResponseMetaData()
+        run_response.metadata = RunOutputMetaData()
 
     # Update reasoning_steps
     if run_response.metadata.reasoning_steps is None:
@@ -75,7 +75,7 @@ def format_tool_calls(tool_calls: List[ToolExecution]) -> List[str]:
     return formatted_tool_calls
 
 
-def create_paused_run_response_panel(run_response: Union[RunResponsePausedEvent, RunResponse]):
+def create_paused_run_response_panel(run_response: Union[RunOutputPausedEvent, RunOutput]):
     from rich.text import Text
 
     tool_calls_content = Text("Run is paused. ")
@@ -117,7 +117,7 @@ def create_paused_run_response_panel(run_response: Union[RunResponsePausedEvent,
     return response_panel
 
 
-def get_paused_content(run_response: RunResponse) -> str:
+def get_paused_content(run_response: RunOutput) -> str:
     paused_content = ""
     for tool in run_response.tools or []:
         # Initialize flags for each tool
@@ -150,12 +150,12 @@ def get_paused_content(run_response: RunResponse) -> str:
 
 
 def generator_wrapper(
-    event: Union[RunResponseEvent, TeamRunResponseEvent],
-) -> Iterator[Union[RunResponseEvent, TeamRunResponseEvent]]:
+    event: Union[RunOutputEvent, TeamRunOutputEvent],
+) -> Iterator[Union[RunOutputEvent, TeamRunOutputEvent]]:
     yield event
 
 
 async def async_generator_wrapper(
-    event: Union[RunResponseEvent, TeamRunResponseEvent],
-) -> AsyncIterator[Union[RunResponseEvent, TeamRunResponseEvent]]:
+    event: Union[RunOutputEvent, TeamRunOutputEvent],
+) -> AsyncIterator[Union[RunOutputEvent, TeamRunOutputEvent]]:
     yield event

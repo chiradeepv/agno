@@ -3,7 +3,7 @@ import wave
 from pathlib import Path
 from typing import Iterator
 
-from agno.agent import Agent, RunResponse  # noqa
+from agno.agent import Agent, RunOutput  # noqa
 from agno.models.openai import OpenAIChat
 
 # Audio Configuration
@@ -22,7 +22,7 @@ agent = Agent(
         },  # Only pcm16 is supported with streaming
     ),
 )
-output_stream: Iterator[RunResponse] = agent.run(
+output_stream: Iterator[RunOutput] = agent.run(
     "Tell me a 10 second story", stream=True
 )
 

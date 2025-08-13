@@ -53,8 +53,8 @@ from agno.os.utils import (
     process_image,
     process_video,
 )
-from agno.run.response import RunResponse, RunResponseErrorEvent
-from agno.run.team import RunResponseErrorEvent as TeamRunResponseErrorEvent
+from agno.run.response import RunOutput, RunOutputErrorEvent
+from agno.run.team import RunOutputErrorEvent as TeamRunOutputErrorEvent
 from agno.run.workflow import WorkflowErrorEvent
 from agno.team.team import Team
 from agno.utils.log import log_debug, log_error, log_warning, logger
@@ -144,7 +144,7 @@ async def agent_response_streamer(
         import traceback
 
         traceback.print_exc(limit=3)
-        error_response = RunResponseErrorEvent(
+        error_response = RunOutputErrorEvent(
             content=str(e),
         )
         yield error_response.to_json()
@@ -172,7 +172,7 @@ async def agent_continue_response_streamer(
         import traceback
 
         traceback.print_exc(limit=3)
-        error_response = RunResponseErrorEvent(
+        error_response = RunOutputErrorEvent(
             content=str(e),
         )
         yield error_response.to_json()
@@ -208,7 +208,7 @@ async def team_response_streamer(
         import traceback
 
         traceback.print_exc()
-        error_response = TeamRunResponseErrorEvent(
+        error_response = TeamRunOutputErrorEvent(
             content=str(e),
         )
         yield error_response.to_json()
@@ -504,7 +504,7 @@ def get_base_router(
             )
         else:
             run_response = cast(
-                RunResponse,
+                RunOutput,
                 await agent.arun(
                     message=message,
                     session_id=session_id,
@@ -567,7 +567,7 @@ def get_base_router(
             )
         else:
             run_response_obj = cast(
-                RunResponse,
+                RunOutput,
                 await agent.acontinue_run(
                     run_id=run_id,  # run_id from path
                     updated_tools=updated_tools,

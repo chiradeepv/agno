@@ -4,13 +4,13 @@ from dataclasses import dataclass
 from typing import AsyncIterator, Awaitable, Callable, Iterator, List, Optional, Union
 
 from agno.models.metrics import Metrics
-from agno.run.response import RunResponseEvent
-from agno.run.team import TeamRunResponseEvent
+from agno.run.response import RunOutputEvent
+from agno.run.team import TeamRunOutputEvent
 from agno.run.workflow import (
     ParallelExecutionCompletedEvent,
     ParallelExecutionStartedEvent,
-    WorkflowRunResponse,
-    WorkflowRunResponseEvent,
+    WorkflowRunOutput,
+    WorkflowRunOutputEvent,
 )
 from agno.utils.log import log_debug, logger
 from agno.workflow.condition import Condition
@@ -191,7 +191,7 @@ class Parallel:
         step_input: StepInput,
         session_id: Optional[str] = None,
         user_id: Optional[str] = None,
-        workflow_run_response: Optional[WorkflowRunResponse] = None,
+        workflow_run_response: Optional[WorkflowRunOutput] = None,
         store_executor_responses: bool = True,
     ) -> StepOutput:
         """Execute all steps in parallel and return aggregated result"""
@@ -282,10 +282,10 @@ class Parallel:
         session_id: Optional[str] = None,
         user_id: Optional[str] = None,
         stream_intermediate_steps: bool = False,
-        workflow_run_response: Optional[WorkflowRunResponse] = None,
+        workflow_run_response: Optional[WorkflowRunOutput] = None,
         step_index: Optional[Union[int, tuple]] = None,
         store_executor_responses: bool = True,
-    ) -> Iterator[Union[WorkflowRunResponseEvent, StepOutput]]:
+    ) -> Iterator[Union[WorkflowRunOutputEvent, StepOutput]]:
         """Execute all steps in parallel with streaming support"""
         log_debug(f"Parallel Start: {self.name} ({len(self.steps)} steps)", center=True, symbol="=")
 
@@ -427,7 +427,7 @@ class Parallel:
         step_input: StepInput,
         session_id: Optional[str] = None,
         user_id: Optional[str] = None,
-        workflow_run_response: Optional[WorkflowRunResponse] = None,
+        workflow_run_response: Optional[WorkflowRunOutput] = None,
         store_executor_responses: bool = True,
     ) -> StepOutput:
         """Execute all steps in parallel using asyncio and return aggregated result"""
@@ -519,10 +519,10 @@ class Parallel:
         session_id: Optional[str] = None,
         user_id: Optional[str] = None,
         stream_intermediate_steps: bool = False,
-        workflow_run_response: Optional[WorkflowRunResponse] = None,
+        workflow_run_response: Optional[WorkflowRunOutput] = None,
         step_index: Optional[Union[int, tuple]] = None,
         store_executor_responses: bool = True,
-    ) -> AsyncIterator[Union[WorkflowRunResponseEvent, TeamRunResponseEvent, RunResponseEvent, StepOutput]]:
+    ) -> AsyncIterator[Union[WorkflowRunOutputEvent, TeamRunOutputEvent, RunOutputEvent, StepOutput]]:
         """Execute all steps in parallel with async streaming support"""
         log_debug(f"Parallel Start: {self.name} ({len(self.steps)} steps)", center=True, symbol="=")
 
