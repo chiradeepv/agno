@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from enum import Enum
 from typing import Any, Dict, List, Optional, Union
 
 from fastapi import WebSocket
@@ -185,7 +186,6 @@ class StepOutput:
     step_id: Optional[str] = None
     executor_type: Optional[str] = None
     executor_name: Optional[str] = None
-
     # Primary output
     content: Optional[Union[str, Dict[str, Any], List[Any], BaseModel, Any]] = None
 
@@ -230,7 +230,7 @@ class StepOutput:
             "images": [img.to_dict() for img in self.images] if self.images else None,
             "videos": [vid.to_dict() for vid in self.videos] if self.videos else None,
             "audio": [aud.to_dict() for aud in self.audio] if self.audio else None,
-            "metrics": self.metrics.to_dict() if hasattr(self.metrics, "to_dict") else self.metrics,
+            "metrics": self.metrics.to_dict() if self.metrics else None,
             "success": self.success,
             "error": self.error,
             "stop": self.stop,
@@ -277,7 +277,7 @@ class StepMetrics:
     executor_type: str  # "agent", "team", etc.
     executor_name: str
 
-    # For regular steps: actual metrics data
+    # For regular steps: our generic metrics data
     metrics: Optional[Metrics] = None
 
     # For parallel steps: nested step metrics
@@ -296,7 +296,7 @@ class StepMetrics:
             result["parallel_steps"] = {name: step.to_dict() for name, step in self.parallel_steps.items()}  # type: ignore[assignment]
         elif self.executor_type != "parallel":
             # For non-parallel steps, include metrics (even if None)
-            result["metrics"] = self.metrics.to_dict() if hasattr(self.metrics, "to_dict") else self.metrics  # type: ignore[assignment]
+            result["metrics"] = self.metrics.to_dict() if self.metrics else None  # type: ignore[assignment]
 
         return result
 
@@ -392,3 +392,12 @@ class WebSocketHandler:
             await self.websocket.send_text(json.dumps(data))
         except Exception as e:
             log_warning(f"Failed to send WebSocket dict: {e}")
+
+
+class StepType(str, Enum):
+    STEP = "Step"
+    STEPS = "Steps"
+    LOOP = "Loop"
+    PARALLEL = "Parallel"
+    CONDITION = "Condition"
+    ROUTER = "Router"

@@ -1,6 +1,6 @@
 import json
 from datetime import datetime, timezone
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 from uuid import uuid4
 
 from pydantic import BaseModel
@@ -48,7 +48,7 @@ class AgentSummaryResponse(BaseModel):
 
     @classmethod
     def from_agent(cls, agent: Agent) -> "AgentSummaryResponse":
-        return cls(agent_id=agent.agent_id, name=agent.name, description=agent.description)
+        return cls(agent_id=agent.id, name=agent.name, description=agent.description)
 
 
 class TeamSummaryResponse(BaseModel):
@@ -86,7 +86,7 @@ class ModelResponse(BaseModel):
 
 
 class AgentResponse(BaseModel):
-    agent_id: Optional[str] = None
+    id: Optional[str] = None
     name: Optional[str] = None
     description: Optional[str] = None
     instructions: Optional[Union[List[str], str]] = None
@@ -133,7 +133,7 @@ class AgentResponse(BaseModel):
         knowledge_table = agent.db.knowledge_table_name if agent.db and agent.knowledge else None
 
         return AgentResponse(
-            agent_id=agent.agent_id,
+            id=agent.id,
             name=agent.name,
             description=agent.description,
             instructions=str(agent.instructions) if agent.instructions else None,
@@ -152,7 +152,7 @@ class AgentResponse(BaseModel):
 
 
 class TeamResponse(BaseModel):
-    team_id: Optional[str] = None
+    id: Optional[str] = None
     name: Optional[str] = None
     description: Optional[str] = None
     mode: Optional[str] = None
@@ -211,10 +211,12 @@ class TeamResponse(BaseModel):
         memory_table = team.db.memory_table_name if team.db and team.enable_user_memories else None
         knowledge_table = team.db.knowledge_table_name if team.db and team.knowledge else None
 
-        team_instructions = team.instructions() if isinstance(team.instructions, Callable) else team.instructions
+        team_instructions = (
+            team.instructions() if team.instructions and callable(team.instructions) else team.instructions
+        )
 
         return TeamResponse(
-            team_id=team.team_id,
+            id=team.id,
             name=team.name,
             model=ModelResponse(
                 name=team.model.name or team.model.__class__.__name__ if team.model else None,
@@ -245,20 +247,31 @@ class TeamResponse(BaseModel):
 
 
 class WorkflowResponse(BaseModel):
-    workflow_id: Optional[str] = None
+    id: Optional[str] = None
     name: Optional[str] = None
     description: Optional[str] = None
     input_schema: Optional[Dict[str, Any]] = None
     steps: Optional[List[Dict[str, Any]]] = None
+    agent: Optional[AgentResponse] = None
+    team: Optional[TeamResponse] = None
 
     @classmethod
     def from_workflow(cls, workflow: Workflow) -> "WorkflowResponse":
         workflow_dict = workflow.to_dict()
+        steps = workflow_dict.get("steps")
+
+        if steps:
+            for step in steps:
+                if step.get("agent"):
+                    step["agent"] = AgentResponse.from_agent(step["agent"])
+                if step.get("team"):
+                    step["team"] = TeamResponse.from_team(step["team"])
+
         return cls(
-            workflow_id=workflow.workflow_id,
+            id=workflow.id,
             name=workflow.name,
             description=workflow.description,
-            steps=workflow_dict.get("steps"),
+            steps=steps,
             input_schema=get_workflow_input_schema_dict(workflow),
         )
 
@@ -272,6 +285,7 @@ class WorkflowRunRequest(BaseModel):
 class SessionSchema(BaseModel):
     session_id: str
     session_name: str
+    session_state: Optional[dict]
     created_at: Optional[datetime]
     updated_at: Optional[datetime]
 
@@ -281,6 +295,7 @@ class SessionSchema(BaseModel):
         return cls(
             session_id=session.get("session_id", ""),
             session_name=session_name,
+            session_state=session.get("session_data", {}).get("session_state", None),
             created_at=datetime.fromtimestamp(session.get("created_at", 0), tz=timezone.utc)
             if session.get("created_at")
             else None,
@@ -301,9 +316,10 @@ class AgentSessionDetailSchema(BaseModel):
     session_id: str
     session_name: str
     session_summary: Optional[dict]
+    session_state: Optional[dict]
     agent_id: Optional[str]
-    agent_data: Optional[dict]
     total_tokens: Optional[int]
+    agent_data: Optional[dict]
     metrics: Optional[dict]
     chat_history: Optional[List[dict]]
     created_at: Optional[datetime]
@@ -318,6 +334,7 @@ class AgentSessionDetailSchema(BaseModel):
             session_id=session.session_id,
             session_name=session_name,
             session_summary=session.summary.to_dict() if session.summary else None,
+            session_state=session.session_data.get("session_state", None) if session.session_data else None,
             agent_id=session.agent_id if session.agent_id else None,
             agent_data=session.agent_data,
             total_tokens=session.session_data.get("session_metrics", {}).get("total_tokens")
@@ -336,9 +353,9 @@ class TeamSessionDetailSchema(BaseModel):
     user_id: Optional[str]
     team_id: Optional[str]
     session_summary: Optional[dict]
+    session_state: Optional[dict]
     metrics: Optional[dict]
     team_data: Optional[dict]
-    total_tokens: Optional[int]
     created_at: Optional[datetime]
     updated_at: Optional[datetime]
 
@@ -354,6 +371,7 @@ class TeamSessionDetailSchema(BaseModel):
             session_summary=session_dict.get("summary") if session_dict.get("summary") else None,
             user_id=session.user_id,
             team_data=session.team_data,
+            session_state=session.session_data.get("session_state", None) if session.session_data else None,
             total_tokens=session.session_data.get("session_metrics", {}).get("total_tokens")
             if session.session_data
             else None,
@@ -372,6 +390,7 @@ class WorkflowSessionDetailSchema(BaseModel):
     session_name: str
 
     session_data: Optional[dict]
+    session_state: Optional[dict]
     workflow_data: Optional[dict]
     metadata: Optional[dict]
 
@@ -390,6 +409,7 @@ class WorkflowSessionDetailSchema(BaseModel):
             workflow_name=session.workflow_name,
             session_name=session_name,
             session_data=session.session_data,
+            session_state=session.session_data.get("session_state", None) if session.session_data else None,
             workflow_data=session.workflow_data,
             metadata=session.metadata,
             created_at=datetime.fromtimestamp(session.created_at, tz=timezone.utc) if session.created_at else None,

@@ -66,10 +66,21 @@ from agno.workflow.types import (
     StepInput,
     StepMetrics,
     StepOutput,
+    StepType,
     WebSocketHandler,
     WorkflowExecutionInput,
     WorkflowMetrics,
 )
+
+# TODO: This is used to infer the Step type in the main to_dict() method. Instead, each step should have a type field
+STEP_TYPE_MAPPING = {
+    Step: StepType.STEP,
+    Steps: StepType.STEPS,
+    Loop: StepType.LOOP,
+    Parallel: StepType.PARALLEL,
+    Condition: StepType.CONDITION,
+    Router: StepType.ROUTER,
+}
 
 WorkflowSteps = Union[
     Callable[
@@ -99,7 +110,7 @@ class Workflow:
 
     # Workflow identification - make name optional with default
     name: Optional[str] = None
-    workflow_id: Optional[str] = None
+    id: Optional[str] = None
     description: Optional[str] = None
 
     # Workflow configuration
@@ -142,7 +153,7 @@ class Workflow:
 
     def __init__(
         self,
-        workflow_id: Optional[str] = None,
+        id: Optional[str] = None,
         name: Optional[str] = None,
         description: Optional[str] = None,
         db: Optional[BaseDb] = None,
@@ -159,7 +170,7 @@ class Workflow:
         input_schema: Optional[Type[BaseModel]] = None,
         store_executor_responses: bool = True,
     ):
-        self.workflow_id = workflow_id
+        self.id = id
         self.name = name
         self.description = description
         self.db = db
@@ -260,9 +271,9 @@ class Workflow:
         return parameters
 
     def initialize_workflow(self):
-        if self.workflow_id is None:
-            self.workflow_id = str(uuid4())
-            log_debug(f"Generated new workflow_id: {self.workflow_id}")
+        if self.id is None:
+            self.id = str(uuid4())
+            log_debug(f"Generated new workflow_id: {self.id}")
 
         if self.session_id is None:
             self.session_id = str(uuid4())
@@ -276,7 +287,6 @@ class Workflow:
         if self.session_id is None:
             return f"Workflow Session - {datetime.now().strftime('%Y-%m-%d %H:%M')}"
 
-        workflow_session = self.get_workflow_session()
         datetime_str = datetime.now().strftime("%Y-%m-%d %H:%M")
         new_session_name = f"Workflow Session-{datetime_str}"
 
@@ -365,7 +375,7 @@ class Workflow:
             step_index=step_index,
         )
 
-    def _set_debug(self) -> None:
+    def _set_debug_mode(self) -> None:
         """Set debug mode and configure logging"""
         if self.debug_mode or getenv("AGNO_DEBUG", "false").lower() == "true":
             use_workflow_logger()
@@ -828,7 +838,7 @@ class Workflow:
 
                 error_event = WorkflowErrorEvent(
                     run_id=self.run_id or "",
-                    workflow_id=self.workflow_id,
+                    workflow_id=self.id,
                     workflow_name=self.name,
                     session_id=self.session_id,
                     error=str(e),
@@ -1203,7 +1213,7 @@ class Workflow:
 
                 error_event = WorkflowErrorEvent(
                     run_id=self.run_id or "",
-                    workflow_id=self.workflow_id,
+                    workflow_id=self.id,
                     workflow_name=self.name,
                     session_id=self.session_id,
                     error=str(e),
@@ -1236,7 +1246,7 @@ class Workflow:
 
         self.workflow_session_state.update(
             {
-                "workflow_id": self.workflow_id,
+                "workflow_id": self.id,
                 "run_id": self.run_id,
                 "session_id": self.session_id,
                 "session_name": self.session_name,
@@ -1268,8 +1278,7 @@ class Workflow:
         if self.session_id is None:
             self.session_id = str(uuid4())
 
-        if self.run_id is None:
-            self.run_id = str(uuid4())
+        self.run_id = str(uuid4())
 
         self.initialize_workflow()
         self.load_session()
@@ -1279,7 +1288,7 @@ class Workflow:
         workflow_run_response = WorkflowRunResponse(
             run_id=self.run_id,
             session_id=self.session_id,
-            workflow_id=self.workflow_id,
+            workflow_id=self.id,
             workflow_name=self.name,
             created_at=int(datetime.now().timestamp()),
             status=RunStatus.pending,
@@ -1348,8 +1357,7 @@ class Workflow:
         if self.session_id is None:
             self.session_id = str(uuid4())
 
-        if self.run_id is None:
-            self.run_id = str(uuid4())
+        self.run_id = str(uuid4())
 
         self.initialize_workflow()
         self.load_session()
@@ -1359,7 +1367,7 @@ class Workflow:
         workflow_run_response = WorkflowRunResponse(
             run_id=self.run_id,
             session_id=self.session_id,
-            workflow_id=self.workflow_id,
+            workflow_id=self.id,
             workflow_name=self.name,
             created_at=int(datetime.now().timestamp()),
             status=RunStatus.pending,
@@ -1480,7 +1488,7 @@ class Workflow:
         if background:
             raise RuntimeError("Background execution is not supported for sync run()")
 
-        self._set_debug()
+        self._set_debug_mode()
 
         log_debug(f"Workflow Run Start: {self.name}", center=True)
 
@@ -1519,7 +1527,7 @@ class Workflow:
         workflow_run_response = WorkflowRunResponse(
             run_id=self.run_id,
             session_id=self.session_id,
-            workflow_id=self.workflow_id,
+            workflow_id=self.id,
             workflow_name=self.name,
             created_at=int(datetime.now().timestamp()),
         )
@@ -1638,7 +1646,7 @@ class Workflow:
                     **kwargs,
                 )
 
-        self._set_debug()
+        self._set_debug_mode()
 
         log_debug(f"Async Workflow Run Start: {self.name}", center=True)
 
@@ -1677,7 +1685,7 @@ class Workflow:
         workflow_run_response = WorkflowRunResponse(
             run_id=self.run_id,
             session_id=self.session_id,
-            workflow_id=self.workflow_id,
+            workflow_id=self.id,
             workflow_name=self.name,
             created_at=int(datetime.now().timestamp()),
         )
@@ -1740,19 +1748,27 @@ class Workflow:
     def get_workflow_session(self) -> WorkflowSession:
         """Get a WorkflowSession object for storage"""
         workflow_data = {}
+
         if self.steps and not callable(self.steps):
-            workflow_data["steps"] = [
-                {
+            steps_dict = []
+            for step in self.steps:  # type: ignore
+                # TODO: The step should have a type field
+                step_type = STEP_TYPE_MAPPING[type(step)]
+                step_dict = {
                     "name": step.name if hasattr(step, "name") else step.__name__,
                     "description": step.description if hasattr(step, "description") else "User-defined callable step",
+                    "type": step_type.value,
                 }
-                for step in self.steps  # type: ignore
-            ]
+                steps_dict.append(step_dict)
+
+            workflow_data["steps"] = steps_dict
+
         elif callable(self.steps):
             workflow_data["steps"] = [
                 {
                     "name": "Custom Function",
                     "description": "User-defined callable workflow",
+                    "type": "Callable",
                 }
             ]
 
@@ -1762,17 +1778,17 @@ class Workflow:
         return WorkflowSession(
             session_id=self.session_id,
             user_id=self.user_id,
-            workflow_id=self.workflow_id,
+            workflow_id=self.id,
             workflow_name=self.name,
             runs=self.workflow_session.runs if self.workflow_session else [],
             workflow_data=workflow_data,
-            session_data={},
+            session_data=self.workflow_session_state,
         )
 
     def load_workflow_session(self, session: WorkflowSession):
         """Load workflow session from storage"""
-        if self.workflow_id is None and session.workflow_id is not None:
-            self.workflow_id = session.workflow_id
+        if self.id is None and session.workflow_id is not None:
+            self.id = session.workflow_id
         if self.user_id is None and session.user_id is not None:
             self.user_id = session.user_id
         if self.session_id is None and session.session_id is not None:
@@ -1824,7 +1840,7 @@ class Workflow:
                 self.workflow_session = WorkflowSession(
                     session_id=self.session_id,
                     user_id=self.user_id,
-                    workflow_id=self.workflow_id,
+                    workflow_id=self.id,
                     workflow_name=self.name,
                 )
                 saved_session = self.write_to_storage()
@@ -3433,12 +3449,17 @@ class Workflow:
 
         return {
             "name": self.name,
-            "workflow_id": self.workflow_id,
+            "workflow_id": self.id,
             "description": self.description,
             "steps": [
+                # TODO: this should be encapsulated in step.to_dict() - for all step classes
                 {
                     "name": s.name if hasattr(s, "name") else s.__name__,
                     "description": s.description if hasattr(s, "description") else "User-defined callable step",
+                    # TODO: The step should have a type field
+                    "type": STEP_TYPE_MAPPING[type(s)].value,  # type: ignore
+                    "agent": s.agent if hasattr(s, "agent") else None,  # type: ignore
+                    "team": s.team if hasattr(s, "team") else None,  # type: ignore
                 }
                 for s in steps_list
             ],
@@ -3494,7 +3515,7 @@ class Workflow:
                     if hasattr(active_executor, "workflow_session_id"):
                         active_executor.workflow_session_id = self.session_id
                     if hasattr(active_executor, "workflow_id"):
-                        active_executor.workflow_id = self.workflow_id
+                        active_executor.workflow_id = self.id
 
                     # Set workflow_session_state on agents and teams
                     self._update_executor_workflow_session_state(active_executor)
@@ -3505,7 +3526,7 @@ class Workflow:
                             if hasattr(member, "workflow_session_id"):
                                 member.workflow_session_id = self.session_id
                             if hasattr(member, "workflow_id"):
-                                member.workflow_id = self.workflow_id
+                                member.workflow_id = self.id
 
                             # Set workflow_session_state on team members
                             self._update_executor_workflow_session_state(member)

@@ -368,21 +368,18 @@ def get_base_router(
             ],
             apps=apps_response,
             agents=[
-                AgentSummaryResponse(agent_id=agent.agent_id, name=agent.name, description=agent.description)
+                AgentSummaryResponse(agent_id=agent.id, name=agent.name, description=agent.description)
                 for agent in os.agents
             ]
             if os.agents
             else [],
             teams=[
-                TeamSummaryResponse(team_id=team.team_id, name=team.name, description=team.description)
-                for team in os.teams
+                TeamSummaryResponse(team_id=team.id, name=team.name, description=team.description) for team in os.teams
             ]
             if os.teams
             else [],
             workflows=[
-                WorkflowSummaryResponse(
-                    workflow_id=workflow.workflow_id, name=workflow.name, description=workflow.description
-                )
+                WorkflowSummaryResponse(workflow_id=workflow.id, name=workflow.name, description=workflow.description)
                 for workflow in os.workflows
             ]
             if os.workflows
@@ -396,7 +393,7 @@ def get_base_router(
     )
     async def get_models():
         """Return the list of all models used by agents and teams in the contextual OS"""
-        all_components = []
+        all_components: List[Union[Agent, Team]] = []
         if os.agents:
             all_components.extend(os.agents)
         if os.teams:
@@ -404,10 +401,11 @@ def get_base_router(
 
         unique_models = {}
         for item in all_components:
-            if item.model.id is not None and item.model.provider is not None:
-                key = (item.model.id, item.model.provider)
+            model = cast(Model, item.model)
+            if model.id is not None and model.provider is not None:
+                key = (model.id, model.provider)
                 if key not in unique_models:
-                    unique_models[key] = Model(id=item.model.id, provider=item.model.provider)
+                    unique_models[key] = Model(id=model.id, provider=model.provider)
 
         return list(unique_models.values())
 
@@ -717,8 +715,8 @@ def get_base_router(
         if agent.db is None:
             raise HTTPException(status_code=404, detail="Agent has no database. Sessions are unavailable.")
 
-        session = agent.rename_session(session_id=session_id, session_name=session_name)
-        if not session:
+        session = agent.set_session_name(session_id=session_id, session_name=session_name)
+        if session is None:
             raise HTTPException(status_code=404, detail=f"Session with id {session_id} not found")
 
         return AgentSessionDetailSchema.from_session(session)  # type: ignore
@@ -973,7 +971,7 @@ def get_base_router(
         if team.db is None:
             raise HTTPException(status_code=404, detail="Team has no database. Sessions are unavailable.")
 
-        session = team.rename_session(session_id=session_id, session_name=session_name)
+        session = team.set_session_name(session_id=session_id, session_name=session_name)
         if not session:
             raise HTTPException(status_code=404, detail=f"Session with id {session_id} not found")
 
@@ -1017,7 +1015,7 @@ def get_base_router(
 
         return [
             WorkflowResponse(
-                workflow_id=str(workflow.workflow_id),
+                id=str(workflow.id),
                 name=workflow.name,
                 description=workflow.description,
                 input_schema=get_workflow_input_schema_dict(workflow),
