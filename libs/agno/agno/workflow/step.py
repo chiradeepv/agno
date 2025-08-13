@@ -809,6 +809,21 @@ class Step:
                         if isinstance(mr, RunResponse):
                             workflow_run_response.step_executor_runs.append(mr)
 
+    def _get_deepest_content_from_step_output(self, step_output: "StepOutput") -> Optional[str]:
+        """
+        Extract the deepest content from a step output, handling nested structures like Steps, Router, Loop, etc.
+
+        For container steps (Steps, Router, Loop, etc.), this will recursively find the content from the
+        last actual step rather than using the generic container message.
+        """
+        # If this step has nested steps (like Steps, Condition, Router, Loop, etc.)
+        if hasattr(step_output, "steps") and step_output.steps and len(step_output.steps) > 0:
+            # Recursively get content from the last nested step
+            return self._get_deepest_content_from_step_output(step_output.steps[-1])
+
+        # For regular steps, return their content
+        return step_output.content
+
     def _prepare_message(
         self,
         message: Optional[Union[str, Dict[str, Any], List[Any], BaseModel]],
@@ -818,8 +833,10 @@ class Step:
 
         if previous_step_outputs and self._executor_type in ["agent", "team"]:
             last_output = list(previous_step_outputs.values())[-1] if previous_step_outputs else None
-            if last_output and last_output.content:
-                return last_output.content
+            if last_output:
+                deepest_content = self._get_deepest_content_from_step_output(last_output)
+                if deepest_content:
+                    return deepest_content
 
         # If no previous step outputs, return the original message unchanged
         return message

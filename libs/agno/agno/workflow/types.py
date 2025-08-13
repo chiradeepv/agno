@@ -102,6 +102,7 @@ class StepInput:
 
         For parallel steps, if you ask for the parallel step name, returns a dict
         with {step_name: content} for each sub-step.
+        For other nested steps (Condition, Router, Loop, Steps), returns the deepest content.
         """
         step_output = self.get_step_output(step_name)
         if not step_output:
@@ -124,8 +125,22 @@ class StepInput:
                         parallel_content[sub_step.step_name] = str(sub_step.content)
             return parallel_content if parallel_content else str(step_output.content)
 
+        # For other nested step types (Condition, Router, Loop, Steps), get the deepest content
+        elif step_output.steps and len(step_output.steps) > 0:
+            # This is a nested step structure - recursively get the deepest content
+            return self._get_deepest_step_content(step_output.steps[-1])
+
         # Regular step, return content directly
         return step_output.content  # type: ignore[return-value]
+
+    def _get_deepest_step_content(self, step_output: "StepOutput") -> Optional[str]:
+        """Helper method to recursively extract deepest content from nested steps"""
+        # If this step has nested steps, go deeper
+        if step_output.steps and len(step_output.steps) > 0:
+            return self._get_deepest_step_content(step_output.steps[-1])
+
+        # Return the content of this step
+        return step_output.content
 
     def get_all_previous_content(self) -> str:
         """Get concatenated content from all previous steps"""
@@ -145,7 +160,11 @@ class StepInput:
             return None
 
         last_output = list(self.previous_step_outputs.values())[-1] if self.previous_step_outputs else None
-        return last_output.content if last_output else None  # type: ignore[return-value]
+        if not last_output:
+            return None
+
+        # Use the helper method to get the deepest content
+        return self._get_deepest_step_content(last_output)
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary"""
