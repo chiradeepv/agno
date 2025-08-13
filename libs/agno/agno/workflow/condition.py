@@ -168,7 +168,7 @@ class Condition:
             log_debug(f"Condition {self.name} not met, skipping {len(self.steps)} steps")
             return StepOutput(
                 step_name=self.name,
-                step_id=str(uuid4()),
+                step_id=conditional_step_id,
                 step_type="Condition",
                 content=f"Condition {self.name} not met - skipped {len(self.steps)} steps",
                 success=True,
