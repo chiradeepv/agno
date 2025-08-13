@@ -179,8 +179,6 @@ class Steps:
                 step_type="Steps",
                 content=f"Steps {self.name} completed with {len(all_results)} results",
                 success=all(result.success for result in all_results) if all_results else True,
-                error=None,
-                stop=False,
                 steps=all_results,
             )
 
@@ -314,8 +312,6 @@ class Steps:
                 step_type="Steps",
                 content=f"Steps {self.name} completed with {len(all_results)} results",
                 success=all(result.success for result in all_results) if all_results else True,
-                error=None,
-                stop=False,
                 steps=all_results,
             )
 
@@ -396,8 +392,6 @@ class Steps:
                 step_type="Steps",
                 content=f"Steps {self.name} completed with {len(all_results)} results",
                 success=all(result.success for result in all_results) if all_results else True,
-                error=None,
-                stop=False,
                 steps=all_results,
             )
 
@@ -530,8 +524,6 @@ class Steps:
                 step_type="Steps",
                 content=f"Steps {self.name} completed with {len(all_results)} results",
                 success=all(result.success for result in all_results) if all_results else True,
-                error=None,
-                stop=False,
                 steps=all_results,
             )
 

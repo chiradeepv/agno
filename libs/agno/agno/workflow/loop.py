@@ -209,8 +209,6 @@ class Loop:
             step_type="Loop",
             content=f"Loop {self.name} completed {iteration} iterations with {len(flattened_results)} total steps",
             success=all(result.success for result in flattened_results) if flattened_results else True,
-            error=None,
-            stop=False,
             steps=flattened_results,
         )
 
@@ -397,8 +395,6 @@ class Loop:
             step_type="Loop",
             content=f"Loop {self.name} completed {iteration} iterations with {len(flattened_results)} total steps",
             success=all(result.success for result in flattened_results) if flattened_results else True,
-            error=None,
-            stop=False,
             steps=flattened_results,
         )
 
@@ -492,8 +488,6 @@ class Loop:
             step_type="Loop",
             content=f"Loop {self.name} completed {iteration} iterations with {len(flattened_results)} total steps",
             success=all(result.success for result in flattened_results) if flattened_results else True,
-            error=None,
-            stop=False,
             steps=flattened_results,
         )
 
@@ -683,7 +677,5 @@ class Loop:
             step_type="Loop",
             content=f"Loop {self.name} completed {iteration} iterations with {len(flattened_results)} total steps",
             success=all(result.success for result in flattened_results) if flattened_results else True,
-            error=None,
-            stop=False,
             steps=flattened_results,
         )

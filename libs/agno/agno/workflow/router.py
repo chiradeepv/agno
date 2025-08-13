@@ -168,9 +168,6 @@ class Router:
                 step_type="Router",
                 content=f"Router {self.name} completed with 0 results (no steps selected)",
                 success=True,
-                error=None,
-                stop=False,
-                steps=[],
             )
 
         all_results: List[StepOutput] = []
@@ -230,8 +227,6 @@ class Router:
             step_type="Router",
             content=f"Router {self.name} completed with {len(all_results)} results",
             success=all(result.success for result in all_results) if all_results else True,
-            error=None,
-            stop=False,
             steps=all_results,
         )
 
@@ -376,8 +371,6 @@ class Router:
             step_type="Router",
             content=f"Router {self.name} completed with {len(all_results)} results",
             success=all(result.success for result in all_results) if all_results else True,
-            error=None,
-            stop=False,
             steps=all_results,
         )
 
@@ -407,9 +400,6 @@ class Router:
                 step_type="Router",
                 content=f"Router {self.name} completed with 0 results (no steps selected)",
                 success=True,
-                error=None,
-                stop=False,
-                steps=[],
             )
 
         # Chain steps sequentially like Loop does
@@ -472,8 +462,6 @@ class Router:
             step_type="Router",
             content=f"Router {self.name} completed with {len(all_results)} results",
             success=all(result.success for result in all_results) if all_results else True,
-            error=None,
-            stop=False,
             steps=all_results,
         )
 

@@ -172,9 +172,6 @@ class Condition:
                 step_type="Condition",
                 content=f"Condition {self.name} not met - skipped {len(self.steps)} steps",
                 success=True,
-                error=None,
-                stop=False,
-                steps=[],
             )
 
         log_debug(f"Condition {self.name} met, executing {len(self.steps)} steps")
@@ -395,8 +392,6 @@ class Condition:
             step_type="Condition",
             content=f"Condition {self.name} completed with {len(all_results)} results",
             success=all(result.success for result in all_results) if all_results else True,
-            error=None,
-            stop=False,
             steps=all_results,
         )
 
@@ -427,9 +422,6 @@ class Condition:
                 step_type="Condition",
                 content=f"Condition {self.name} not met - skipped {len(self.steps)} steps",
                 success=True,
-                error=None,
-                stop=False,
-                steps=[],
             )
 
         log_debug(f"Condition {self.name} met, executing {len(self.steps)} steps")
@@ -652,7 +644,5 @@ class Condition:
             step_type="Condition",
             content=f"Condition {self.name} completed with {len(all_results)} results",
             success=all(result.success for result in all_results) if all_results else True,
-            error=None,
-            stop=False,
             steps=all_results,
         )
