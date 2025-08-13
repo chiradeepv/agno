@@ -1,3 +1,4 @@
+import asyncio
 import json
 import uuid
 from hashlib import md5
@@ -273,6 +274,10 @@ class Weaviate(VectorDb):
         if not documents:
             return
 
+        # Embed document
+        embed_tasks = [document.async_embed(embedder=self.embedder) for document in documents]
+        await asyncio.gather(*embed_tasks, return_exceptions=True)
+
         client = await self.get_async_client()
         try:
             collection = client.collections.get(self.collection)
@@ -280,8 +285,6 @@ class Weaviate(VectorDb):
             # Process documents first
             for document in documents:
                 try:
-                    # Embed document
-                    document.embed(embedder=self.embedder)
                     if document.embedding is None:
                         logger.error(f"Document embedding is None: {document.name}")
                         continue
@@ -342,13 +345,14 @@ class Weaviate(VectorDb):
             return
 
         log_debug(f"Upserting {len(documents)} documents into Weaviate asynchronously.")
+        embed_tasks = [document.async_embed(embedder=self.embedder) for document in documents]
+        await asyncio.gather(*embed_tasks, return_exceptions=True)
 
         client = await self.get_async_client()
         try:
             collection = client.collections.get(self.collection)
 
             for document in documents:
-                document.embed(embedder=self.embedder)
                 if document.embedding is None:
                     logger.error(f"Document embedding is None: {document.name}")
                     continue

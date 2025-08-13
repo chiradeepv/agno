@@ -140,10 +140,7 @@ class AwsBedrockEmbedder(Embedder):
                 region_name=self.aws_region,
             )
 
-        return aio_session.client(
-            "bedrock-runtime",
-            **(self.client_params or {})
-        )
+        return aio_session.client("bedrock-runtime", **(self.client_params or {}))
 
     def _format_request_body(self, text: str) -> str:
         """
@@ -261,6 +258,7 @@ class AwsBedrockEmbedder(Embedder):
             usage = response["usage"]
 
         return embedding, usage
+
     async def async_get_embedding(self, text: str) -> List[float]:
         """
         Async version of get_embedding() using native aioboto3 async client.
@@ -275,7 +273,7 @@ class AwsBedrockEmbedder(Embedder):
                     accept="application/json",
                 )
                 response_body = json.loads(response["body"].read().decode("utf-8"))
-                
+
                 # Extract embeddings using the same logic as get_embedding
                 if "embeddings" in response_body:
                     if isinstance(response_body["embeddings"], list):
@@ -311,7 +309,7 @@ class AwsBedrockEmbedder(Embedder):
                     accept="application/json",
                 )
                 response_body = json.loads(response["body"].read().decode("utf-8"))
-                
+
                 embedding: List[float] = []
                 # Extract embeddings using the same logic as get_embedding_and_usage
                 if "embeddings" in response_body:
@@ -338,4 +336,3 @@ class AwsBedrockEmbedder(Embedder):
         except Exception as e:
             log_error(f"Unexpected error calling Bedrock API: {str(e)}")
             raise ModelProviderError(message=str(e), model_name="AwsBedrockEmbedder", model_id=self.id) from e
-

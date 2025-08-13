@@ -6139,18 +6139,21 @@ class Agent:
         from agno.knowledge.document import Document
 
         if self.knowledge is None:
-            return "Knowledge base not available"
+            return "Knowledge not available"
         document_name = self.name
         if document_name is None:
             document_name = query.replace(" ", "_").replace("?", "").replace("!", "").replace(".", "")
         document_content = json.dumps({"query": query, "result": result})
-        log_info(f"Adding document to knowledge base: {document_name}: {document_content}")
-        self.knowledge.add_document_to_knowledge_base(
-            document=Document(
-                name=document_name,
-                content=document_content,
-            )
-        )
+        log_info(f"Adding document to Knowledge: {document_name}: {document_content}")
+        # self.knowledge.add_document_to_knowledge_base(
+        #     document=Document(
+        #         name=document_name,
+        #         content=document_content,
+        #     )
+        # )
+        from agno.knowledge.reader.text_reader import TextReader
+
+        self.knowledge.add_content(name=document_name, content=document_content, reader=TextReader())
         return "Successfully added to knowledge base"
 
     ###########################################################################

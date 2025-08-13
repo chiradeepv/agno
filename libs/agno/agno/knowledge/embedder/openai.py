@@ -53,12 +53,11 @@ class OpenAIEmbedder(Embedder):
             "organization": self.organization,
             "base_url": self.base_url,
         }
-        params = {k: v for k, v in params.items() if v is not None}
+        filtered_params: Dict[str, Any] = {k: v for k, v in params.items() if v is not None}
         if self.client_params:
-            params.update(self.client_params)
-        self.async_client = AsyncOpenAI(**params)
+            filtered_params.update(self.client_params)
+        self.async_client = AsyncOpenAI(**filtered_params)
         return self.async_client
-        
 
     def response(self, text: str) -> CreateEmbeddingResponse:
         _request_params: Dict[str, Any] = {

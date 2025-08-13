@@ -1,4 +1,5 @@
 import asyncio
+
 from agno.agent import Agent
 from agno.knowledge.knowledge import Knowledge
 from agno.vectordb.chroma import ChromaDb
@@ -9,14 +10,16 @@ knowledge = Knowledge(
     description="Agno 2.0 Knowledge Implementation with ChromaDB",
     vector_db=ChromaDb(
         collection="vectors", path="tmp/chromadb", persistent_client=True
-    )
+    ),
 )
 
-asyncio.run(knowledge.add_content(
-    name="Recipes",
-    url="https://agno-public.s3.amazonaws.com/recipes/ThaiRecipes.pdf",
-    metadata={"doc_type": "recipe_book"},
-))
+asyncio.run(
+    knowledge.add_content(
+        name="Recipes",
+        url="https://agno-public.s3.amazonaws.com/recipes/ThaiRecipes.pdf",
+        metadata={"doc_type": "recipe_book"},
+    )
+)
 
 # Create and use the agent
 agent = Agent(knowledge=knowledge)

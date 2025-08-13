@@ -1,6 +1,5 @@
 import asyncio
 from hashlib import md5
-import re
 from typing import Any, Dict, List, Optional
 
 try:
@@ -16,7 +15,7 @@ except ImportError:
 from agno.knowledge.document import Document
 from agno.knowledge.embedder import Embedder
 from agno.reranker.base import Reranker
-from agno.utils.log import log_debug, log_info, log_error, logger
+from agno.utils.log import log_debug, log_error, log_info, logger
 from agno.vectordb.base import VectorDb
 from agno.vectordb.distance import Distance
 
@@ -178,7 +177,7 @@ class ChromaDb(VectorDb):
             embed_tasks = [document.async_embed(embedder=self.embedder) for document in documents]
             await asyncio.gather(*embed_tasks, return_exceptions=True)
         except Exception as e:
-            log_error(f"Error processing document '{document.name}': {e}")
+            log_error(f"Error processing document: {e}")
 
         for document in documents:
             cleaned_content = document.content.replace("\x00", "\ufffd")
@@ -276,8 +275,9 @@ class ChromaDb(VectorDb):
                 self._collection.upsert(ids=ids, embeddings=docs_embeddings, documents=docs, metadatas=docs_metadata)
                 log_debug(f"Committed {len(docs)} documents")
 
-
-    async def _async_upsert(self, content_hash: str, documents: List[Document], filters: Optional[Dict[str, Any]] = None) -> None:
+    async def _async_upsert(
+        self, content_hash: str, documents: List[Document], filters: Optional[Dict[str, Any]] = None
+    ) -> None:
         """Upsert documents into the collection.
 
         Args:
@@ -642,21 +642,21 @@ class ChromaDb(VectorDb):
         if not self.client:
             logger.error("Client not initialized")
             return False
-        
+
         try:
             collection: Collection = self.client.get_collection(name=self.collection_name)
-            
+
             # Try to query for documents with the given content_hash
             try:
                 result = collection.get(where={"content_hash": {"$eq": content_hash}})
                 # Safely extract ids from result
-                if hasattr(result, 'get') and callable(result.get):
+                if hasattr(result, "get") and callable(result.get):
                     found_ids = result.get("ids", [])
-                elif hasattr(result, '__getitem__') and "ids" in result:
+                elif hasattr(result, "__getitem__") and "ids" in result:
                     found_ids = result["ids"]
                 else:
                     found_ids = []
-                
+
                 # Return True if any documents were found
                 if isinstance(found_ids, (list, tuple)):
                     return len(found_ids) > 0
@@ -665,16 +665,18 @@ class ChromaDb(VectorDb):
                     return found_ids > 0
                 else:
                     return False
-                    
+
             except TypeError as te:
                 if "object of type 'int' has no len()" in str(te):
                     # Known issue with ChromaDB 0.5.0 - internal bug
                     # As a workaround, assume content doesn't exist to allow processing to continue
-                    logger.warning(f"ChromaDB internal error (version 0.5.0 bug): {te}. Assuming content_hash '{content_hash}' does not exist.")
+                    logger.warning(
+                        f"ChromaDB internal error (version 0.5.0 bug): {te}. Assuming content_hash '{content_hash}' does not exist."
+                    )
                     return False
                 else:
                     raise te
-                    
+
         except Exception as e:
             logger.error(f"Error checking if content_hash '{content_hash}' exists: {e}")
             return False

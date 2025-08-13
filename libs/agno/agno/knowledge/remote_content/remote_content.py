@@ -60,8 +60,10 @@ class GCSContent(RemoteContent):
         try:
             from google.cloud import storage
         except ImportError:
-            raise ImportError("The `google-cloud-storage` package is not installed. Please install it via `pip install google-cloud-storage`.")
-        
+            raise ImportError(
+                "The `google-cloud-storage` package is not installed. Please install it via `pip install google-cloud-storage`."
+            )
+
         self.bucket = bucket
         self.bucket_name = bucket_name
         self.blob_name = blob_name
