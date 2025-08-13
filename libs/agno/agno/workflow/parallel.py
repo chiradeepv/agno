@@ -17,7 +17,7 @@ from agno.utils.log import log_debug, logger
 from agno.workflow.condition import Condition
 from agno.workflow.step import Step
 from agno.workflow.steps import Steps
-from agno.workflow.types import StepInput, StepOutput
+from agno.workflow.types import StepInput, StepOutput, StepType
 
 WorkflowSteps = List[
     Union[
@@ -96,7 +96,7 @@ class Parallel:
             return StepOutput(
                 step_name=self.name or "Parallel",
                 step_id=str(uuid4()),
-                step_type="Parallel",
+                step_type=StepType.PARALLEL,
                 content=f"Parallel {self.name or 'execution'} completed with 1 result",
                 executor_name=self.name or "Parallel",
                 images=single_result.images,
@@ -133,7 +133,7 @@ class Parallel:
         return StepOutput(
             step_name=self.name or "Parallel",
             step_id=str(uuid4()),
-            step_type="Parallel",
+            step_type=StepType.PARALLEL,
             executor_type="parallel",
             executor_name=self.name or "Parallel",
             content=aggregated_content,

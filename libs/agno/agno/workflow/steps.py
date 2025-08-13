@@ -11,7 +11,7 @@ from agno.run.workflow import (
     WorkflowRunResponseEvent,
 )
 from agno.utils.log import log_debug, logger
-from agno.workflow.step import Step, StepInput, StepOutput
+from agno.workflow.step import Step, StepInput, StepOutput, StepType
 
 WorkflowSteps = List[
     Union[
@@ -176,7 +176,7 @@ class Steps:
             return StepOutput(
                 step_name=self.name,
                 step_id=steps_id,
-                step_type="Steps",
+                step_type=StepType.STEPS,
                 content=f"Steps {self.name} completed with {len(all_results)} results",
                 success=all(result.success for result in all_results) if all_results else True,
                 steps=all_results,
@@ -309,7 +309,7 @@ class Steps:
             yield StepOutput(
                 step_name=self.name,
                 step_id=steps_id,
-                step_type="Steps",
+                step_type=StepType.STEPS,
                 content=f"Steps {self.name} completed with {len(all_results)} results",
                 success=all(result.success for result in all_results) if all_results else True,
                 steps=all_results,
@@ -389,7 +389,7 @@ class Steps:
             return StepOutput(
                 step_name=self.name,
                 step_id=steps_id,
-                step_type="Steps",
+                step_type=StepType.STEPS,
                 content=f"Steps {self.name} completed with {len(all_results)} results",
                 success=all(result.success for result in all_results) if all_results else True,
                 steps=all_results,
@@ -521,7 +521,7 @@ class Steps:
             yield StepOutput(
                 step_name=self.name,
                 step_id=steps_id,
-                step_type="Steps",
+                step_type=StepType.STEPS,
                 content=f"Steps {self.name} completed with {len(all_results)} results",
                 success=all(result.success for result in all_results) if all_results else True,
                 steps=all_results,

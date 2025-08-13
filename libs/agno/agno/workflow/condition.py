@@ -13,7 +13,7 @@ from agno.run.workflow import (
 )
 from agno.utils.log import log_debug, logger
 from agno.workflow.step import Step
-from agno.workflow.types import StepInput, StepOutput
+from agno.workflow.types import StepInput, StepOutput, StepType
 
 WorkflowSteps = List[
     Union[
@@ -169,7 +169,7 @@ class Condition:
             return StepOutput(
                 step_name=self.name,
                 step_id=conditional_step_id,
-                step_type="Condition",
+                step_type=StepType.CONDITION,
                 content=f"Condition {self.name} not met - skipped {len(self.steps)} steps",
                 success=True,
             )
@@ -234,7 +234,7 @@ class Condition:
         return StepOutput(
             step_name=self.name,
             step_id=conditional_step_id,
-            step_type="Condition",
+            step_type=StepType.CONDITION,
             content=f"Condition {self.name} completed with {len(all_results)} results",
             success=all(result.success for result in all_results) if all_results else True,
             error=None,
@@ -389,7 +389,7 @@ class Condition:
         yield StepOutput(
             step_name=self.name,
             step_id=conditional_step_id,
-            step_type="Condition",
+            step_type=StepType.CONDITION,
             content=f"Condition {self.name} completed with {len(all_results)} results",
             success=all(result.success for result in all_results) if all_results else True,
             steps=all_results,
@@ -419,7 +419,7 @@ class Condition:
             return StepOutput(
                 step_name=self.name,
                 step_id=str(uuid4()),
-                step_type="Condition",
+                step_type=StepType.CONDITION,
                 content=f"Condition {self.name} not met - skipped {len(self.steps)} steps",
                 success=True,
             )
@@ -483,7 +483,7 @@ class Condition:
         return StepOutput(
             step_name=self.name,
             step_id=conditional_step_id,
-            step_type="Condition",
+            step_type=StepType.CONDITION,
             content=f"Condition {self.name} completed with {len(all_results)} results",
             success=all(result.success for result in all_results) if all_results else True,
             error=None,
@@ -641,7 +641,7 @@ class Condition:
         yield StepOutput(
             step_name=self.name,
             step_id=conditional_step_id,
-            step_type="Condition",
+            step_type=StepType.CONDITION,
             content=f"Condition {self.name} completed with {len(all_results)} results",
             success=all(result.success for result in all_results) if all_results else True,
             steps=all_results,
