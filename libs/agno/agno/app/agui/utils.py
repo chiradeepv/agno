@@ -147,7 +147,7 @@ def _create_events_from_chunk(
     Process a single chunk and return events to emit + updated message_started state.
     Returns: (events_to_emit, new_message_started_state)
     """
-    events_to_emit = []
+    events_to_emit: List[BaseEvent] = []
 
     # Extract content if the contextual event is a content event
     if chunk.event == RunEvent.run_response_content:
@@ -226,8 +226,8 @@ def _create_events_from_chunk(
         step_event = StepStartedEvent(type=EventType.STEP_STARTED, step_name="reasoning")
         events_to_emit.append(step_event)
     elif chunk.event == RunEvent.reasoning_completed:
-        step_event = StepFinishedEvent(type=EventType.STEP_FINISHED, step_name="reasoning")
-        events_to_emit.append(step_event)
+        step_finished_event = StepFinishedEvent(type=EventType.STEP_FINISHED, step_name="reasoning")
+        events_to_emit.append(step_finished_event)
 
     return events_to_emit, message_started
 
@@ -241,7 +241,7 @@ def _create_completion_events(
     run_id: str,
 ) -> List[BaseEvent]:
     """Create events for run completion."""
-    events_to_emit = []
+    events_to_emit: List[BaseEvent] = []
 
     # End remaining active tool calls if needed
     for tool_call_id in list(event_buffer.active_tool_call_ids):
@@ -303,7 +303,7 @@ def _emit_event_logic(event: BaseEvent, event_buffer: EventBuffer) -> List[BaseE
     - Events for non-blocking tool calls are buffered until the blocking tool call completes
     - When a blocking tool call ends, buffered events are processed in order
     """
-    events_to_emit = []
+    events_to_emit: List[BaseEvent] = []
     events_to_process = [event]  # Use a queue instead of recursion to prevent infinite loops
     
     while events_to_process:
