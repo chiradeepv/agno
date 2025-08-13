@@ -4,7 +4,7 @@ import pytest
 from ag_ui.core import EventType
 
 from agno.app.agui.utils import EventBuffer, async_stream_agno_response_as_agui_events
-from agno.run.response import RunOutputContentEvent, ToolCallCompletedEvent, ToolCallStartedEvent
+from agno.run.response import RunContentEvent, ToolCallCompletedEvent, ToolCallStartedEvent
 
 
 def test_event_buffer_initial_state():
@@ -159,11 +159,11 @@ async def test_stream_basic():
     from agno.run.response import RunEvent
 
     async def mock_stream():
-        text_response = RunOutputContentEvent()
+        text_response = RunContentEvent()
         text_response.event = RunEvent.run_content
         text_response.content = "Hello world"
         yield text_response
-        completed_response = RunOutputContentEvent()
+        completed_response = RunContentEvent()
         completed_response.event = RunEvent.run_completed
         completed_response.content = ""
         yield completed_response
@@ -187,7 +187,7 @@ async def test_stream_with_tool_call_blocking():
 
     async def mock_stream_with_tool_calls():
         # Start with a text response
-        text_response = RunOutputContentEvent()
+        text_response = RunContentEvent()
         text_response.event = RunEvent.run_content
         text_response.content = "I'll help you"
         yield text_response
@@ -203,7 +203,7 @@ async def test_stream_with_tool_call_blocking():
         tool_start_response.tool = tool_call
         yield tool_start_response
 
-        buffered_text_response = RunOutputContentEvent()
+        buffered_text_response = RunContentEvent()
         buffered_text_response.event = RunEvent.run_content
         buffered_text_response.content = "Searching..."
         yield buffered_text_response
@@ -212,7 +212,7 @@ async def test_stream_with_tool_call_blocking():
         tool_end_response.content = ""
         tool_end_response.tool = tool_call
         yield tool_end_response
-        completed_response = RunOutputContentEvent()
+        completed_response = RunContentEvent()
         completed_response.event = RunEvent.run_completed
         completed_response.content = ""
         yield completed_response

@@ -57,13 +57,13 @@ from agno.utils.events import (
     create_reasoning_completed_event,
     create_reasoning_started_event,
     create_reasoning_step_event,
-    create_run_response_cancelled_event,
-    create_run_response_completed_event,
-    create_run_response_content_event,
-    create_run_response_continued_event,
-    create_run_response_error_event,
-    create_run_response_paused_event,
-    create_run_response_started_event,
+    create_run_output_cancelled_event,
+    create_run_output_completed_event,
+    create_run_output_content_event,
+    create_run_output_continued_event,
+    create_run_output_error_event,
+    create_run_output_paused_event,
+    create_run_output_started_event,
     create_tool_call_completed_event,
     create_tool_call_started_event,
 )
@@ -81,7 +81,7 @@ from agno.utils.prompts import get_json_output_prompt, get_response_model_format
 from agno.utils.response import (
     async_generator_wrapper,
     create_panel,
-    create_paused_run_response_panel,
+    create_paused_run_output_panel,
     escape_markdown_tags,
     format_tool_calls,
     generator_wrapper,
@@ -827,7 +827,7 @@ class Agent:
 
         # Start the Run by yielding a RunStarted event
         if stream_intermediate_steps:
-            yield self._handle_event(create_run_response_started_event(run_response), run_response, workflow_context)
+            yield self._handle_event(create_run_output_started_event(run_response), run_response, workflow_context)
 
         # 1. Reason about the task if reasoning is enabled
         yield from self._handle_reasoning_stream(run_messages=run_messages)
@@ -869,7 +869,7 @@ class Agent:
 
         if stream_intermediate_steps:
             yield self._handle_event(
-                create_run_response_completed_event(from_run_response=run_response), run_response, workflow_context
+                create_run_output_completed_event(from_run_output=run_response), run_response, workflow_context
             )
 
         # Set the run duration
@@ -1101,12 +1101,12 @@ class Agent:
 
                     time.sleep(delay)
             except KeyboardInterrupt:
-                self.run_response = self.create_run_response(
+                self.run_response = self.create_run_output(
                     run_state=RunStatus.cancelled, content="Operation cancelled by user", run_response=run_response
                 )
                 if stream:
                     return generator_wrapper(  # type: ignore
-                        create_run_response_cancelled_event(run_response, "Operation cancelled by user")
+                        create_run_output_cancelled_event(run_response, "Operation cancelled by user")
                     )
                 else:
                     return self.run_response
@@ -1119,12 +1119,12 @@ class Agent:
                 f"Failed after {num_attempts} attempts. Last error using {last_exception.model_name}({last_exception.model_id})"
             )
             if stream:
-                return generator_wrapper(create_run_response_error_event(run_response, error=str(last_exception)))  # type: ignore
+                return generator_wrapper(create_run_output_error_event(run_response, error=str(last_exception)))  # type: ignore
 
             raise last_exception
         else:
             if stream:
-                return generator_wrapper(create_run_response_error_event(run_response, error=str(last_exception)))  # type: ignore
+                return generator_wrapper(create_run_output_error_event(run_response, error=str(last_exception)))  # type: ignore
             raise Exception(f"Failed after {num_attempts} attempts.")
 
     async def _arun(
@@ -1238,7 +1238,7 @@ class Agent:
         log_debug(f"Agent Run Start: {run_response.run_id}", center=True)
         # Start the Run by yielding a RunStarted event
         if stream_intermediate_steps:
-            yield self._handle_event(create_run_response_started_event(run_response), run_response, workflow_context)
+            yield self._handle_event(create_run_output_started_event(run_response), run_response, workflow_context)
 
         # 1. Reason about the task if reasoning is enabled
         async for item in self._ahandle_reasoning_stream(run_messages=run_messages):
@@ -1284,7 +1284,7 @@ class Agent:
 
         if stream_intermediate_steps:
             yield self._handle_event(
-                create_run_response_completed_event(from_run_response=run_response), run_response, workflow_context
+                create_run_output_completed_event(from_run_output=run_response), run_response, workflow_context
             )
 
         # Set the run duration
@@ -1510,12 +1510,12 @@ class Agent:
 
                     time.sleep(delay)
             except KeyboardInterrupt:
-                self.run_response = self.create_run_response(
+                self.run_response = self.create_run_output(
                     run_state=RunStatus.cancelled, content="Operation cancelled by user", run_response=run_response
                 )
                 if stream:
                     return async_generator_wrapper(
-                        create_run_response_cancelled_event(run_response, "Operation cancelled by user")
+                        create_run_output_cancelled_event(run_response, "Operation cancelled by user")
                     )
                 else:
                     return self.run_response
@@ -1529,11 +1529,11 @@ class Agent:
             )
 
             if stream:
-                return async_generator_wrapper(create_run_response_error_event(run_response, error=str(last_exception)))
+                return async_generator_wrapper(create_run_output_error_event(run_response, error=str(last_exception)))
             raise last_exception
         else:
             if stream:
-                return async_generator_wrapper(create_run_response_error_event(run_response, error=str(last_exception)))
+                return async_generator_wrapper(create_run_output_error_event(run_response, error=str(last_exception)))
             raise Exception(f"Failed after {num_attempts} attempts.")
 
     @overload
@@ -1757,10 +1757,10 @@ class Agent:
             except KeyboardInterrupt:
                 if stream:
                     return generator_wrapper(  # type: ignore
-                        create_run_response_cancelled_event(run_response, "Operation cancelled by user")
+                        create_run_output_cancelled_event(run_response, "Operation cancelled by user")
                     )
                 else:
-                    return self.create_run_response(
+                    return self.create_run_output(
                         run_state=RunStatus.cancelled, content="Operation cancelled by user", run_response=run_response
                     )
             finally:
@@ -1773,11 +1773,11 @@ class Agent:
             )
 
             if stream:
-                return generator_wrapper(create_run_response_error_event(run_response, error=str(last_exception)))  # type: ignore
+                return generator_wrapper(create_run_output_error_event(run_response, error=str(last_exception)))  # type: ignore
             raise last_exception
         else:
             if stream:
-                return generator_wrapper(create_run_response_error_event(run_response, error=str(last_exception)))  # type: ignore
+                return generator_wrapper(create_run_output_error_event(run_response, error=str(last_exception)))  # type: ignore
             raise Exception(f"Failed after {num_attempts} attempts.")
 
     def _continue_run(
@@ -1883,7 +1883,7 @@ class Agent:
         """
         # Start the Run by yielding a RunContinued event
         if stream_intermediate_steps:
-            yield self._handle_event(create_run_response_continued_event(run_response), run_response)
+            yield self._handle_event(create_run_output_continued_event(run_response), run_response)
 
         # 1. Handle the updated tools
         yield from self._handle_tool_call_updates_stream(run_response=run_response, run_messages=run_messages)
@@ -1918,7 +1918,7 @@ class Agent:
         self.run_response.status = RunStatus.completed
 
         if stream_intermediate_steps:
-            yield self._handle_event(create_run_response_completed_event(run_response), run_response)
+            yield self._handle_event(create_run_output_completed_event(run_response), run_response)
 
         # Set the run duration
         if run_response.metrics:
@@ -2163,10 +2163,10 @@ class Agent:
             except KeyboardInterrupt:
                 if stream:
                     return async_generator_wrapper(
-                        create_run_response_cancelled_event(run_response, "Operation cancelled by user")
+                        create_run_output_cancelled_event(run_response, "Operation cancelled by user")
                     )
                 else:
-                    return self.create_run_response(
+                    return self.create_run_output(
                         run_state=RunStatus.cancelled, content="Operation cancelled by user", run_response=run_response
                     )
             finally:
@@ -2178,11 +2178,11 @@ class Agent:
                 f"Failed after {num_attempts} attempts. Last error using {last_exception.model_name}({last_exception.model_id})"
             )
             if stream:
-                return async_generator_wrapper(create_run_response_error_event(run_response, error=str(last_exception)))
+                return async_generator_wrapper(create_run_output_error_event(run_response, error=str(last_exception)))
             raise last_exception
         else:
             if stream:
-                return async_generator_wrapper(create_run_response_error_event(run_response, error=str(last_exception)))
+                return async_generator_wrapper(create_run_output_error_event(run_response, error=str(last_exception)))
             raise Exception(f"Failed after {num_attempts} attempts.")
 
     async def _acontinue_run(
@@ -2287,7 +2287,7 @@ class Agent:
         """
         # Start the Run by yielding a RunContinued event
         if stream_intermediate_steps:
-            yield self._handle_event(create_run_response_continued_event(run_response), run_response)
+            yield self._handle_event(create_run_output_continued_event(run_response), run_response)
 
         # 1. Handle the updated tools
         async for event in self._ahandle_tool_call_updates_stream(run_response=run_response, run_messages=run_messages):
@@ -2330,7 +2330,7 @@ class Agent:
         self.run_response.status = RunStatus.completed
 
         if stream_intermediate_steps:
-            yield self._handle_event(create_run_response_completed_event(run_response), run_response)
+            yield self._handle_event(create_run_output_completed_event(run_response), run_response)
 
         # 6. Save session to storage
         self.save_session(user_id=user_id, session_id=session_id)
@@ -2379,8 +2379,8 @@ class Agent:
 
         # We return and await confirmation/completion for the tools that require it
         yield self._handle_event(
-            create_run_response_paused_event(
-                from_run_response=run_response,
+            create_run_output_paused_event(
+                from_run_output=run_response,
                 tools=run_response.tools,
             ),
             run_response,
@@ -2480,7 +2480,7 @@ class Agent:
             if isinstance(call_result, ModelResponse):
                 if call_result.event == ModelResponseEvent.tool_call_started.value:
                     yield self._handle_event(
-                        create_tool_call_started_event(from_run_response=self.run_response, tool=tool),
+                        create_tool_call_started_event(from_run_output=self.run_response, tool=tool),
                         self.run_response,
                     )
 
@@ -2490,7 +2490,7 @@ class Agent:
                     tool.tool_call_error = tool_execution.tool_call_error
                     yield self._handle_event(
                         create_tool_call_completed_event(
-                            from_run_response=self.run_response, tool=tool, content=call_result.content
+                            from_run_output=self.run_response, tool=tool, content=call_result.content
                         ),
                         self.run_response,
                     )
@@ -2528,7 +2528,7 @@ class Agent:
             if isinstance(call_result, ModelResponse):
                 if call_result.event == ModelResponseEvent.tool_call_started.value:
                     yield self._handle_event(
-                        create_tool_call_started_event(from_run_response=self.run_response, tool=tool),
+                        create_tool_call_started_event(from_run_output=self.run_response, tool=tool),
                         self.run_response,
                     )
                 if call_result.event == ModelResponseEvent.tool_call_completed.value and call_result.tool_executions:
@@ -2537,7 +2537,7 @@ class Agent:
                     tool.tool_call_error = tool_execution.tool_call_error
                     yield self._handle_event(
                         create_tool_call_completed_event(
-                            from_run_response=self.run_response, tool=tool, content=call_result.content
+                            from_run_output=self.run_response, tool=tool, content=call_result.content
                         ),
                         self.run_response,
                     )
@@ -2848,7 +2848,7 @@ class Agent:
                 self._add_reasoning_metrics_to_metadata(reasoning_state["reasoning_time_taken"])
                 yield self._handle_event(
                     create_reasoning_completed_event(
-                        from_run_response=run_response,
+                        from_run_output=run_response,
                         content=ReasoningSteps(reasoning_steps=all_reasoning_steps),
                         content_type=ReasoningSteps.__name__,
                     ),
@@ -2922,7 +2922,7 @@ class Agent:
                 self._add_reasoning_metrics_to_metadata(reasoning_state["reasoning_time_taken"])
                 yield self._handle_event(
                     create_reasoning_completed_event(
-                        from_run_response=run_response,
+                        from_run_output=run_response,
                         content=ReasoningSteps(reasoning_steps=all_reasoning_steps),
                         content_type=ReasoningSteps.__name__,
                     ),
@@ -2997,8 +2997,8 @@ class Agent:
                 # Only yield if we have content to show
                 if content_type != "str":
                     yield self._handle_event(
-                        create_run_response_content_event(
-                            from_run_response=run_response,
+                        create_run_output_content_event(
+                            from_run_output=run_response,
                             content=model_response.content,
                             content_type=content_type,
                         ),
@@ -3012,8 +3012,8 @@ class Agent:
                     or model_response_event.citations is not None
                 ):
                     yield self._handle_event(
-                        create_run_response_content_event(
-                            from_run_response=run_response,
+                        create_run_output_content_event(
+                            from_run_output=run_response,
                             content=model_response_event.content,
                             thinking=model_response_event.thinking,
                             redacted_thinking=model_response_event.redacted_thinking,
@@ -3052,8 +3052,8 @@ class Agent:
                     run_response.created_at = model_response_event.created_at
 
                     yield self._handle_event(
-                        create_run_response_content_event(
-                            from_run_response=run_response,
+                        create_run_output_content_event(
+                            from_run_output=run_response,
                             response_audio=run_response.response_audio,
                         ),
                         run_response,
@@ -3064,8 +3064,8 @@ class Agent:
                     self.add_image(model_response_event.image)
 
                     yield self._handle_event(
-                        create_run_response_content_event(
-                            from_run_response=run_response,
+                        create_run_output_content_event(
+                            from_run_output=run_response,
                             image=model_response_event.image,
                         ),
                         run_response,
@@ -3103,7 +3103,7 @@ class Agent:
                     # Yield each tool call started event
                     for tool in tool_executions_list:
                         yield self._handle_event(
-                            create_tool_call_started_event(from_run_response=run_response, tool=tool), run_response
+                            create_tool_call_started_event(from_run_output=run_response, tool=tool), run_response
                         )
 
             # If the model response is a tool_call_completed, update the existing tool call in the run_response
@@ -3148,7 +3148,7 @@ class Agent:
 
                         yield self._handle_event(
                             create_tool_call_completed_event(
-                                from_run_response=run_response, tool=tool_call, content=model_response_event.content
+                                from_run_output=run_response, tool=tool_call, content=model_response_event.content
                             ),
                             run_response,
                         )
@@ -3157,20 +3157,20 @@ class Agent:
                     if reasoning_step is not None:
                         if reasoning_state and not reasoning_state["reasoning_started"]:
                             yield self._handle_event(
-                                create_reasoning_started_event(from_run_response=run_response), run_response
+                                create_reasoning_started_event(from_run_output=run_response), run_response
                             )
                             reasoning_state["reasoning_started"] = True
 
                         yield self._handle_event(
                             create_reasoning_step_event(
-                                from_run_response=run_response,
+                                from_run_output=run_response,
                                 reasoning_step=reasoning_step,
                                 reasoning_content=run_response.reasoning_content or "",
                             ),
                             run_response,
                         )
 
-    def create_run_response(
+    def create_run_output(
         self,
         content: Optional[Any] = None,
         *,
@@ -3311,7 +3311,7 @@ class Agent:
             if futures:
                 if self.stream_intermediate_steps:
                     yield self._handle_event(
-                        create_memory_update_started_event(from_run_response=self.run_response), self.run_response
+                        create_memory_update_started_event(from_run_output=self.run_response), self.run_response
                     )
 
                 # Wait for all operations to complete and handle any errors
@@ -3323,7 +3323,7 @@ class Agent:
 
                 if self.stream_intermediate_steps:
                     yield self._handle_event(
-                        create_memory_update_completed_event(from_run_response=self.run_response), self.run_response
+                        create_memory_update_completed_event(from_run_output=self.run_response), self.run_response
                     )
 
     async def _amake_memories_and_summaries(
@@ -3381,7 +3381,7 @@ class Agent:
         if tasks:
             if self.stream_intermediate_steps:
                 yield self._handle_event(
-                    create_memory_update_started_event(from_run_response=self.run_response), self.run_response
+                    create_memory_update_started_event(from_run_output=self.run_response), self.run_response
                 )
 
             # Execute all tasks concurrently and handle any errors
@@ -3392,7 +3392,7 @@ class Agent:
 
             if self.stream_intermediate_steps:
                 yield self._handle_event(
-                    create_memory_update_completed_event(from_run_response=self.run_response), self.run_response
+                    create_memory_update_completed_event(from_run_output=self.run_response), self.run_response
                 )
 
     def _raise_if_async_tools(self) -> None:
@@ -4977,7 +4977,7 @@ class Agent:
             except Exception as e:
                 log_warning(f"Failed to save output to file: {e}")
 
-    def update_run_response_with_reasoning(
+    def update_run_output_with_reasoning(
         self, reasoning_steps: List[ReasoningStep], reasoning_agent_messages: List[Message]
     ) -> None:
         self.run_response = cast(RunOutput, self.run_response)
@@ -5231,7 +5231,7 @@ class Agent:
         # Yield a reasoning started event
         if self.stream_intermediate_steps:
             yield self._handle_event(
-                create_reasoning_started_event(from_run_response=self.run_response), self.run_response
+                create_reasoning_started_event(from_run_output=self.run_response), self.run_response
             )
 
         use_default_reasoning = False
@@ -5311,14 +5311,14 @@ class Agent:
                     return
                 run_messages.messages.append(reasoning_message)
                 # Add reasoning step to the Agent's run_response
-                self.update_run_response_with_reasoning(
+                self.update_run_output_with_reasoning(
                     reasoning_steps=[ReasoningStep(result=reasoning_message.content)],
                     reasoning_agent_messages=[reasoning_message],
                 )
                 if self.stream_intermediate_steps:
                     yield self._handle_event(
                         create_reasoning_completed_event(
-                            from_run_response=self.run_response,
+                            from_run_output=self.run_response,
                             content=ReasoningSteps(reasoning_steps=[ReasoningStep(result=reasoning_message.content)]),
                             content_type=ReasoningSteps.__name__,
                         ),
@@ -5396,7 +5396,7 @@ class Agent:
 
                             yield self._handle_event(
                                 create_reasoning_step_event(
-                                    from_run_response=self.run_response,
+                                    from_run_output=self.run_response,
                                     reasoning_step=reasoning_step,
                                     reasoning_content=updated_reasoning_content,
                                 ),
@@ -5412,7 +5412,7 @@ class Agent:
                     reasoning_messages = reasoning_agent_response.messages[first_assistant_index:]
 
                     # Add reasoning step to the Agent's run_response
-                    self.update_run_response_with_reasoning(
+                    self.update_run_output_with_reasoning(
                         reasoning_steps=reasoning_steps, reasoning_agent_messages=reasoning_agent_response.messages
                     )
                     # Get the next action
@@ -5438,7 +5438,7 @@ class Agent:
             if self.stream_intermediate_steps:
                 yield self._handle_event(
                     create_reasoning_completed_event(
-                        from_run_response=self.run_response,
+                        from_run_output=self.run_response,
                         content=ReasoningSteps(reasoning_steps=all_reasoning_steps),
                         content_type=ReasoningSteps.__name__,
                     ),
@@ -5450,7 +5450,7 @@ class Agent:
         # Yield a reasoning started event
         if self.stream_intermediate_steps:
             yield self._handle_event(
-                create_reasoning_started_event(from_run_response=self.run_response), self.run_response
+                create_reasoning_started_event(from_run_output=self.run_response), self.run_response
             )
 
         use_default_reasoning = False
@@ -5530,14 +5530,14 @@ class Agent:
                     return
                 run_messages.messages.append(reasoning_message)
                 # Add reasoning step to the Agent's run_response
-                self.update_run_response_with_reasoning(
+                self.update_run_output_with_reasoning(
                     reasoning_steps=[ReasoningStep(result=reasoning_message.content)],
                     reasoning_agent_messages=[reasoning_message],
                 )
                 if self.stream_intermediate_steps:
                     yield self._handle_event(
                         create_reasoning_completed_event(
-                            from_run_response=self.run_response,
+                            from_run_output=self.run_response,
                             content=ReasoningSteps(reasoning_steps=[ReasoningStep(result=reasoning_message.content)]),
                             content_type=ReasoningSteps.__name__,
                         ),
@@ -5614,7 +5614,7 @@ class Agent:
                             # Yield the response with the updated reasoning_content
                             yield self._handle_event(
                                 create_reasoning_step_event(
-                                    from_run_response=self.run_response,
+                                    from_run_output=self.run_response,
                                     reasoning_step=reasoning_step,
                                     reasoning_content=updated_reasoning_content,
                                 ),
@@ -5630,7 +5630,7 @@ class Agent:
                     reasoning_messages = reasoning_agent_response.messages[first_assistant_index:]
 
                     # Add reasoning step to the Agent's run_response
-                    self.update_run_response_with_reasoning(
+                    self.update_run_output_with_reasoning(
                         reasoning_steps=reasoning_steps, reasoning_agent_messages=reasoning_agent_response.messages
                     )
 
@@ -5655,7 +5655,7 @@ class Agent:
             if self.stream_intermediate_steps:
                 yield self._handle_event(
                     create_reasoning_completed_event(
-                        from_run_response=self.run_response,
+                        from_run_output=self.run_response,
                         content=ReasoningSteps(reasoning_steps=all_reasoning_steps),
                         content_type=ReasoningSteps.__name__,
                     ),
@@ -6238,7 +6238,7 @@ class Agent:
                     if isinstance(resp, tuple(get_args(RunOutputEvent))):
                         if resp.is_paused:
                             resp = cast(RunPausedEvent, resp)
-                            response_panel = create_paused_run_response_panel(resp)
+                            response_panel = create_paused_run_output_panel(resp)
                             panels.append(response_panel)
                             live_log.update(Group(*panels))
                             break
@@ -6457,7 +6457,7 @@ class Agent:
                 reasoning_steps = []
 
                 if isinstance(run_response, RunOutput) and run_response.is_paused:
-                    response_panel = create_paused_run_response_panel(run_response)
+                    response_panel = create_paused_run_output_panel(run_response)
                     panels.append(response_panel)
                     live_log.update(Group(*panels))
                     return
@@ -6685,7 +6685,7 @@ class Agent:
                 async for resp in result:
                     if isinstance(resp, tuple(get_args(RunOutputEvent))):
                         if resp.is_paused:
-                            response_panel = create_paused_run_response_panel(resp)
+                            response_panel = create_paused_run_output_panel(resp)
                             panels.append(response_panel)
                             live_log.update(Group(*panels))
                             break
@@ -6904,7 +6904,7 @@ class Agent:
                 response_timer.stop()
 
                 if isinstance(run_response, RunOutput) and run_response.is_paused:
-                    response_panel = create_paused_run_response_panel(run_response)
+                    response_panel = create_paused_run_output_panel(run_response)
                     panels.append(response_panel)
                     live_log.update(Group(*panels))
                     return

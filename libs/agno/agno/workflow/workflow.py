@@ -2582,8 +2582,8 @@ class Workflow:
                         elif isinstance(response, StepOutputEvent):
                             response_str = response.content or ""  # type: ignore
                         else:
-                            from agno.run.response import RunOutputContentEvent
-                            from agno.run.team import RunOutputContentEvent as TeamRunOutputContentEvent
+                            from agno.run.response import RunContentEvent
+                            from agno.run.team import RunContentEvent as TeamRunContentEvent
 
                             current_step_executor_type = None
                             # Handle both integer and tuple step indices for parallel execution
@@ -2601,16 +2601,16 @@ class Workflow:
                                     current_step_executor_type = step.executor_type
 
                             # Check if this is a streaming content event from agent or team
-                            if isinstance(response, (TeamRunOutputContentEvent, WorkflowRunOutputEvent)):  # type: ignore
+                            if isinstance(response, (TeamRunContentEvent, WorkflowRunOutputEvent)):  # type: ignore
                                 # Check if this is a team's final structured output
                                 is_structured_output = (
-                                    isinstance(response, TeamRunOutputContentEvent)
+                                    isinstance(response, TeamRunContentEvent)
                                     and hasattr(response, "content_type")
                                     and response.content_type != "str"
                                     and response.content_type != ""
                                 )
                                 response_str = response.content  # type: ignore
-                            elif isinstance(response, RunOutputContentEvent) and current_step_executor_type != "team":
+                            elif isinstance(response, RunContentEvent) and current_step_executor_type != "team":
                                 response_str = response.content  # type: ignore
                             else:
                                 continue
@@ -3355,8 +3355,8 @@ class Workflow:
                             # Handle StepOutputEvent objects yielded from workflow
                             response_str = response.content or ""  # type: ignore
                         else:
-                            from agno.run.response import RunOutputContentEvent
-                            from agno.run.team import RunOutputContentEvent as TeamRunOutputContentEvent
+                            from agno.run.response import RunContentEvent
+                            from agno.run.team import RunContentEvent as TeamRunContentEvent
 
                             current_step_executor_type = None
                             # Handle both integer and tuple step indices for parallel execution
@@ -3371,19 +3371,19 @@ class Workflow:
                             # Check if this is a streaming content event from agent or team
                             if isinstance(
                                 response,
-                                (RunOutputContentEvent, TeamRunOutputContentEvent, WorkflowRunOutputEvent),  # type: ignore
+                                (RunContentEvent, TeamRunContentEvent, WorkflowRunOutputEvent),  # type: ignore
                             ):  # type: ignore
                                 # Extract the content from the streaming event
                                 response_str = response.content  # type: ignore
 
                                 # Check if this is a team's final structured output
                                 is_structured_output = (
-                                    isinstance(response, TeamRunOutputContentEvent)
+                                    isinstance(response, TeamRunContentEvent)
                                     and hasattr(response, "content_type")
                                     and response.content_type != "str"
                                     and response.content_type != ""
                                 )
-                            elif isinstance(response, RunOutputContentEvent) and current_step_executor_type != "team":
+                            elif isinstance(response, RunContentEvent) and current_step_executor_type != "team":
                                 response_str = response.content  # type: ignore
                             else:
                                 continue

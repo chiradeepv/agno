@@ -389,7 +389,7 @@ class RunOutput:
             data = data.pop("run")
 
         events = data.pop("events", None)
-        events = [run_response_event_from_dict(event) for event in events] if events else None
+        events = [run_output_event_from_dict(event) for event in events] if events else None
 
         messages = data.pop("messages", None)
         messages = [Message.model_validate(message) for message in messages] if messages else None
