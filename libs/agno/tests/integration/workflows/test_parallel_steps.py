@@ -33,7 +33,7 @@ def final_step(step_input: StepInput) -> StepOutput:
 def test_parallel_direct_execute():
     """Test Parallel.execute() directly without workflow."""
     parallel = Parallel(step_a, step_b, name="Direct Parallel")
-    step_input = StepInput(message="direct test")
+    step_input = StepInput(input="direct test")
 
     result = parallel.execute(step_input)
 
@@ -49,7 +49,7 @@ def test_parallel_direct_execute():
 async def test_parallel_direct_aexecute():
     """Test Parallel.aexecute() directly without workflow."""
     parallel = Parallel(step_a, step_b, name="Direct Async Parallel")
-    step_input = StepInput(message="direct async test")
+    step_input = StepInput(input="direct async test")
 
     result = await parallel.aexecute(step_input)
 
@@ -64,7 +64,7 @@ def test_parallel_direct_execute_stream():
     from agno.run.workflow import ParallelExecutionCompletedEvent, ParallelExecutionStartedEvent, WorkflowRunResponse
 
     parallel = Parallel(step_a, step_b, name="Direct Stream Parallel")
-    step_input = StepInput(message="direct stream test")
+    step_input = StepInput(input="direct stream test")
 
     # Mock workflow response for streaming
     mock_response = WorkflowRunResponse(
@@ -94,7 +94,7 @@ def test_parallel_direct_execute_stream():
 def test_parallel_direct_single_step():
     """Test Parallel with single step."""
     parallel = Parallel(step_a, name="Single Step Parallel")
-    step_input = StepInput(message="single test")
+    step_input = StepInput(input="single test")
 
     result = parallel.execute(step_input)
 
@@ -116,7 +116,7 @@ def test_basic_parallel(workflow_storage):
         steps=[Parallel(step_a, step_b, name="Parallel Phase"), final_step],
     )
 
-    response = workflow.run(message="test")
+    response = workflow.run(input="test")
     assert isinstance(response, WorkflowRunResponse)
     assert len(response.step_results) == 2
 
@@ -135,7 +135,7 @@ def test_parallel_streaming(workflow_storage):
         steps=[Parallel(step_a, step_b, name="Parallel Phase"), final_step],
     )
 
-    events = list(workflow.run(message="test", stream=True, stream_intermediate_steps=True))
+    events = list(workflow.run(input="test", stream=True, stream_intermediate_steps=True))
     completed_events = [e for e in events if isinstance(e, WorkflowCompletedEvent)]
     assert len(completed_events) == 1
     assert completed_events[0].content is not None
@@ -151,7 +151,7 @@ def test_parallel_with_agent(workflow_storage, test_agent):
         steps=[Parallel(step_a, agent_step, name="Mixed Parallel"), final_step],
     )
 
-    response = workflow.run(message="test")
+    response = workflow.run(input="test")
     assert isinstance(response, WorkflowRunResponse)
     parallel_output = response.step_results[0]
     assert isinstance(parallel_output, StepOutput)
@@ -167,7 +167,7 @@ async def test_async_parallel(workflow_storage):
         steps=[Parallel(step_a, step_b, name="Parallel Phase"), final_step],
     )
 
-    response = await workflow.arun(message="test")
+    response = await workflow.arun(input="test")
     assert isinstance(response, WorkflowRunResponse)
     assert len(response.step_results) == 2
 
@@ -182,7 +182,7 @@ async def test_async_parallel_streaming(workflow_storage):
     )
 
     events = []
-    async for event in await workflow.arun(message="test", stream=True, stream_intermediate_steps=True):
+    async for event in await workflow.arun(input="test", stream=True, stream_intermediate_steps=True):
         events.append(event)
 
     completed_events = [e for e in events if isinstance(e, WorkflowCompletedEvent)]

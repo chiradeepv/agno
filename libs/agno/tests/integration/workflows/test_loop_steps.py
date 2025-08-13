@@ -40,7 +40,7 @@ def test_loop_direct_execute():
         return len(outputs) >= 2
 
     loop = Loop(name="Direct Loop", steps=[research_step], end_condition=simple_end_condition, max_iterations=3)
-    step_input = StepInput(message="direct test")
+    step_input = StepInput(input="direct test")
 
     result = loop.execute(step_input)
 
@@ -57,7 +57,7 @@ async def test_loop_direct_aexecute():
         return len(outputs) >= 2
 
     loop = Loop(name="Direct Async Loop", steps=[research_step], end_condition=simple_end_condition, max_iterations=3)
-    step_input = StepInput(message="direct async test")
+    step_input = StepInput(input="direct async test")
 
     result = await loop.aexecute(step_input)
 
@@ -74,7 +74,7 @@ def test_loop_direct_execute_stream():
         return len(outputs) >= 1
 
     loop = Loop(name="Direct Stream Loop", steps=[research_step], end_condition=simple_end_condition, max_iterations=2)
-    step_input = StepInput(message="direct stream test")
+    step_input = StepInput(input="direct stream test")
 
     # Mock workflow response for streaming
     mock_response = WorkflowRunResponse(
@@ -109,7 +109,7 @@ def test_loop_direct_max_iterations():
         return False  # Never end
 
     loop = Loop(name="Max Iterations Loop", steps=[research_step], end_condition=never_end_condition, max_iterations=2)
-    step_input = StepInput(message="max iterations test")
+    step_input = StepInput(input="max iterations test")
 
     result = loop.execute(step_input)
 
@@ -120,7 +120,7 @@ def test_loop_direct_max_iterations():
 def test_loop_direct_no_end_condition():
     """Test Loop without end condition (uses max_iterations only)."""
     loop = Loop(name="No End Condition Loop", steps=[research_step], max_iterations=3)
-    step_input = StepInput(message="no condition test")
+    step_input = StepInput(input="no condition test")
 
     result = loop.execute(step_input)
 
@@ -140,7 +140,7 @@ def test_loop_direct_multiple_steps():
         end_condition=simple_end_condition,
         max_iterations=3,
     )
-    step_input = StepInput(message="multi step test")
+    step_input = StepInput(input="multi step test")
 
     result = loop.execute(step_input)
 
@@ -178,7 +178,7 @@ def test_basic_loop(workflow_storage):
         ],
     )
 
-    response = workflow.run(message="test")
+    response = workflow.run(input="test")
     assert isinstance(response, WorkflowRunResponse)
     assert len(response.step_results) == 1
     assert "AI trends" in response.content
@@ -206,7 +206,7 @@ def test_loop_with_parallel(workflow_storage):
         ],
     )
 
-    response = workflow.run(message="test")
+    response = workflow.run(input="test")
     assert isinstance(response, WorkflowRunResponse)
 
     # Check the parallel step output in step_results
@@ -234,7 +234,7 @@ def test_loop_streaming(workflow_storage):
         ],
     )
 
-    events = list(workflow.run(message="test", stream=True, stream_intermediate_steps=True))
+    events = list(workflow.run(input="test", stream=True, stream_intermediate_steps=True))
 
     loop_started = [e for e in events if isinstance(e, LoopExecutionStartedEvent)]
     loop_completed = [e for e in events if isinstance(e, LoopExecutionCompletedEvent)]
@@ -260,7 +260,7 @@ def test_parallel_loop_streaming(workflow_storage):
         ],
     )
 
-    events = list(workflow.run(message="test", stream=True, stream_intermediate_steps=True))
+    events = list(workflow.run(input="test", stream=True, stream_intermediate_steps=True))
     completed_events = [e for e in events if isinstance(e, WorkflowCompletedEvent)]
     assert len(completed_events) == 1
 
@@ -285,7 +285,7 @@ async def test_async_loop(workflow_storage):
         ],
     )
 
-    response = await workflow.arun(message="test")
+    response = await workflow.arun(input="test")
     assert isinstance(response, WorkflowRunResponse)
     assert "AI trends" in response.content
 
@@ -313,6 +313,6 @@ async def test_async_parallel_loop(workflow_storage):
         ],
     )
 
-    response = await workflow.arun(message="test")
+    response = await workflow.arun(input="test")
     assert isinstance(response, WorkflowRunResponse)
     assert "AI trends" in response.content

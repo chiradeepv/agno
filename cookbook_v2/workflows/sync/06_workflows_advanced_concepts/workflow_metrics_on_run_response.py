@@ -64,7 +64,7 @@ if __name__ == "__main__":
         steps=[research_step, content_planning_step],
     )
     workflow_run_response: WorkflowRunResponse = content_creation_workflow.run(
-        message="AI trends in 2024",
+        input="AI trends in 2024",
     )
 
     # Print workflow metrics

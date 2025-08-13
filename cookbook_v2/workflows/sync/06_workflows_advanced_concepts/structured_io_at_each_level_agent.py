@@ -126,5 +126,5 @@ if __name__ == "__main__":
 
     # Test with simple string input
     structured_workflow.print_response(
-        message="Latest developments in artificial intelligence and machine learning"
+        input="Latest developments in artificial intelligence and machine learning"
     )

@@ -71,7 +71,7 @@ content_creation_workflow = Workflow(
 # Create and use workflow
 async def main():
     await content_creation_workflow.aprint_response(
-        message="AI agent frameworks 2025",
+        input="AI agent frameworks 2025",
         markdown=True,
     )
 

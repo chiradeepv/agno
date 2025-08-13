@@ -75,7 +75,7 @@ if __name__ == "__main__":
     )
     asyncio.run(
         content_creation_workflow.aprint_response(
-            message="AI trends in 2024",
+            input="AI trends in 2024",
             stream=True,
             stream_intermediate_steps=True,
         )

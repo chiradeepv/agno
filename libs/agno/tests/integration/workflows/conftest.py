@@ -225,7 +225,7 @@ def router_workflow(tmp_path):
 
     def research_router(step_input: StepInput) -> List[Step]:
         """Route based on topic content"""
-        topic = step_input.message or ""
+        topic = step_input.input or ""
         tech_keywords = ["ai", "machine learning", "programming", "software", "tech", "computer"]
 
         if any(keyword in topic.lower() for keyword in tech_keywords):

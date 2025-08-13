@@ -17,7 +17,7 @@ memory = Memory(model=Gemini(id="gemini-2.0-flash-exp"), db=memory_db)
 john_doe_id = "john_doe@example.com"
 
 memory.create_user_memories(
-    message="""\
+    input="""\
 I enjoy hiking in the mountains on weekends,
 reading science fiction novels before bed,
 cooking new recipes from different cultures,
@@ -37,7 +37,7 @@ pprint(memories)
 jane_doe_id = "jane_doe@example.com"
 # Send a history of messages and add memories
 memory.create_user_memories(
-    messages=[
+    input=[
         Message(role="user", content="My name is Jane Doe"),
         Message(role="assistant", content="That is great!"),
         Message(role="user", content="I like to play chess"),

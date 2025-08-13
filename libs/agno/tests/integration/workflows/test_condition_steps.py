@@ -16,7 +16,7 @@ from agno.workflow.types import StepInput, StepOutput
 # Helper functions
 def research_step(step_input: StepInput) -> StepOutput:
     """Research step that generates content."""
-    return StepOutput(content=f"Research findings: {step_input.message}. Found data showing 40% growth.", success=True)
+    return StepOutput(content=f"Research findings: {step_input.input}. Found data showing 40% growth.", success=True)
 
 
 def analysis_step(step_input: StepInput) -> StepOutput:
@@ -32,15 +32,15 @@ def fact_check_step(step_input: StepInput) -> StepOutput:
 # Condition evaluators
 def has_statistics(step_input: StepInput) -> bool:
     """Check if content contains statistics."""
-    content = step_input.previous_step_content or step_input.message or ""
+    content = step_input.previous_step_content or step_input.input or ""
     # Only check the input message for statistics
-    content = step_input.message or ""
+    content = step_input.input or ""
     return any(x in content.lower() for x in ["percent", "%", "growth", "increase", "decrease"])
 
 
 def is_tech_topic(step_input: StepInput) -> bool:
     """Check if topic is tech-related."""
-    content = step_input.message or step_input.previous_step_content or ""
+    content = step_input.input or step_input.previous_step_content or ""
     return any(x in content.lower() for x in ["ai", "tech", "software", "data"])
 
 
@@ -57,7 +57,7 @@ async def async_evaluator(step_input: StepInput) -> bool:
 def test_condition_direct_execute_true():
     """Test Condition.execute() directly when condition is true."""
     condition = Condition(name="Direct True Condition", evaluator=has_statistics, steps=[fact_check_step])
-    step_input = StepInput(message="Market shows 40% growth")
+    step_input = StepInput(input="Market shows 40% growth")
 
     result = condition.execute(step_input)
 
@@ -69,7 +69,7 @@ def test_condition_direct_execute_true():
 def test_condition_direct_execute_false():
     """Test Condition.execute() directly when condition is false."""
     condition = Condition(name="Direct False Condition", evaluator=has_statistics, steps=[fact_check_step])
-    step_input = StepInput(message="General market overview")
+    step_input = StepInput(input="General market overview")
 
     result = condition.execute(step_input)
 
@@ -80,7 +80,7 @@ def test_condition_direct_execute_false():
 def test_condition_direct_boolean_evaluator():
     """Test Condition with boolean evaluator."""
     condition = Condition(name="Boolean Condition", evaluator=True, steps=[research_step])
-    step_input = StepInput(message="test")
+    step_input = StepInput(input="test")
 
     result = condition.execute(step_input)
 
@@ -93,7 +93,7 @@ def test_condition_direct_boolean_evaluator():
 async def test_condition_direct_aexecute():
     """Test Condition.aexecute() directly."""
     condition = Condition(name="Direct Async Condition", evaluator=async_evaluator, steps=[research_step])
-    step_input = StepInput(message="AI technology")
+    step_input = StepInput(input="AI technology")
 
     result = await condition.aexecute(step_input)
 
@@ -107,7 +107,7 @@ def test_condition_direct_execute_stream():
     from agno.run.workflow import WorkflowRunResponse
 
     condition = Condition(name="Direct Stream Condition", evaluator=is_tech_topic, steps=[research_step])
-    step_input = StepInput(message="AI trends")
+    step_input = StepInput(input="AI trends")
 
     # Mock workflow response for streaming
     mock_response = WorkflowRunResponse(
@@ -136,7 +136,7 @@ def test_condition_direct_execute_stream():
 def test_condition_direct_multiple_steps():
     """Test Condition with multiple steps."""
     condition = Condition(name="Multi Step Condition", evaluator=is_tech_topic, steps=[research_step, analysis_step])
-    step_input = StepInput(message="AI technology")
+    step_input = StepInput(input="AI technology")
 
     result = condition.execute(step_input)
 
@@ -159,7 +159,7 @@ def test_basic_condition_true(workflow_storage):
         steps=[research_step, Condition(name="stats_check", evaluator=has_statistics, steps=[fact_check_step])],
     )
 
-    response = workflow.run(message="Market shows 40% growth")
+    response = workflow.run(input="Market shows 40% growth")
     assert isinstance(response, WorkflowRunResponse)
     assert len(response.step_results) == 2
     # Condition output is a list
@@ -178,7 +178,7 @@ def test_basic_condition_false(workflow_storage):
     )
 
     # Using a message without statistics
-    response = workflow.run(message="General market overview")
+    response = workflow.run(input="General market overview")
     assert isinstance(response, WorkflowRunResponse)
 
     # Should have 2 step responses: research_step + empty condition result
@@ -201,7 +201,7 @@ def test_parallel_with_conditions(workflow_storage):
         ],
     )
 
-    response = workflow.run(message="AI market shows 40% growth")
+    response = workflow.run(input="AI market shows 40% growth")
     assert isinstance(response, WorkflowRunResponse)
     assert len(response.step_results) == 2  # research_step + parallel
 
@@ -220,7 +220,7 @@ def test_condition_streaming(workflow_storage):
         steps=[Condition(name="tech_check", evaluator=is_tech_topic, steps=[research_step, analysis_step])],
     )
 
-    events = list(workflow.run(message="AI trends", stream=True, stream_intermediate_steps=True))
+    events = list(workflow.run(input="AI trends", stream=True, stream_intermediate_steps=True))
 
     # Verify event types
     condition_started = [e for e in events if isinstance(e, ConditionExecutionStartedEvent)]
@@ -245,7 +245,7 @@ def test_condition_error_handling(workflow_storage):
         steps=[Condition(name="failing_check", evaluator=failing_evaluator, steps=[research_step])],
     )
 
-    response = workflow.run(message="test")
+    response = workflow.run(input="test")
     assert isinstance(response, WorkflowRunResponse)
     assert response.status == RunStatus.error
     assert "Evaluator failed" in response.content
@@ -265,7 +265,7 @@ def test_nested_conditions(workflow_storage):
         ],
     )
 
-    response = workflow.run(message="AI market shows 40% growth")
+    response = workflow.run(input="AI market shows 40% growth")
     assert isinstance(response, WorkflowRunResponse)
     assert len(response.step_results) == 1
     outer_condition = response.step_results[0]
@@ -283,7 +283,7 @@ async def test_async_condition(workflow_storage):
         steps=[Condition(name="async_check", evaluator=async_evaluator, steps=[research_step])],
     )
 
-    response = await workflow.arun(message="AI technology")
+    response = await workflow.arun(input="AI technology")
     assert isinstance(response, WorkflowRunResponse)
     assert len(response.step_results) == 1
     assert isinstance(response.step_results[0], list)
@@ -300,7 +300,7 @@ async def test_async_condition_streaming(workflow_storage):
     )
 
     events = []
-    async for event in await workflow.arun(message="AI technology", stream=True, stream_intermediate_steps=True):
+    async for event in await workflow.arun(input="AI technology", stream=True, stream_intermediate_steps=True):
         events.append(event)
 
     condition_started = [e for e in events if isinstance(e, ConditionExecutionStartedEvent)]

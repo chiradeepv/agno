@@ -114,7 +114,7 @@ workflow = Workflow(
 
 if __name__ == "__main__":
     workflow.print_response(
-        message="Research the latest trends in AI and machine learning, then create a summary",
+        input="Research the latest trends in AI and machine learning, then create a summary",
         stream=True,
         stream_intermediate_steps=True,
     )

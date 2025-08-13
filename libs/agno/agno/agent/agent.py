@@ -237,11 +237,11 @@ class Agent:
     # If True, add the session state variables in the user and system messages
     add_state_in_messages: bool = False
 
-    # --- Extra Messages ---
+    # --- Extra Input Messages ---
     # A list of extra messages added after the system message and before the user message.
     # Use these for few-shot learning or to provide additional context to the Model.
     # Note: these are not retained in memory, they are added directly to the messages sent to the model.
-    additional_messages: Optional[List[Union[Dict, Message]]] = None
+    additional_input_messages: Optional[List[Union[str, Dict, BaseModel, Message]]] = None
     # --- User message settings ---
     # Provide the user message as a string, list, dict, or function
     # Note: this will ignore the message sent to the run function
@@ -382,7 +382,7 @@ class Agent:
         add_location_to_context: bool = False,
         timezone_identifier: Optional[str] = None,
         add_state_in_messages: bool = False,
-        additional_messages: Optional[List[Union[Dict, Message]]] = None,
+        additional_input_messages: Optional[List[Union[str, Dict, BaseModel, Message]]] = None,
         user_message: Optional[Union[List, Dict, str, Callable, Message]] = None,
         user_message_role: str = "user",
         build_user_context: bool = True,
@@ -475,7 +475,7 @@ class Agent:
         self.add_location_to_context = add_location_to_context
         self.timezone_identifier = timezone_identifier
         self.add_state_in_messages = add_state_in_messages
-        self.additional_messages = additional_messages
+        self.additional_input_messages = additional_input_messages
 
         self.user_message = user_message
         self.user_message_role = user_message_role
@@ -890,7 +890,7 @@ class Agent:
     @overload
     def run(
         self,
-        message: Optional[Union[str, List, Dict, Message, BaseModel]] = None,
+        input: Optional[Union[str, List, Dict, Message, BaseModel, List[Message]]] = None,
         *,
         stream: Literal[False] = False,
         stream_intermediate_steps: Optional[bool] = None,
@@ -901,7 +901,6 @@ class Agent:
         images: Optional[Sequence[Image]] = None,
         videos: Optional[Sequence[Video]] = None,
         files: Optional[Sequence[File]] = None,
-        messages: Optional[Sequence[Union[Dict, Message]]] = None,
         retries: Optional[int] = None,
         knowledge_filters: Optional[Dict[str, Any]] = None,
         debug_mode: Optional[bool] = None,
@@ -912,7 +911,7 @@ class Agent:
     @overload
     def run(
         self,
-        message: Optional[Union[str, List, Dict, Message, BaseModel]] = None,
+        input: Optional[Union[str, List, Dict, Message, BaseModel, List[Message]]] = None,
         *,
         stream: Literal[True] = True,
         stream_intermediate_steps: Optional[bool] = None,
@@ -923,7 +922,6 @@ class Agent:
         images: Optional[Sequence[Image]] = None,
         videos: Optional[Sequence[Video]] = None,
         files: Optional[Sequence[File]] = None,
-        messages: Optional[Sequence[Union[Dict, Message]]] = None,
         retries: Optional[int] = None,
         knowledge_filters: Optional[Dict[str, Any]] = None,
         debug_mode: Optional[bool] = None,
@@ -933,7 +931,7 @@ class Agent:
 
     def run(
         self,
-        message: Optional[Union[str, List, Dict, Message, BaseModel]] = None,
+        input: Optional[Union[str, List, Dict, Message, BaseModel, List[Message]]] = None,
         *,
         stream: Optional[bool] = None,
         stream_intermediate_steps: Optional[bool] = None,
@@ -944,7 +942,6 @@ class Agent:
         images: Optional[Sequence[Image]] = None,
         videos: Optional[Sequence[Video]] = None,
         files: Optional[Sequence[File]] = None,
-        messages: Optional[Sequence[Union[Dict, Message]]] = None,
         retries: Optional[int] = None,
         knowledge_filters: Optional[Dict[str, Any]] = None,
         debug_mode: Optional[bool] = None,
@@ -1030,6 +1027,27 @@ class Agent:
         self.run_id = run_id
 
         # If no retries are set, use the agent's default retries
+
+        # Parse input into separate variables for processing
+        single_message = None
+        message_list = None
+
+        if input is not None:
+            # Parse the input for processing
+            if isinstance(input, list):
+                # Check if it's a list of Message objects or regular list content
+                if len(input) > 0 and isinstance(input[0], Message):
+                    # List of Message objects - treat as message list
+                    message_list = input
+                elif len(input) > 0 and isinstance(input[0], dict) and "role" in input[0]:
+                    # List of message dicts - convert to Message objects
+                    message_list = [Message.model_validate(m) if isinstance(m, dict) else m for m in input]
+                else:
+                    # Regular list content - treat as single message
+                    single_message = input
+            elif isinstance(input, (Message, dict, str, BaseModel)):
+                # Single content - treat as single message
+                single_message = input
         retries = retries if retries is not None else self.retries
 
         last_exception = None
@@ -1038,10 +1056,12 @@ class Agent:
         for attempt in range(num_attempts):
             try:
                 # Set run_input
-                if messages is not None:
-                    self.run_input = [m.to_dict() if isinstance(m, Message) else m for m in messages]
-                if message is not None:
-                    formatted_message = message.to_dict() if isinstance(message, Message) else message
+                if message_list is not None:
+                    self.run_input = [m.to_dict() if isinstance(m, Message) else m for m in message_list]
+                if single_message is not None:
+                    formatted_message = (
+                        single_message.to_dict() if isinstance(single_message, Message) else single_message
+                    )
                     if self.run_input is not None:
                         self.run_input.append(formatted_message)
                     else:
@@ -1049,14 +1069,13 @@ class Agent:
 
                 # Prepare run messages
                 run_messages: RunMessages = self.get_run_messages(
-                    message=message,
+                    input=input,
                     session_id=session_id,
                     user_id=user_id,
                     audio=audio,
                     images=images,
                     videos=videos,
                     files=files,
-                    messages=messages,
                     knowledge_filters=effective_filters,
                     **kwargs,
                 )
@@ -1305,7 +1324,7 @@ class Agent:
     @overload
     async def arun(
         self,
-        message: Optional[Union[str, List, Dict, Message, BaseModel]] = None,
+        input: Optional[Union[str, List, Dict, Message, BaseModel, List[Message]]] = None,
         *,
         stream: Literal[False] = False,
         user_id: Optional[str] = None,
@@ -1314,7 +1333,6 @@ class Agent:
         images: Optional[Sequence[Image]] = None,
         videos: Optional[Sequence[Video]] = None,
         files: Optional[Sequence[File]] = None,
-        messages: Optional[Sequence[Union[Dict, Message]]] = None,
         stream_intermediate_steps: Optional[bool] = None,
         retries: Optional[int] = None,
         knowledge_filters: Optional[Dict[str, Any]] = None,
@@ -1325,7 +1343,7 @@ class Agent:
     @overload
     def arun(
         self,
-        message: Optional[Union[str, List, Dict, Message, BaseModel]] = None,
+        input: Optional[Union[str, List, Dict, Message, BaseModel, List[Message]]] = None,
         *,
         stream: Literal[True] = True,
         user_id: Optional[str] = None,
@@ -1334,7 +1352,6 @@ class Agent:
         images: Optional[Sequence[Image]] = None,
         videos: Optional[Sequence[Video]] = None,
         files: Optional[Sequence[File]] = None,
-        messages: Optional[Sequence[Union[Dict, Message]]] = None,
         stream_intermediate_steps: Optional[bool] = None,
         retries: Optional[int] = None,
         knowledge_filters: Optional[Dict[str, Any]] = None,
@@ -1344,7 +1361,7 @@ class Agent:
 
     def arun(
         self,
-        message: Optional[Union[str, List, Dict, Message, BaseModel]] = None,
+        input: Optional[Union[str, List, Dict, Message, BaseModel, List[Message]]] = None,
         *,
         stream: Optional[bool] = None,
         user_id: Optional[str] = None,
@@ -1354,7 +1371,6 @@ class Agent:
         images: Optional[Sequence[Image]] = None,
         videos: Optional[Sequence[Video]] = None,
         files: Optional[Sequence[File]] = None,
-        messages: Optional[Sequence[Union[Dict, Message]]] = None,
         stream_intermediate_steps: Optional[bool] = None,
         retries: Optional[int] = None,
         knowledge_filters: Optional[Dict[str, Any]] = None,
@@ -1448,10 +1464,12 @@ class Agent:
         for attempt in range(num_attempts):
             try:
                 # Set run_input
-                if messages is not None:
-                    self.run_input = [m.to_dict() if isinstance(m, Message) else m for m in messages]
-                if message is not None:
-                    formatted_message = message.to_dict() if isinstance(message, Message) else message
+                if message_list is not None:
+                    self.run_input = [m.to_dict() if isinstance(m, Message) else m for m in message_list]
+                if single_message is not None:
+                    formatted_message = (
+                        single_message.to_dict() if isinstance(single_message, Message) else single_message
+                    )
                     if self.run_input is not None:
                         self.run_input.append(formatted_message)
                     else:
@@ -1459,14 +1477,13 @@ class Agent:
 
                 # Prepare run messages
                 run_messages: RunMessages = self.get_run_messages(
-                    message=message,
+                    input=input,
                     session_id=session_id,
                     user_id=user_id,
                     audio=audio,
                     images=images,
                     videos=videos,
                     files=files,
-                    messages=messages,
                     knowledge_filters=effective_filters,
                     **kwargs,
                 )
@@ -1706,7 +1723,7 @@ class Agent:
 
             # Prepare run messages
             self.run_messages = self.get_continue_run_messages(
-                messages=messages,
+                messages=message_list,
             )
 
             # Set run_input
@@ -2111,8 +2128,8 @@ class Agent:
                 self.run_input = user_message.to_dict()
             else:
                 self.run_input = user_message
-        elif messages is not None:
-            self.run_input = [m.to_dict() if isinstance(m, Message) else m for m in messages]
+        elif message_list is not None:
+            self.run_input = [m.to_dict() if isinstance(m, Message) else m for m in message_list]
 
         last_exception = None
         num_attempts = retries + 1
@@ -2123,7 +2140,7 @@ class Agent:
 
             # Prepare run messages
             run_messages: RunMessages = self.get_continue_run_messages(
-                messages=messages,
+                messages=message_list,
             )
 
             # Reset the run paused state
@@ -2777,7 +2794,6 @@ class Agent:
         run_messages: RunMessages,
         session_id: str,
         user_id: Optional[str] = None,
-        messages: Optional[Sequence[Union[Dict, Message]]] = None,
     ) -> Iterator[RunResponseEvent]:
         self.run_response = cast(RunResponse, self.run_response)
 
@@ -2788,7 +2804,6 @@ class Agent:
         run_messages: RunMessages,
         session_id: str,
         user_id: Optional[str] = None,
-        messages: Optional[Sequence[Union[Dict, Message]]] = None,
     ) -> AsyncIterator[RunResponseEvent]:
         self.run_response = cast(RunResponse, self.run_response)
 
@@ -3231,7 +3246,7 @@ class Agent:
             rr.content_type = content_type
         if created_at is not None:
             rr.created_at = created_at
-        if messages is not None:
+        if message_list is not None:
             rr.messages = messages
         if metadata is not None:
             rr.metadata = metadata
@@ -4270,7 +4285,7 @@ class Agent:
     def get_user_message(
         self,
         *,
-        message: Optional[Union[str, List, Dict, Message, BaseModel]] = None,
+        input: Optional[Union[str, List, Dict, Message, BaseModel, List[Message]]] = None,
         audio: Optional[Sequence[Audio]] = None,
         images: Optional[Sequence[Image]] = None,
         videos: Optional[Sequence[Video]] = None,
@@ -4287,12 +4302,12 @@ class Agent:
         # Get references from the knowledge base to use in the user message
         references = None
         self.run_response = cast(RunResponse, self.run_response)
-        if self.add_knowledge_to_context and message:
+        if self.add_knowledge_to_context and input:
             message_str: str
-            if isinstance(message, str):
-                message_str = message
-            elif callable(message):
-                message_str = message(agent=self)
+            if isinstance(input, str):
+                message_str = input
+            elif callable(input):
+                message_str = input(agent=self)
             else:
                 raise Exception("message must be a string or a callable when add_knowledge_to_context is True")
 
@@ -4324,7 +4339,7 @@ class Agent:
 
             user_message_content = self.user_message
             if callable(self.user_message):
-                user_message_kwargs = {"agent": self, "message": message, "references": references}
+                user_message_kwargs = {"agent": self, "message": input, "references": references}
                 user_message_content = self.user_message(**user_message_kwargs)
                 if not isinstance(user_message_content, str):
                     raise Exception("user_message must return a string")
@@ -4343,10 +4358,10 @@ class Agent:
             )
 
         # 2. If build_user_context is False or message is a list, return the message as is.
-        if not self.build_user_context or isinstance(message, list):
+        if not self.build_user_context or isinstance(input, list):
             return Message(
                 role=self.user_message_role,
-                content=message,
+                content=input,
                 images=images,
                 audio=audio,
                 videos=videos,
@@ -4355,12 +4370,12 @@ class Agent:
             )
 
         # Handle list messages by converting to string
-        if isinstance(message, list):
+        if isinstance(input, list):
             # Convert list to string (join with newlines if all elements are strings)
-            if all(isinstance(item, str) for item in message):
-                message_content = "\n".join(message)
+            if all(isinstance(item, str) for item in input):
+                message_content = "\n".join(input)
             else:
-                message_content = str(message)
+                message_content = str(input)
 
             return Message(
                 role=self.user_message_role,
@@ -4373,7 +4388,7 @@ class Agent:
             )
 
         # 3. Build the default user message for the Agent
-        if message is None:
+        if input is None:
             # If we have any media, return a message with empty content
             if images is not None or audio is not None or videos is not None or files is not None:
                 return Message(
@@ -4389,7 +4404,7 @@ class Agent:
                 # If the message is None, return None
                 return None
 
-        user_msg_content = message
+        user_msg_content = input
         # Format the message with the session state variables
         if self.add_state_in_messages:
             user_msg_content = self.format_message_with_state_variables(message)
@@ -4431,14 +4446,13 @@ class Agent:
     def get_run_messages(
         self,
         *,
-        message: Optional[Union[str, List, Dict, Message, BaseModel]] = None,
+        input: Optional[Union[str, List, Dict, Message, BaseModel, List[Message]]] = None,
         session_id: str,
         user_id: Optional[str] = None,
         audio: Optional[Sequence[Audio]] = None,
         images: Optional[Sequence[Image]] = None,
         videos: Optional[Sequence[Video]] = None,
         files: Optional[Sequence[File]] = None,
-        messages: Optional[Sequence[Union[Dict, Message]]] = None,
         knowledge_filters: Optional[Dict[str, Any]] = None,
         **kwargs: Any,
     ) -> RunMessages:
@@ -4462,7 +4476,7 @@ class Agent:
 
         Typical usage:
         run_messages = self.get_run_messages(
-            message=message, session_id=session_id, user_id=user_id, audio=audio, images=images, videos=videos, files=files, messages=messages, **kwargs
+            input=input, session_id=session_id, user_id=user_id, audio=audio, images=images, videos=videos, files=files, **kwargs
         )
         """
 
@@ -4477,12 +4491,12 @@ class Agent:
             run_messages.messages.append(system_message)
 
         # 2. Add extra messages to run_messages if provided
-        if self.additional_messages is not None:
+        if self.additional_input_messages is not None:
             messages_to_add_to_run_response: List[Message] = []
             if run_messages.extra_messages is None:
                 run_messages.extra_messages = []
 
-            for _m in self.additional_messages:
+            for _m in self.additional_input_messages:
                 if isinstance(_m, Message):
                     messages_to_add_to_run_response.append(_m)
                     run_messages.messages.append(_m)
@@ -4500,13 +4514,13 @@ class Agent:
                 log_debug(f"Adding {len(messages_to_add_to_run_response)} extra messages")
                 if self.run_response.metadata is None:
                     self.run_response.metadata = RunResponseMetaData(
-                        additional_messages=messages_to_add_to_run_response
+                        additional_input_messages=messages_to_add_to_run_response
                     )
                 else:
-                    if self.run_response.metadata.additional_messages is None:
-                        self.run_response.metadata.additional_messages = messages_to_add_to_run_response
+                    if self.run_response.metadata.additional_input_messages is None:
+                        self.run_response.metadata.additional_input_messages = messages_to_add_to_run_response
                     else:
-                        self.run_response.metadata.additional_messages.extend(messages_to_add_to_run_response)
+                        self.run_response.metadata.additional_input_messages.extend(messages_to_add_to_run_response)
 
         # 3. Add history to run_messages
         if self.add_history_to_context and self.agent_session is not None:
@@ -4534,10 +4548,37 @@ class Agent:
 
         # 4.Add user message to run_messages
         user_message: Optional[Message] = None
-        # 4.1 Build user message if message is None, str or list
-        if message is None or isinstance(message, str) or isinstance(message, list) and messages is None:
+
+        # Handle different input types and parse messages
+        single_message = None
+        message_list = None
+
+        if input is not None:
+            # Parse the input for processing
+            if isinstance(input, list):
+                # Check if it's a list of Message objects or regular list content
+                if len(input) > 0 and isinstance(input[0], Message):
+                    # List of Message objects - treat as message list
+                    message_list = input
+                elif len(input) > 0 and isinstance(input[0], dict) and "role" in input[0]:
+                    # List of message dicts - convert to Message objects
+                    message_list = [Message.model_validate(m) if isinstance(m, dict) else m for m in input]
+                else:
+                    # Regular list content - treat as single message
+                    single_message = input
+            elif isinstance(input, (Message, dict, str, BaseModel)):
+                # Single content - treat as single message
+                single_message = input
+
+        # 4.1 Build user message if single_message is None, str or list
+        if (
+            single_message is None
+            or isinstance(single_message, str)
+            or isinstance(single_message, list)
+            and message_list is None
+        ):
             user_message = self.get_user_message(
-                message=message,
+                input=single_message,
                 audio=audio,
                 images=images,
                 videos=videos,
@@ -4545,20 +4586,20 @@ class Agent:
                 knowledge_filters=knowledge_filters,
                 **kwargs,
             )
-        # 4.2 If message is provided as a Message, use it directly
-        elif isinstance(message, Message):
-            user_message = message
-        # 4.3 If message is provided as a dict, try to validate it as a Message
-        elif isinstance(message, dict):
+        # 4.2 If single_message is provided as a Message, use it directly
+        elif isinstance(single_message, Message):
+            user_message = single_message
+        # 4.3 If single_message is provided as a dict, try to validate it as a Message
+        elif isinstance(single_message, dict):
             try:
-                user_message = Message.model_validate(message)
+                user_message = Message.model_validate(single_message)
             except Exception as e:
                 log_warning(f"Failed to validate message: {e}")
-        # 4.4 If message is provided as a BaseModel, convert it to a Message
-        elif isinstance(message, BaseModel):
+        # 4.4 If single_message is provided as a BaseModel, convert it to a Message
+        elif isinstance(single_message, BaseModel):
             try:
                 # Create a user message with the BaseModel content
-                content = message.model_dump_json(indent=2, exclude_none=True)
+                content = single_message.model_dump_json(indent=2, exclude_none=True)
                 user_message = Message(role=self.user_message_role, content=content)
             except Exception as e:
                 log_warning(f"Failed to convert BaseModel to message: {e}")
@@ -4567,9 +4608,9 @@ class Agent:
             run_messages.user_message = user_message
             run_messages.messages.append(user_message)
 
-        # 5. Add messages to run_messages if provided
-        if messages is not None and len(messages) > 0:
-            for _m in messages:
+        # 5. Add message list to run_messages if provided
+        if message_list is not None and len(message_list) > 0:
+            for _m in message_list:
                 if isinstance(_m, Message):
                     run_messages.messages.append(_m)
                     if run_messages.extra_messages is None:
@@ -4952,8 +4993,8 @@ class Agent:
     ) -> None:
         if self.save_response_to_file is not None and self.run_response is not None:
             message_str = None
-            if message is not None:
-                if isinstance(message, str):
+            if single_message is not None:
+                if isinstance(input, str):
                     message_str = message
                 else:
                     log_warning("Did not use message in output file name: message is not a string")
@@ -6161,7 +6202,6 @@ class Agent:
         session_id: Optional[str] = None,
         session_state: Optional[Dict[str, Any]] = None,
         user_id: Optional[str] = None,
-        messages: Optional[List[Union[Dict, Message]]] = None,
         audio: Optional[Sequence[Audio]] = None,
         images: Optional[Sequence[Image]] = None,
         videos: Optional[Sequence[Video]] = None,
@@ -6226,8 +6266,7 @@ class Agent:
                     live_log.update(Group(*panels))
 
                 for resp in self.run(
-                    message=message,
-                    messages=messages,
+                    input=input,
                     session_id=session_id,
                     session_state=session_state,
                     user_id=user_id,
@@ -6443,8 +6482,7 @@ class Agent:
 
                 # Run the agent
                 run_response = self.run(
-                    message=message,
-                    messages=messages,
+                    input=input,
                     session_id=session_id,
                     session_state=session_state,
                     user_id=user_id,
@@ -6604,7 +6642,6 @@ class Agent:
         self,
         message: Optional[Union[List, Dict, str, Message, BaseModel]] = None,
         *,
-        messages: Optional[List[Union[Dict, Message]]] = None,
         session_id: Optional[str] = None,
         session_state: Optional[Dict[str, Any]] = None,
         user_id: Optional[str] = None,
@@ -6672,8 +6709,7 @@ class Agent:
                     live_log.update(Group(*panels))
 
                 result = self.arun(
-                    message=message,
-                    messages=messages,
+                    input=input,
                     session_id=session_id,
                     session_state=session_state,
                     user_id=user_id,
@@ -6892,8 +6928,7 @@ class Agent:
 
                 # Run the agent
                 run_response = await self.arun(
-                    message=message,
-                    messages=messages,
+                    input=input,
                     session_id=session_id,
                     session_state=session_state,
                     user_id=user_id,

@@ -18,7 +18,7 @@ def test_router_direct_execute():
     step_b = Step(name="step_b", executor=lambda x: StepOutput(content="Output B"))
 
     def simple_selector(step_input: StepInput):
-        if "A" in step_input.message:
+        if "A" in step_input.input:
             return [step_a]
         return [step_b]
 
@@ -27,14 +27,14 @@ def test_router_direct_execute():
     )
 
     # Test routing to step A
-    input_a = StepInput(message="Choose A")
+    input_a = StepInput(input="Choose A")
     results_a = router.execute(input_a)
     assert len(results_a) == 1
     assert results_a[0].content == "Output A"
     assert results_a[0].success
 
     # Test routing to step B
-    input_b = StepInput(message="Choose B")
+    input_b = StepInput(input="Choose B")
     results_b = router.execute(input_b)
     assert len(results_b) == 1
     assert results_b[0].content == "Output B"
@@ -48,7 +48,7 @@ def test_router_direct_multiple_steps():
     step_3 = Step(name="step_3", executor=lambda x: StepOutput(content="Step 3"))
 
     def multi_selector(step_input: StepInput):
-        if "multi" in step_input.message:
+        if "multi" in step_input.input:
             return [step_1, step_2]
         return [step_3]
 
@@ -57,7 +57,7 @@ def test_router_direct_multiple_steps():
     )
 
     # Test multiple steps selection
-    input_multi = StepInput(message="Choose multi")
+    input_multi = StepInput(input="Choose multi")
     results_multi = router.execute(input_multi)
     assert len(results_multi) == 2
     assert results_multi[0].content == "Step 1"
@@ -65,7 +65,7 @@ def test_router_direct_multiple_steps():
     assert all(r.success for r in results_multi)
 
     # Test single step selection
-    input_single = StepInput(message="Choose single")
+    input_single = StepInput(input="Choose single")
     results_single = router.execute(input_single)
     assert len(results_single) == 1
     assert results_single[0].content == "Step 3"
@@ -81,7 +81,7 @@ def test_router_direct_with_steps_component():
     single_step = Step(name="single", executor=lambda x: StepOutput(content="Single"))
 
     def sequence_selector(step_input: StepInput):
-        if "sequence" in step_input.message:
+        if "sequence" in step_input.input:
             return [steps_sequence]
         return [single_step]
 
@@ -93,7 +93,7 @@ def test_router_direct_with_steps_component():
     )
 
     # Test routing to Steps sequence
-    input_seq = StepInput(message="Choose sequence")
+    input_seq = StepInput(input="Choose sequence")
     results_seq = router.execute(input_seq)
     # Steps component returns multiple outputs
     assert len(results_seq) >= 1
@@ -103,7 +103,7 @@ def test_router_direct_with_steps_component():
     assert "B" in all_content
 
     # Test routing to single step
-    input_single = StepInput(message="Choose single")
+    input_single = StepInput(input="Choose single")
     results_single = router.execute(input_single)
     assert len(results_single) == 1
     assert results_single[0].content == "Single"
@@ -119,7 +119,7 @@ def test_router_direct_error_handling():
     success_step = Step(name="success", executor=lambda x: StepOutput(content="Success"))
 
     def error_selector(step_input: StepInput):
-        if "fail" in step_input.message:
+        if "fail" in step_input.input:
             return [failing_step]
         return [success_step]
 
@@ -131,14 +131,14 @@ def test_router_direct_error_handling():
     )
 
     # Test error case
-    input_fail = StepInput(message="Make it fail")
+    input_fail = StepInput(input="Make it fail")
     results_fail = router.execute(input_fail)
     assert len(results_fail) == 1
     assert not results_fail[0].success
     assert "Test error" in results_fail[0].content
 
     # Test success case
-    input_success = StepInput(message="Make it success")
+    input_success = StepInput(input="Make it success")
     results_success = router.execute(input_success)
     assert len(results_success) == 1
     assert results_success[0].success
@@ -149,7 +149,7 @@ def test_router_direct_chaining():
     """Test Router.execute with step chaining (sequential execution)."""
 
     def step_1_executor(step_input: StepInput) -> StepOutput:
-        return StepOutput(content=f"Step 1: {step_input.message}")
+        return StepOutput(content=f"Step 1: {step_input.input}")
 
     def step_2_executor(step_input: StepInput) -> StepOutput:
         # Should receive output from step 1
@@ -165,7 +165,7 @@ def test_router_direct_chaining():
         name="chain_router", selector=chain_selector, choices=[step_1, step_2], description="Chaining router"
     )
 
-    input_test = StepInput(message="Hello")
+    input_test = StepInput(input="Hello")
     results = router.execute(input_test)
 
     assert len(results) == 2
@@ -186,7 +186,7 @@ def test_basic_routing(workflow_storage):
 
     def route_selector(step_input: StepInput):
         """Select between tech and general steps."""
-        if "tech" in step_input.message.lower():
+        if "tech" in step_input.input.lower():
             return [tech_step]
         return [general_step]
 
@@ -203,10 +203,10 @@ def test_basic_routing(workflow_storage):
         ],
     )
 
-    tech_response = workflow.run(message="tech topic")
+    tech_response = workflow.run(input="tech topic")
     assert tech_response.step_results[0][0].content == "Tech content"
 
-    general_response = workflow.run(message="general topic")
+    general_response = workflow.run(input="general topic")
     assert general_response.step_results[0][0].content == "General content"
 
 
@@ -231,7 +231,7 @@ def test_streaming(workflow_storage):
         ],
     )
 
-    events = list(workflow.run(message="test", stream=True))
+    events = list(workflow.run(input="test", stream=True))
     completed_events = [e for e in events if isinstance(e, WorkflowCompletedEvent)]
     assert len(completed_events) == 1
     assert "Stream content" in completed_events[0].content
@@ -258,7 +258,7 @@ def test_agent_routing(workflow_storage, test_agent):
         ],
     )
 
-    response = workflow.run(message="test")
+    response = workflow.run(input="test")
     assert response.step_results[0][0].success
 
 
@@ -269,9 +269,9 @@ def test_mixed_routing(workflow_storage, test_agent, test_team):
     team_step = Step(name="team", team=test_team)
 
     def route_selector(step_input: StepInput):
-        if "function" in step_input.message:
+        if "function" in step_input.input:
             return [function_step]
-        elif "agent" in step_input.message:
+        elif "agent" in step_input.input:
             return [agent_step]
         return [team_step]
 
@@ -289,15 +289,15 @@ def test_mixed_routing(workflow_storage, test_agent, test_team):
     )
 
     # Test function route
-    function_response = workflow.run(message="test function")
+    function_response = workflow.run(input="test function")
     assert "Function output" in function_response.step_results[0][0].content
 
     # Test agent route
-    agent_response = workflow.run(message="test agent")
+    agent_response = workflow.run(input="test agent")
     assert agent_response.step_results[0][0].success
 
     # Test team route
-    team_response = workflow.run(message="test team")
+    team_response = workflow.run(input="test team")
     assert team_response.step_results[0][0].success
 
 
@@ -308,7 +308,7 @@ def test_multiple_step_routing(workflow_storage):
     summary_step = Step(name="summary", executor=lambda x: StepOutput(content="Summary output"))
 
     def route_selector(step_input: StepInput):
-        if "research" in step_input.message:
+        if "research" in step_input.input:
             return [research_step, analysis_step]
         return [summary_step]
 
@@ -325,7 +325,7 @@ def test_multiple_step_routing(workflow_storage):
         ],
     )
 
-    response = workflow.run(message="test research")
+    response = workflow.run(input="test research")
     assert len(response.step_results[0]) == 2
     assert "Research output" in response.step_results[0][0].content
     assert "Analysis output" in response.step_results[0][1].content
@@ -340,7 +340,7 @@ def test_route_steps(workflow_storage):
     summary_step = Step(name="summary", executor=lambda x: StepOutput(content="Summary output"))
 
     def route_selector(step_input: StepInput):
-        if "research" in step_input.message:
+        if "research" in step_input.input:
             return [research_sequence]
         return [summary_step]
 
@@ -357,7 +357,7 @@ def test_route_steps(workflow_storage):
         ],
     )
 
-    response = workflow.run(message="test research")
+    response = workflow.run(input="test research")
 
     router_results = response.step_results[0]
 

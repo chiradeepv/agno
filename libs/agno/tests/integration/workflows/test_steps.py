@@ -16,7 +16,7 @@ from agno.workflow import Step, StepInput, StepOutput, Steps, Workflow
 # Simple helper functions
 def step1_function(step_input: StepInput) -> StepOutput:
     """First step function."""
-    return StepOutput(content=f"Step1: {step_input.message}")
+    return StepOutput(content=f"Step1: {step_input.input}")
 
 
 def step2_function(step_input: StepInput) -> StepOutput:
@@ -34,12 +34,12 @@ def step3_function(step_input: StepInput) -> StepOutput:
 async def async_step_function(step_input: StepInput) -> StepOutput:
     """Async step function."""
     await asyncio.sleep(0.001)
-    return StepOutput(content=f"AsyncStep: {step_input.message}")
+    return StepOutput(content=f"AsyncStep: {step_input.input}")
 
 
 async def async_streaming_function(step_input: StepInput) -> AsyncIterator[str]:
     """Async streaming step function."""
-    yield f"Streaming: {step_input.message}"
+    yield f"Streaming: {step_input.input}"
     await asyncio.sleep(0.001)
 
 
@@ -54,7 +54,7 @@ def test_steps_direct_execute():
     step2 = Step(name="step2", executor=step2_function)
 
     steps = Steps(name="Direct Steps", steps=[step1, step2])
-    step_input = StepInput(message="direct test")
+    step_input = StepInput(input="direct test")
 
     result = steps.execute(step_input)
 
@@ -71,7 +71,7 @@ async def test_steps_direct_aexecute():
     step2 = Step(name="step2", executor=step2_function)
 
     steps = Steps(name="Direct Async Steps", steps=[step1, step2])
-    step_input = StepInput(message="direct async test")
+    step_input = StepInput(input="direct async test")
 
     result = await steps.aexecute(step_input)
 
@@ -89,7 +89,7 @@ def test_steps_direct_execute_stream():
     step2 = Step(name="step2", executor=step2_function)
 
     steps = Steps(name="Direct Stream Steps", steps=[step1, step2])
-    step_input = StepInput(message="direct stream test")
+    step_input = StepInput(input="direct stream test")
 
     # Mock workflow response for streaming
     mock_response = WorkflowRunResponse(
@@ -116,7 +116,7 @@ def test_steps_direct_execute_stream():
 def test_steps_direct_empty():
     """Test Steps with no internal steps."""
     steps = Steps(name="Empty Steps", steps=[])
-    step_input = StepInput(message="test")
+    step_input = StepInput(input="test")
 
     result = steps.execute(step_input)
 
@@ -129,7 +129,7 @@ def test_steps_direct_single_step():
     """Test Steps with single step."""
     step1 = Step(name="step1", executor=step1_function)
     steps = Steps(name="Single Step", steps=[step1])
-    step_input = StepInput(message="single test")
+    step_input = StepInput(input="single test")
 
     result = steps.execute(step_input)
 
@@ -145,7 +145,7 @@ def test_steps_direct_chaining():
     step3 = Step(name="third", executor=lambda x: StepOutput(content=f"third_{x.previous_step_content}"))
 
     steps = Steps(name="Chaining Steps", steps=[step1, step2, step3])
-    step_input = StepInput(message="test")
+    step_input = StepInput(input="test")
 
     result = steps.execute(step_input)
 
@@ -174,7 +174,7 @@ def test_basic_steps_execution(workflow_storage):
         steps=[steps_sequence],
     )
 
-    response = workflow.run(message="test message")
+    response = workflow.run(input="test message")
 
     assert len(response.step_results) == 1
     assert "Step2: Step1: test message" in response.content
@@ -193,7 +193,7 @@ def test_steps_streaming(workflow_storage):
         steps=[steps_sequence],
     )
 
-    events = list(workflow.run(message="stream test", stream=True, stream_intermediate_steps=True))
+    events = list(workflow.run(input="stream test", stream=True, stream_intermediate_steps=True))
 
     # Check for required events
     steps_started = [e for e in events if isinstance(e, StepsExecutionStartedEvent)]
@@ -223,7 +223,7 @@ async def test_async_steps_execution(workflow_storage):
         steps=[steps_sequence],
     )
 
-    response = await workflow.arun(message="async test")
+    response = await workflow.arun(input="async test")
 
     assert len(response.step_results) == 1
     assert "Step2: AsyncStep: async test" in response.content
@@ -244,7 +244,7 @@ async def test_async_steps_streaming(workflow_storage):
     )
 
     events = []
-    async for event in await workflow.arun(message="async stream test", stream=True, stream_intermediate_steps=True):
+    async for event in await workflow.arun(input="async stream test", stream=True, stream_intermediate_steps=True):
         events.append(event)
 
     # Check that we have events
@@ -269,7 +269,7 @@ def test_steps_chaining(workflow_storage):
         steps=[steps_sequence],
     )
 
-    response = workflow.run(message="test")
+    response = workflow.run(input="test")
 
     # Should chain through all steps
     assert "third_second_first_output" in response.content
@@ -285,7 +285,7 @@ def test_empty_steps(workflow_storage):
         steps=[empty_steps],
     )
 
-    response = workflow.run(message="test")
+    response = workflow.run(input="test")
 
     assert response.content == "No steps to execute"
 
@@ -304,7 +304,7 @@ def test_steps_media_aggregation(workflow_storage):
         steps=[steps_sequence],
     )
 
-    response = workflow.run(message="test")
+    response = workflow.run(input="test")
 
     # Should have aggregated media
     assert len(response.images) == 1
@@ -330,7 +330,7 @@ def test_nested_steps(workflow_storage):
         steps=[outer_steps],
     )
 
-    response = workflow.run(message="test")
+    response = workflow.run(input="test")
 
     # Should chain through nested structure
     assert "outer_inner2_inner1" in response.content
@@ -352,7 +352,7 @@ def test_steps_with_other_workflow_steps(workflow_storage):
         steps=[individual_step, grouped_steps, final_step],
     )
 
-    response = workflow.run(message="test")
+    response = workflow.run(input="test")
 
     assert len(response.step_results) == 3
     assert "final_grouped2_grouped1_individual_output" in response.content

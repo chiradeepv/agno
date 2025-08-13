@@ -95,7 +95,7 @@ async def run_team():
     async def run_team_for_user(user: str):
         random_city = random.choice(cities)
         await team.arun(
-            message=f"I love {random_city}! What activities and weather can I expect in {random_city}?",
+            input=f"I love {random_city}! What activities and weather can I expect in {random_city}?",
             user_id=user,
             session_id=f"session_{uuid.uuid4()}",
         )

@@ -30,7 +30,7 @@ memory = Memory(
 john_doe_id = "john_doe@example.com"
 
 memory.create_user_memories(
-    message="""\
+    input="""\
 My name is John Doe.
 
 I enjoy hiking in the mountains on weekends,
@@ -55,7 +55,7 @@ jane_doe_id = "jane_doe@example.com"
 
 # Send a history of messages and add memories
 memory.create_user_memories(
-    messages=[
+    input=[
         Message(role="user", content="Hi, how are you?"),
         Message(role="assistant", content="I'm good, thank you!"),
         Message(role="user", content="What are you capable of?"),

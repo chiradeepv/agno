@@ -81,7 +81,7 @@ step_workflow = Workflow(
 
 print("Running Step workflow with streaming...")
 for event in step_workflow.run(
-    message="AI trends in 2024",
+    input="AI trends in 2024",
     stream=True,
     stream_intermediate_steps=True,
 ):
@@ -129,7 +129,7 @@ parallel_workflow = Workflow(
 
 print("Running Parallel workflow...")
 for event in parallel_workflow.run(
-    message="Research machine learning developments",
+    input="Research machine learning developments",
     stream=True,
     stream_intermediate_steps=True,
 ):

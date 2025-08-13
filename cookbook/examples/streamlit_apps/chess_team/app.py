@@ -368,7 +368,7 @@ Respond with a JSON object containing:
 }}"""
 
                         st.session_state.team.run(
-                            message=analysis_message,
+                            input=analysis_message,
                             stream=False,
                             dependencies={
                                 "board_state": board_state,
@@ -401,7 +401,7 @@ Respond with a JSON object containing:
                 else:
                     logger.error(f"Invalid move attempt: {message}")
                     st.session_state.team.run(
-                        message=f"""\
+                        input=f"""\
 Invalid move: {message}
 
 Current board state (FEN): {fen}

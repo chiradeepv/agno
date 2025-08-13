@@ -51,7 +51,7 @@ agent_team = Team(
 )
 
 agent_team.print_response(
-    message="Run a full Tic Tac Toe game. After the game, report the final board state and the results.",
+    input="Run a full Tic Tac Toe game. After the game, report the final board state and the results.",
     stream=True,
     stream_intermediate_steps=True,
 )

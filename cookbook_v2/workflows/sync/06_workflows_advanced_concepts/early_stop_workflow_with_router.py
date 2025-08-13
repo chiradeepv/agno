@@ -79,7 +79,7 @@ def research_router(step_input: StepInput) -> List[Step]:
     Decide which research method to use based on the input topic.
     Returns a list containing the step(s) to execute including safety check.
     """
-    topic = step_input.previous_step_content or step_input.message or ""
+    topic = step_input.previous_step_content or step_input.input or ""
     topic = topic.lower()
 
     # Check if the topic is tech/startup related - use HackerNews
@@ -141,7 +141,7 @@ if __name__ == "__main__":
     print()
 
     workflow.print_response(
-        message="Research the latest controversial trends in AI and machine learning",
+        input="Research the latest controversial trends in AI and machine learning",
         stream=True,
         stream_intermediate_steps=True,
     )

@@ -87,6 +87,6 @@ if __name__ == "__main__":
         sources_required=8,
     )
     content_creation_workflow.print_response(
-        message=research_topic,
+        input=research_topic,
         markdown=True,
     )

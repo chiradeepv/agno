@@ -434,7 +434,7 @@ class Workflow:
             log_debug(f"Using previous step content from: {list(previous_step_outputs.keys())[-1]}")
 
         return StepInput(
-            message=execution_input.message,
+            input=execution_input.input,
             previous_step_content=previous_step_content,
             previous_step_outputs=previous_step_outputs,
             additional_data=execution_input.additional_data,
@@ -1259,7 +1259,7 @@ class Workflow:
 
     async def _arun_background(
         self,
-        message: Optional[Union[str, Dict[str, Any], List[Any], BaseModel]] = None,
+        input: Optional[Union[str, Dict[str, Any], List[Any], BaseModel]] = None,
         additional_data: Optional[Dict[str, Any]] = None,
         user_id: Optional[str] = None,
         session_id: Optional[str] = None,
@@ -1299,7 +1299,7 @@ class Workflow:
 
         # Prepare execution input
         inputs = WorkflowExecutionInput(
-            message=message,
+            input=input,
             additional_data=additional_data,
             audio=audio,  # type: ignore
             images=images,  # type: ignore
@@ -1336,7 +1336,7 @@ class Workflow:
 
     async def _arun_background_stream(
         self,
-        message: Optional[Union[str, Dict[str, Any], List[Any], BaseModel]] = None,
+        input: Optional[Union[str, Dict[str, Any], List[Any], BaseModel]] = None,
         additional_data: Optional[Dict[str, Any]] = None,
         user_id: Optional[str] = None,
         session_id: Optional[str] = None,
@@ -1378,7 +1378,7 @@ class Workflow:
 
         # Prepare execution input
         inputs = WorkflowExecutionInput(
-            message=message,
+            input=input,
             additional_data=additional_data,
             audio=audio,  # type: ignore
             images=images,  # type: ignore
@@ -1438,7 +1438,7 @@ class Workflow:
     @overload
     def run(
         self,
-        message: Optional[Union[str, Dict[str, Any], List[Any], BaseModel]] = None,
+        input: Optional[Union[str, Dict[str, Any], List[Any], BaseModel]] = None,
         additional_data: Optional[Dict[str, Any]] = None,
         user_id: Optional[str] = None,
         session_id: Optional[str] = None,
@@ -1453,7 +1453,7 @@ class Workflow:
     @overload
     def run(
         self,
-        message: Optional[Union[str, Dict[str, Any], List[Any], BaseModel]] = None,
+        input: Optional[Union[str, Dict[str, Any], List[Any], BaseModel]] = None,
         additional_data: Optional[Dict[str, Any]] = None,
         user_id: Optional[str] = None,
         session_id: Optional[str] = None,
@@ -1467,7 +1467,7 @@ class Workflow:
 
     def run(
         self,
-        message: Optional[Union[str, Dict[str, Any], List[Any], BaseModel]] = None,
+        input: Optional[Union[str, Dict[str, Any], List[Any], BaseModel]] = None,
         additional_data: Optional[Dict[str, Any]] = None,
         user_id: Optional[str] = None,
         session_id: Optional[str] = None,
@@ -1481,9 +1481,9 @@ class Workflow:
     ) -> Union[WorkflowRunResponse, Iterator[WorkflowRunResponseEvent]]:
         """Execute the workflow synchronously with optional streaming"""
 
-        validated_input = self._validate_input(message)
+        validated_input = self._validate_input(input)
         if validated_input is not None:
-            message = validated_input
+            input = validated_input
 
         if background:
             raise RuntimeError("Background execution is not supported for sync run()")
@@ -1534,7 +1534,7 @@ class Workflow:
         self.run_response = workflow_run_response
 
         inputs = WorkflowExecutionInput(
-            message=message,
+            input=input,
             additional_data=additional_data,
             audio=audio,  # type: ignore
             images=images,  # type: ignore
@@ -1559,7 +1559,7 @@ class Workflow:
     @overload
     async def arun(
         self,
-        message: Optional[Union[str, Dict[str, Any], List[Any], BaseModel]] = None,
+        input: Optional[Union[str, Dict[str, Any], List[Any], BaseModel]] = None,
         additional_data: Optional[Dict[str, Any]] = None,
         user_id: Optional[str] = None,
         session_id: Optional[str] = None,
@@ -1575,7 +1575,7 @@ class Workflow:
     @overload
     async def arun(
         self,
-        message: Optional[Union[str, Dict[str, Any], List[Any], BaseModel]] = None,
+        input: Optional[Union[str, Dict[str, Any], List[Any], BaseModel]] = None,
         additional_data: Optional[Dict[str, Any]] = None,
         user_id: Optional[str] = None,
         session_id: Optional[str] = None,
@@ -1590,7 +1590,7 @@ class Workflow:
 
     async def arun(
         self,
-        message: Optional[Union[str, Dict[str, Any], List[Any], BaseModel]] = None,
+        input: Optional[Union[str, Dict[str, Any], List[Any], BaseModel]] = None,
         additional_data: Optional[Dict[str, Any]] = None,
         user_id: Optional[str] = None,
         session_id: Optional[str] = None,
@@ -1605,9 +1605,9 @@ class Workflow:
     ) -> Union[WorkflowRunResponse, AsyncIterator[WorkflowRunResponseEvent]]:
         """Execute the workflow synchronously with optional streaming"""
 
-        validated_input = self._validate_input(message)
+        validated_input = self._validate_input(input)
         if validated_input is not None:
-            message = validated_input
+            input = validated_input
 
         websocket_handler = None
         if websocket:
@@ -1619,7 +1619,7 @@ class Workflow:
             if stream and websocket:
                 # Background + Streaming + WebSocket = Real-time events
                 return await self._arun_background_stream(
-                    message=message,
+                    input=input,
                     additional_data=additional_data,
                     user_id=user_id,
                     session_id=session_id,
@@ -1636,7 +1636,7 @@ class Workflow:
             else:
                 # Background + Non-streaming = Polling (existing)
                 return await self._arun_background(
-                    message=message,
+                    input=input,
                     additional_data=additional_data,
                     user_id=user_id,
                     session_id=session_id,
@@ -1692,7 +1692,7 @@ class Workflow:
         self.run_response = workflow_run_response
 
         inputs = WorkflowExecutionInput(
-            message=message,
+            input=input,
             additional_data=additional_data,
             audio=audio,  # type: ignore
             images=images,  # type: ignore
@@ -1890,7 +1890,7 @@ class Workflow:
 
     def print_response(
         self,
-        message: Optional[Union[str, Dict[str, Any], List[Any], BaseModel]] = None,
+        input: Optional[Union[str, Dict[str, Any], List[Any], BaseModel]] = None,
         additional_data: Optional[Dict[str, Any]] = None,
         user_id: Optional[str] = None,
         session_id: Optional[str] = None,
@@ -1928,7 +1928,7 @@ class Workflow:
 
         if stream:
             self._print_response_stream(
-                message=message,
+                input=input,
                 user_id=user_id,
                 session_id=session_id,
                 additional_data=additional_data,
@@ -1944,7 +1944,7 @@ class Workflow:
             )
         else:
             self._print_response(
-                message=message,
+                input=input,
                 user_id=user_id,
                 session_id=session_id,
                 additional_data=additional_data,
@@ -1960,7 +1960,7 @@ class Workflow:
 
     def _print_response(
         self,
-        message: Optional[Union[str, Dict[str, Any], List[Any], BaseModel]] = None,
+        input: Optional[Union[str, Dict[str, Any], List[Any], BaseModel]] = None,
         user_id: Optional[str] = None,
         session_id: Optional[str] = None,
         additional_data: Optional[Dict[str, Any]] = None,
@@ -2036,7 +2036,7 @@ class Workflow:
             try:
                 # Execute workflow and get the response directly
                 workflow_response: WorkflowRunResponse = self.run(
-                    message=message,
+                    input=input,
                     user_id=user_id,
                     session_id=session_id,
                     additional_data=additional_data,
@@ -2116,7 +2116,7 @@ class Workflow:
 
     def _print_response_stream(
         self,
-        message: Optional[Union[str, Dict[str, Any], List[Any], BaseModel]] = None,
+        input: Optional[Union[str, Dict[str, Any], List[Any], BaseModel]] = None,
         user_id: Optional[str] = None,
         session_id: Optional[str] = None,
         additional_data: Optional[Dict[str, Any]] = None,
@@ -2245,7 +2245,7 @@ class Workflow:
 
             try:
                 for response in self.run(
-                    message=message,
+                    input=input,
                     user_id=user_id,
                     session_id=session_id,
                     additional_data=additional_data,
@@ -2666,7 +2666,7 @@ class Workflow:
 
     async def aprint_response(
         self,
-        message: Optional[Union[str, Dict[str, Any], List[Any], BaseModel]] = None,
+        input: Optional[Union[str, Dict[str, Any], List[Any], BaseModel]] = None,
         additional_data: Optional[Dict[str, Any]] = None,
         user_id: Optional[str] = None,
         session_id: Optional[str] = None,
@@ -2700,7 +2700,7 @@ class Workflow:
         """
         if stream:
             await self._aprint_response_stream(
-                message=message,
+                input=input,
                 additional_data=additional_data,
                 user_id=user_id,
                 session_id=session_id,
@@ -2716,7 +2716,7 @@ class Workflow:
             )
         else:
             await self._aprint_response(
-                message=message,
+                input=input,
                 additional_data=additional_data,
                 user_id=user_id,
                 session_id=session_id,
@@ -2732,7 +2732,7 @@ class Workflow:
 
     async def _aprint_response(
         self,
-        message: Optional[Union[str, Dict[str, Any], List[Any], BaseModel]] = None,
+        input: Optional[Union[str, Dict[str, Any], List[Any], BaseModel]] = None,
         additional_data: Optional[Dict[str, Any]] = None,
         user_id: Optional[str] = None,
         session_id: Optional[str] = None,
@@ -2808,7 +2808,7 @@ class Workflow:
             try:
                 # Execute workflow and get the response directly
                 workflow_response: WorkflowRunResponse = await self.arun(
-                    message=message,
+                    input=input,
                     additional_data=additional_data,
                     user_id=user_id,
                     session_id=session_id,
@@ -2889,7 +2889,7 @@ class Workflow:
 
     async def _aprint_response_stream(
         self,
-        message: Optional[Union[str, Dict[str, Any], List[Any], BaseModel]] = None,
+        input: Optional[Union[str, Dict[str, Any], List[Any], BaseModel]] = None,
         additional_data: Optional[Dict[str, Any]] = None,
         user_id: Optional[str] = None,
         session_id: Optional[str] = None,
@@ -3018,7 +3018,7 @@ class Workflow:
 
             try:
                 async for response in await self.arun(
-                    message=message,
+                    input=input,
                     additional_data=additional_data,
                     user_id=user_id,
                     session_id=session_id,

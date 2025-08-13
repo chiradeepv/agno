@@ -57,7 +57,7 @@ def quality_assurance(step_input: StepInput) -> StepOutput:
 # Condition evaluator function
 def should_run_compliance_check(step_input: StepInput) -> bool:
     """Evaluate if compliance check should run based on content type"""
-    content = step_input.message or ""
+    content = step_input.input or ""
 
     # Run compliance check for sensitive topics
     sensitive_keywords = ["legal", "financial", "medical", "violation", "illegal"]
@@ -103,7 +103,7 @@ if __name__ == "__main__":
     print()
 
     workflow.print_response(
-        message="Research legal violation cases and create content about illegal financial practices",
+        input="Research legal violation cases and create content about illegal financial practices",
         stream=True,
         stream_intermediate_steps=True,
     )

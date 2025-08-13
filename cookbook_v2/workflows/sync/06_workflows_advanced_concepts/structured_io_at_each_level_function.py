@@ -62,7 +62,7 @@ def data_analysis_function(step_input: StepInput) -> StepOutput:
     Custom function to analyze the structured data received from previous step
     This will help us see what format the data is in when received
     """
-    message = step_input.message
+    input = step_input.input
     previous_step_content = step_input.previous_step_content
 
     print("\n" + "=" * 60)
@@ -207,7 +207,7 @@ if __name__ == "__main__":
 
     # Test with simple string input
     structured_workflow.print_response(
-        message="Latest developments in artificial intelligence and machine learning",
+        input="Latest developments in artificial intelligence and machine learning",
         # stream=True,
         # stream_intermediate_steps=True,
     )

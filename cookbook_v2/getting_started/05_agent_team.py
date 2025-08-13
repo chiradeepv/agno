@@ -106,15 +106,15 @@ agent_team = Team(
 
 # Example usage with diverse queries
 agent_team.print_response(
-    message="Summarize analyst recommendations and share the latest news for NVDA",
+    input="Summarize analyst recommendations and share the latest news for NVDA",
     stream=True,
 )
 agent_team.print_response(
-    message="What's the market outlook and financial performance of AI semiconductor companies?",
+    input="What's the market outlook and financial performance of AI semiconductor companies?",
     stream=True,
 )
 agent_team.print_response(
-    message="Analyze recent developments and financial performance of TSLA",
+    input="Analyze recent developments and financial performance of TSLA",
     stream=True,
 )
 

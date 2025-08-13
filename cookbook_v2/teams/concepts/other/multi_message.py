@@ -23,8 +23,7 @@ research_team = Team(
 )
 
 research_team.print_response(
-    message="Also, please summarize the key findings in bullet points for my slides.",
-    messages=[
+    input=[
         Message(
             role="user",
             content="I'm preparing a presentation for my company about renewable energy adoption.",
@@ -36,6 +35,10 @@ research_team.print_response(
         Message(
             role="user",
             content="Could you research the latest solar panel efficiency improvements in 2024?",
+        ),
+        Message(
+            role="user", 
+            content="Also, please summarize the key findings in bullet points for my slides.",
         ),
     ],
     markdown=True,

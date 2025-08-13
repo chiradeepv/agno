@@ -54,7 +54,7 @@ def test_simple_custom_execution_non_streaming(workflow_storage):
         steps=simple_custom_execution,
     )
 
-    response = workflow.run(message="Test message")
+    response = workflow.run(input="Test message")
 
     assert isinstance(response, WorkflowRunResponse)
     assert response.content is not None
@@ -79,7 +79,7 @@ def test_agent_based_custom_execution_non_streaming(workflow_storage):
         steps=agent_custom_execution,
     )
 
-    response = workflow.run(message="AI trends")
+    response = workflow.run(input="AI trends")
 
     assert isinstance(response, WorkflowRunResponse)
     assert response.content is not None
@@ -113,7 +113,7 @@ def test_multi_step_custom_execution_non_streaming(workflow_storage):
         steps=multi_step_custom_execution,
     )
 
-    response = workflow.run(message="Technology market analysis")
+    response = workflow.run(input="Technology market analysis")
 
     assert isinstance(response, WorkflowRunResponse)
     assert response.content is not None
@@ -148,7 +148,7 @@ def test_custom_execution_streaming(workflow_storage):
 
     # Collect streaming events
     events = []
-    for event in workflow.run(message="AI market trends", stream=True):
+    for event in workflow.run(input="AI market trends", stream=True):
         events.append(event)
 
     # Verify streaming events were generated
@@ -176,7 +176,7 @@ def test_custom_execution_with_error_handling(workflow_storage):
         steps=failing_custom_execution,
     )
 
-    response = workflow.run(message="Test message")
+    response = workflow.run(input="Test message")
 
     assert isinstance(response, WorkflowRunResponse)
     assert response.status == RunStatus.completed  # Now completed since we handle the error
@@ -199,7 +199,7 @@ def test_custom_execution_with_workflow_access(workflow_storage):
         steps=workflow_aware_execution,
     )
 
-    response = workflow.run(message="Test workflow access")
+    response = workflow.run(input="Test workflow access")
 
     assert isinstance(response, WorkflowRunResponse)
     assert response.content is not None
@@ -236,7 +236,7 @@ def test_custom_execution_with_execution_input_properties(workflow_storage):
 
     # Pass data via message_data instead of user_id/session_id
     message = {"user_id": "test_user", "session_id": "test_session"}
-    response = workflow.run(message=message)
+    response = workflow.run(input=message)
 
     assert isinstance(response, WorkflowRunResponse)
     assert response.content is not None
@@ -264,7 +264,7 @@ async def test_async_custom_execution_non_streaming(workflow_storage):
         steps=async_custom_execution,
     )
 
-    response = await workflow.arun(message="Async test message")
+    response = await workflow.arun(input="Async test message")
 
     assert isinstance(response, WorkflowRunResponse)
     assert response.content is not None
@@ -300,7 +300,7 @@ async def test_async_custom_execution_streaming(workflow_storage):
 
     # Collect async streaming events
     events = []
-    async for event in await workflow.arun(message="Async AI trends", stream=True):
+    async for event in await workflow.arun(input="Async AI trends", stream=True):
         events.append(event)
 
     # Verify streaming events were generated
@@ -330,7 +330,7 @@ def test_custom_execution_return_types(workflow_storage):
         steps=dict_return_execution,
     )
 
-    response = workflow.run(message="Dict test")
+    response = workflow.run(input="Dict test")
 
     assert isinstance(response, WorkflowRunResponse)
     assert response.content is not None
@@ -379,7 +379,7 @@ def test_custom_execution_complex_workflow_simulation(workflow_storage):
         steps=complex_workflow_simulation,
     )
 
-    response = workflow.run(message="Artificial Intelligence Market Trends")
+    response = workflow.run(input="Artificial Intelligence Market Trends")
 
     assert isinstance(response, WorkflowRunResponse)
     assert response.content is not None
@@ -405,7 +405,7 @@ def test_custom_execution_with_none_return(workflow_storage):
         steps=none_return_execution,
     )
 
-    response = workflow.run(message="None test")
+    response = workflow.run(input="None test")
 
     assert isinstance(response, WorkflowRunResponse)
     assert response.status == RunStatus.completed
@@ -425,7 +425,7 @@ def test_custom_execution_with_empty_string_return(workflow_storage):
         steps=empty_string_execution,
     )
 
-    response = workflow.run(message="Empty test")
+    response = workflow.run(input="Empty test")
 
     assert isinstance(response, WorkflowRunResponse)
     assert response.status == RunStatus.completed

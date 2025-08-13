@@ -68,7 +68,7 @@ async def main():
 
     # Start background execution (async)
     bg_response = await content_creation_workflow.arun(
-        message="AI trends in 2024", background=True
+        input="AI trends in 2024", background=True
     )
     print(f" Initial Response: {bg_response.status} - {bg_response.content}")
     print(f" Run ID: {bg_response.run_id}")

@@ -26,7 +26,7 @@ memory.clear()
 user_id = "ava@ava.com"
 
 memory.create_user_memories(
-    message=dedent("""\
+    input=dedent("""\
     My name is Ava and I like to ski.
     I live in San Francisco and study geometric neuron architecture.
     """),

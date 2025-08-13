@@ -221,7 +221,7 @@ class Step:
                 else:
                     # For agents and teams, prepare message with context
                     message = self._prepare_message(
-                        step_input.message,
+                        step_input.input,
                         step_input.previous_step_outputs,
                     )
 
@@ -241,7 +241,7 @@ class Step:
                         )
                         audios = self._convert_audio_artifacts_to_audio(step_input.audio) if step_input.audio else None
                         response = self.active_executor.run(  # type: ignore[misc]
-                            message=message,
+                            input=message,
                             images=images,
                             videos=videos,
                             audio=audios,
@@ -351,7 +351,7 @@ class Step:
                 else:
                     # For agents and teams, prepare message with context
                     message = self._prepare_message(
-                        step_input.message,
+                        step_input.input,
                         step_input.previous_step_outputs,
                     )
 
@@ -370,7 +370,7 @@ class Step:
                         )
                         audios = self._convert_audio_artifacts_to_audio(step_input.audio) if step_input.audio else None
                         response_stream = self.active_executor.run(  # type: ignore[call-overload, misc]
-                            message=message,
+                            input=message,
                             images=images,
                             videos=videos,
                             audio=audios,
@@ -517,7 +517,7 @@ class Step:
                 else:
                     # For agents and teams, prepare message with context
                     message = self._prepare_message(
-                        step_input.message,
+                        step_input.input,
                         step_input.previous_step_outputs,
                     )
 
@@ -537,7 +537,7 @@ class Step:
                         )
                         audios = self._convert_audio_artifacts_to_audio(step_input.audio) if step_input.audio else None
                         response = await self.active_executor.arun(  # type: ignore
-                            message=message,
+                            input=message,
                             images=images,
                             videos=videos,
                             audio=audios,
@@ -665,7 +665,7 @@ class Step:
                 else:
                     # For agents and teams, prepare message with context
                     message = self._prepare_message(
-                        step_input.message,
+                        step_input.input,
                         step_input.previous_step_outputs,
                     )
 
@@ -684,7 +684,7 @@ class Step:
                         )
                         audios = self._convert_audio_artifacts_to_audio(step_input.audio) if step_input.audio else None
                         response_stream = self.active_executor.arun(  # type: ignore
-                            message=message,
+                            input=message,
                             images=images,
                             videos=videos,
                             audio=audios,

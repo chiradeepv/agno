@@ -50,7 +50,7 @@ async def custom_content_planning_function(
     """
     Custom function that does intelligent content planning with context awareness
     """
-    message = step_input.message
+    input = step_input.input
     previous_step_content = step_input.previous_step_content
 
     # Create intelligent planning prompt
@@ -129,7 +129,7 @@ async def main():
         steps=[research_step, content_planning_step],
     )
     await content_creation_workflow.aprint_response(
-        message="AI agent frameworks 2025",
+        input="AI agent frameworks 2025",
         markdown=True,
         stream=True,
         stream_intermediate_steps=True,

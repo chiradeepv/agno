@@ -13,14 +13,14 @@ def test_basic_sequence(workflow_storage):
     """Test basic sequence with just functions."""
 
     def step1(step_input: StepInput) -> StepOutput:
-        return StepOutput(content=f"First: {step_input.message}")
+        return StepOutput(content=f"First: {step_input.input}")
 
     def step2(step_input: StepInput) -> StepOutput:
         return StepOutput(content=f"Second: {step_input.previous_step_content}")
 
     workflow = Workflow(name="Basic Sequence", db=workflow_storage, steps=[step1, step2])
 
-    response = workflow.run(message="test")
+    response = workflow.run(input="test")
     assert isinstance(response, WorkflowRunResponse)
     assert len(response.step_results) == 2
     assert "Second: First: test" in response.content
@@ -30,11 +30,11 @@ def test_function_and_agent_sequence(workflow_storage, test_agent):
     """Test sequence with function and agent."""
 
     def step(step_input: StepInput) -> StepOutput:
-        return StepOutput(content=f"Function: {step_input.message}")
+        return StepOutput(content=f"Function: {step_input.input}")
 
     workflow = Workflow(name="Agent Sequence", db=workflow_storage, steps=[step, test_agent])
 
-    response = workflow.run(message="test")
+    response = workflow.run(input="test")
     assert isinstance(response, WorkflowRunResponse)
     assert len(response.step_results) == 2
     assert response.step_results[1].success
@@ -44,11 +44,11 @@ def test_function_and_team_sequence(workflow_storage, test_team):
     """Test sequence with function and team."""
 
     def step(step_input: StepInput) -> StepOutput:
-        return StepOutput(content=f"Function: {step_input.message}")
+        return StepOutput(content=f"Function: {step_input.input}")
 
     workflow = Workflow(name="Team Sequence", db=workflow_storage, steps=[step, test_team])
 
-    response = workflow.run(message="test")
+    response = workflow.run(input="test")
     assert isinstance(response, WorkflowRunResponse)
     assert len(response.step_results) == 2
     assert response.step_results[1].success
@@ -62,7 +62,7 @@ def test_function_streaming_sequence(workflow_storage):
 
     workflow = Workflow(name="Streaming", db=workflow_storage, steps=[streaming_step])
 
-    events = list(workflow.run(message="test", stream=True))
+    events = list(workflow.run(input="test", stream=True))
     step_events = [e for e in events if isinstance(e, StepOutputEvent)]
     completed_events = [e for e in events if isinstance(e, WorkflowCompletedEvent)]
 
@@ -76,11 +76,11 @@ async def test_async_function_sequence(workflow_storage):
 
     async def async_step(step_input: StepInput) -> StepOutput:
         await asyncio.sleep(0.001)
-        return StepOutput(content=f"Async: {step_input.message}")
+        return StepOutput(content=f"Async: {step_input.input}")
 
     workflow = Workflow(name="Async", db=workflow_storage, steps=[async_step])
 
-    response = await workflow.arun(message="test")
+    response = await workflow.arun(input="test")
     assert isinstance(response, WorkflowRunResponse)
     assert "Async: test" in response.content
 
@@ -95,7 +95,7 @@ async def test_async_function_streaming(workflow_storage):
     workflow = Workflow(name="Async Streaming", db=workflow_storage, steps=[async_streaming_step])
 
     events = []
-    async for event in await workflow.arun(message="test", stream=True):
+    async for event in await workflow.arun(input="test", stream=True):
         events.append(event)
 
     step_events = [e for e in events if isinstance(e, StepOutputEvent)]
@@ -109,11 +109,11 @@ def test_mixed_sequence(workflow_storage, test_agent, test_team):
     """Test sequence with function, agent, and team."""
 
     def step(step_input: StepInput) -> StepOutput:
-        return StepOutput(content=f"Function: {step_input.message}")
+        return StepOutput(content=f"Function: {step_input.input}")
 
     workflow = Workflow(name="Mixed", db=workflow_storage, steps=[step, test_agent, test_team])
 
-    response = workflow.run(message="test")
+    response = workflow.run(input="test")
     assert isinstance(response, WorkflowRunResponse)
     assert len(response.step_results) == 3
     assert "Function: test" in response.step_results[0].content

@@ -62,17 +62,19 @@ def _log_messages(messages: List[Message]) -> None:
         m.log(metrics=False)
 
 
-def _handle_agent_exception(a_exc: AgentRunException, additional_messages: Optional[List[Message]] = None) -> None:
+def _handle_agent_exception(
+    a_exc: AgentRunException, additional_input_messages: Optional[List[Message]] = None
+) -> None:
     """Handle AgentRunException and collect additional messages."""
-    if additional_messages is None:
-        additional_messages = []
+    if additional_input_messages is None:
+        additional_input_messages = []
     if a_exc.user_message is not None:
         msg = (
             Message(role="user", content=a_exc.user_message)
             if isinstance(a_exc.user_message, str)
             else a_exc.user_message
         )
-        additional_messages.append(msg)
+        additional_input_messages.append(msg)
 
     if a_exc.agent_message is not None:
         msg = (
@@ -80,20 +82,20 @@ def _handle_agent_exception(a_exc: AgentRunException, additional_messages: Optio
             if isinstance(a_exc.agent_message, str)
             else a_exc.agent_message
         )
-        additional_messages.append(msg)
+        additional_input_messages.append(msg)
 
     if a_exc.messages:
         for m in a_exc.messages:
             if isinstance(m, Message):
-                additional_messages.append(m)
+                additional_input_messages.append(m)
             elif isinstance(m, dict):
                 try:
-                    additional_messages.append(Message(**m))
+                    additional_input_messages.append(Message(**m))
                 except Exception as e:
                     log_warning(f"Failed to convert dict to Message: {e}")
 
     if a_exc.stop_execution:
-        for m in additional_messages:
+        for m in additional_input_messages:
             m.stop_after_tool_call = True
 
 
@@ -1037,7 +1039,7 @@ class Model(ABC):
         self,
         function_call: FunctionCall,
         function_call_results: List[Message],
-        additional_messages: Optional[List[Message]] = None,
+        additional_input_messages: Optional[List[Message]] = None,
     ) -> Iterator[Union[ModelResponse, RunResponseEvent, TeamRunResponseEvent]]:
         # Start function call
         function_call_timer = Timer()
@@ -1061,7 +1063,7 @@ class Model(ABC):
             function_execution_result = function_call.execute()
         except AgentRunException as a_exc:
             # Update additional messages from function call
-            _handle_agent_exception(a_exc, additional_messages)
+            _handle_agent_exception(a_exc, additional_input_messages)
             # Set function call success to False if an exception occurred
         except Exception as e:
             log_error(f"Error executing function {function_call.function.name}: {e}")
@@ -1131,13 +1133,13 @@ class Model(ABC):
         self,
         function_calls: List[FunctionCall],
         function_call_results: List[Message],
-        additional_messages: Optional[List[Message]] = None,
+        additional_input_messages: Optional[List[Message]] = None,
         current_function_call_count: int = 0,
         function_call_limit: Optional[int] = None,
     ) -> Iterator[Union[ModelResponse, RunResponseEvent, TeamRunResponseEvent]]:
         # Additional messages from function calls that will be added to the function call results
-        if additional_messages is None:
-            additional_messages = []
+        if additional_input_messages is None:
+            additional_input_messages = []
 
         for fc in function_calls:
             if function_call_limit is not None:
@@ -1223,12 +1225,14 @@ class Model(ABC):
                 continue
 
             yield from self.run_function_call(
-                function_call=fc, function_call_results=function_call_results, additional_messages=additional_messages
+                function_call=fc,
+                function_call_results=function_call_results,
+                additional_input_messages=additional_input_messages,
             )
 
         # Add any additional messages at the end
-        if additional_messages:
-            function_call_results.extend(additional_messages)
+        if additional_input_messages:
+            function_call_results.extend(additional_input_messages)
 
     async def arun_function_call(
         self,
@@ -1273,14 +1277,14 @@ class Model(ABC):
         self,
         function_calls: List[FunctionCall],
         function_call_results: List[Message],
-        additional_messages: Optional[List[Message]] = None,
+        additional_input_messages: Optional[List[Message]] = None,
         current_function_call_count: int = 0,
         function_call_limit: Optional[int] = None,
         skip_pause_check: bool = False,
     ) -> AsyncIterator[Union[ModelResponse, RunResponseEvent, TeamRunResponseEvent]]:
         # Additional messages from function calls that will be added to the function call results
-        if additional_messages is None:
-            additional_messages = []
+        if additional_input_messages is None:
+            additional_input_messages = []
 
         function_calls_to_run = []
         for fc in function_calls:
@@ -1419,7 +1423,7 @@ class Model(ABC):
             if isinstance(function_call_success, AgentRunException):
                 a_exc = function_call_success
                 # Update additional messages from function call
-                _handle_agent_exception(a_exc, additional_messages)
+                _handle_agent_exception(a_exc, additional_input_messages)
                 # Set function call success to False if an exception occurred
                 function_call_success = False
 
@@ -1502,8 +1506,8 @@ class Model(ABC):
             function_call_results.append(function_call_result)
 
         # Add any additional messages at the end
-        if additional_messages:
-            function_call_results.extend(additional_messages)
+        if additional_input_messages:
+            function_call_results.extend(additional_input_messages)
 
     def _prepare_function_calls(
         self,
