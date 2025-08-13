@@ -272,7 +272,6 @@ class TeamResponse(BaseModel):
     response_settings: Optional[Dict[str, Any]] = None
     streaming: Optional[Dict[str, Any]] = None
     members: Optional[List[Union[AgentResponse, "TeamResponse"]]] = None
-    team_settings: Optional[Dict[str, Any]] = None
 
     @classmethod
     def from_team(cls, team: Team, memory_app: Optional[MemoryApp] = None) -> "TeamResponse":
@@ -404,21 +403,6 @@ class TeamResponse(BaseModel):
             "stream_member_events": team.stream_member_events,
         }
 
-        team_settings_info = {
-            "mode": team.mode,
-            "enable_agentic_context": team.enable_agentic_context,
-            "share_member_interactions": team.share_member_interactions,
-            "dependencies": json.dumps(team.dependencies) if isinstance(team.dependencies, dict) else team.dependencies,
-            "add_dependencies_to_context": team.add_dependencies_to_context,
-            "parent_team_id": team.parent_team_id,
-            "workflow_id": team.workflow_id,
-            "workflow_session_id": team.workflow_session_id,
-            "role": team.role,
-            "extra_data": team.extra_data,
-            "store_events": team.store_events,
-            "os_id": team.os_id,
-        }
-
         return TeamResponse(
             team_id=team.team_id,
             name=team.name,
@@ -437,7 +421,6 @@ class TeamResponse(BaseModel):
             system_message=filter_none(system_message_info),
             response_settings=filter_none(response_settings_info),
             streaming=filter_none(streaming_info),
-            team_settings=filter_none(team_settings_info),
             members=[  # type: ignore
                 AgentResponse.from_agent(member, memory_app)
                 if isinstance(member, Agent)
