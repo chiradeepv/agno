@@ -365,13 +365,11 @@ class StepMetrics:
 class WorkflowMetrics:
     """Complete metrics for a workflow execution"""
 
-    total_steps: int
     steps: Dict[str, StepMetrics]
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary"""
         return {
-            "total_steps": self.total_steps,
             "steps": {name: step.to_dict() for name, step in self.steps.items()},
         }
 
@@ -381,7 +379,6 @@ class WorkflowMetrics:
         steps = {name: StepMetrics.from_dict(step_data) for name, step_data in data["steps"].items()}
 
         return cls(
-            total_steps=data["total_steps"],
             steps=steps,
         )
 

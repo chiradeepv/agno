@@ -459,13 +459,9 @@ class Workflow:
     def _aggregate_workflow_metrics(self, step_results: List[Union[StepOutput, List[StepOutput]]]) -> WorkflowMetrics:
         """Aggregate metrics from all step responses into structured workflow metrics"""
         steps_dict = {}
-        total_steps = 0
 
         def process_step_output(step_output: StepOutput):
             """Process a single step output for metrics"""
-            nonlocal total_steps
-            total_steps += 1
-
             # Add step-specific metrics
             if step_output.step_name and step_output.metrics:
                 if step_output.step_type == "Parallel" and step_output.steps:
@@ -512,7 +508,6 @@ class Workflow:
                 process_step_output(step_result)
 
         return WorkflowMetrics(
-            total_steps=total_steps,
             steps=steps_dict,
         )
 
