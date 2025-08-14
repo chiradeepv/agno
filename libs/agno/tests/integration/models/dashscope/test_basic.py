@@ -1,8 +1,8 @@
 import pytest
 from pydantic import BaseModel, Field
 
-from agno.agent import Agent, RunResponse
-from agno.models.xai import xAI
+from agno.agent import Agent, RunResponse  # noqa
+from agno.models.dashscope import DashScope
 from agno.storage.sqlite import SqliteStorage
 
 
@@ -14,11 +14,13 @@ def _assert_metrics(response: RunResponse):
     assert sum(input_tokens) > 0
     assert sum(output_tokens) > 0
     assert sum(total_tokens) > 0
+    assert sum(total_tokens) == sum(input_tokens) + sum(output_tokens)
 
 
 def test_basic():
-    agent = Agent(model=xAI(id="grok-3-mini-fast"), markdown=True, telemetry=False, monitoring=False)
+    agent = Agent(model=DashScope(id="qwen-plus"), markdown=True, telemetry=False, monitoring=False)
 
+    # Print the response in the terminal
     response: RunResponse = agent.run("Share a 2 sentence horror story")
 
     assert response.content is not None
@@ -29,22 +31,24 @@ def test_basic():
 
 
 def test_basic_stream():
-    agent = Agent(model=xAI(id="grok-3-mini"), markdown=True, telemetry=False, monitoring=False)
+    agent = Agent(model=DashScope(id="qwen-plus"), markdown=True, telemetry=False, monitoring=False)
 
     response_stream = agent.run("Share a 2 sentence horror story", stream=True)
 
     # Verify it's an iterator
     assert hasattr(response_stream, "__iter__")
 
-    for response in response_stream:
-        assert response.content is not None or response.reasoning_content is not None
+    responses = list(response_stream)
+    assert len(responses) > 0
+    for response in responses:
+        assert response.content is not None
 
     _assert_metrics(agent.run_response)
 
 
 @pytest.mark.asyncio
 async def test_async_basic():
-    agent = Agent(model=xAI(id="grok-3-mini-fast"), markdown=True, telemetry=False, monitoring=False)
+    agent = Agent(model=DashScope(id="qwen-plus"), markdown=True, telemetry=False, monitoring=False)
 
     response = await agent.arun("Share a 2 sentence horror story")
 
@@ -56,20 +60,21 @@ async def test_async_basic():
 
 @pytest.mark.asyncio
 async def test_async_basic_stream():
-    agent = Agent(model=xAI(id="grok-3-mini-fast"), markdown=True, telemetry=False, monitoring=False)
+    agent = Agent(model=DashScope(id="qwen-plus"), markdown=True, telemetry=False, monitoring=False)
 
     response_stream = await agent.arun("Share a 2 sentence horror story", stream=True)
 
     async for response in response_stream:
-        assert response.content is not None or response.reasoning_content is not None
+        assert response.content is not None
 
     _assert_metrics(agent.run_response)
 
 
 def test_with_memory():
     agent = Agent(
-        model=xAI(id="grok-3-mini-fast"),
+        model=DashScope(id="qwen-plus"),
         add_history_to_messages=True,
+        num_history_responses=5,
         markdown=True,
         telemetry=False,
         monitoring=False,
@@ -99,14 +104,15 @@ def test_response_model():
         plot: str = Field(..., description="Brief plot summary")
 
     agent = Agent(
-        model=xAI(id="grok-2-latest"),
-        markdown=True,
+        model=DashScope(id="qwen-plus"),
+        response_model=MovieScript,
         telemetry=False,
         monitoring=False,
-        response_model=MovieScript,
     )
 
-    response = agent.run("Create a movie about time travel")
+    response = agent.run(
+        "Create a movie about time travel. Please return a JSON object with the title, genre, and plot."
+    )
 
     # Verify structured output
     assert isinstance(response.content, MovieScript)
@@ -122,14 +128,14 @@ def test_json_response_mode():
         plot: str = Field(..., description="Brief plot summary")
 
     agent = Agent(
-        model=xAI(id="grok-2-latest"),
+        model=DashScope(id="qwen-plus"),
+        response_model=MovieScript,
         use_json_mode=True,
         telemetry=False,
         monitoring=False,
-        response_model=MovieScript,
     )
 
-    response = agent.run("Create a movie about time travel")
+    response = agent.run("Create a movie about time travel.")
 
     # Verify structured output
     assert isinstance(response.content, MovieScript)
@@ -140,7 +146,7 @@ def test_json_response_mode():
 
 def test_history():
     agent = Agent(
-        model=xAI(id="grok-3-mini-fast"),
+        model=DashScope(id="qwen-plus"),
         storage=SqliteStorage(table_name="agent_sessions", db_file="tmp/agent_storage.db"),
         add_history_to_messages=True,
         telemetry=False,
