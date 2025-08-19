@@ -388,7 +388,9 @@ class Gemini(Model):
             message_parts: List[Any] = []
 
             # Function calls
-            if (not content or role == "model") and message.tool_calls is not None and len(message.tool_calls) > 0:
+            if role == "model" and message.tool_calls is not None and len(message.tool_calls) > 0:
+                if content is not None:
+                    message_parts.append(Part.from_text(text=content))
                 for tool_call in message.tool_calls:
                     message_parts.append(
                         Part.from_function_call(
@@ -396,7 +398,7 @@ class Gemini(Model):
                             args=json.loads(tool_call["function"]["arguments"]),
                         )
                     )
-            # Function results
+            # Function call results
             elif message.tool_calls is not None and len(message.tool_calls) > 0:
                 for tool_call in message.tool_calls:
                     message_parts.append(
